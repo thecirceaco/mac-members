@@ -9,6 +9,7 @@ declare(strict_types=1);
 
 namespace MacMembers;
 
+use MacMembers\Actions\MemberActionController;
 use MacMembers\Assets\FrontendAssets;
 use MacMembers\Contracts\Service;
 use MacMembers\PendingMembers\PendingMembersQuery;
@@ -53,6 +54,7 @@ final class Kernel
 		$pending_members_query = new PendingMembersQuery( $settings_repository );
 		$services             = [
 			new SettingsController( $settings_repository, $settings_schema ),
+			new MemberActionController( $settings_repository ),
 			$frontend_assets,
 			new PendingMembersShortcode(
 				$pending_members_query,

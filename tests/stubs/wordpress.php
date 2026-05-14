@@ -31,6 +31,10 @@ if ( ! class_exists( 'WP_Roles' ) ) {
 	}
 }
 
+if ( ! class_exists( 'MacMembers_Test_Ajax_Exit' ) ) {
+	final class MacMembers_Test_Ajax_Exit extends RuntimeException {}
+}
+
 if ( ! class_exists( 'WP_User' ) ) {
 	final class WP_User {
 		public int $ID;
@@ -39,9 +43,21 @@ if ( ! class_exists( 'WP_User' ) ) {
 		public string $user_registered;
 
 		/**
+		 * @var array<int,string>
+		 */
+		public array $roles;
+
+		/**
 		 * @var array<string,mixed>
 		 */
 		private array $data;
+
+		/**
+		 * @var array<string,bool>
+		 */
+		private array $caps;
+
+		private bool $can_update_roles;
 
 		/**
 		 * @param array<string,mixed> $data User data.
@@ -51,11 +67,39 @@ if ( ! class_exists( 'WP_User' ) ) {
 			$this->user_email      = (string) ( $data['user_email'] ?? '' );
 			$this->user_login      = (string) ( $data['user_login'] ?? '' );
 			$this->user_registered = (string) ( $data['user_registered'] ?? '' );
+			$this->roles           = array_values( array_map( 'strval', $data['roles'] ?? array() ) );
 			$this->data            = $data;
+			$this->caps            = array_map( 'boolval', $data['caps'] ?? array() );
+			$this->can_update_roles = (bool) ( $data['can_update_roles'] ?? true );
 		}
 
 		public function get( string $key ): mixed {
 			return $this->data[ $key ] ?? null;
+		}
+
+		public function add_role( string $role ): void {
+			if ( ! $this->can_update_roles || in_array( $role, $this->roles, true ) ) {
+				return;
+			}
+
+			$this->roles[] = $role;
+		}
+
+		public function remove_role( string $role ): void {
+			if ( ! $this->can_update_roles ) {
+				return;
+			}
+
+			$this->roles = array_values(
+				array_filter(
+					$this->roles,
+					static fn ( string $current_role ): bool => $current_role !== $role
+				)
+			);
+		}
+
+		public function has_cap( string $capability ): bool {
+			return (bool) ( $this->caps[ $capability ] ?? false );
 		}
 	}
 }
@@ -118,12 +162,15 @@ function mac_members_tests_reset_wp_state(): void {
 	$GLOBALS['mac_members_test_logged_in']         = true;
 	$GLOBALS['mac_members_test_shortcodes']        = array();
 	$GLOBALS['mac_members_test_users']             = array();
+	$GLOBALS['mac_members_test_users_by_id']       = array();
 	$GLOBALS['mac_members_test_last_user_query']   = null;
 	$GLOBALS['mac_members_test_registered_styles'] = array();
 	$GLOBALS['mac_members_test_registered_scripts'] = array();
 	$GLOBALS['mac_members_test_enqueued_styles']    = array();
 	$GLOBALS['mac_members_test_enqueued_scripts']   = array();
 	$GLOBALS['mac_members_test_inline_scripts']     = array();
+	$GLOBALS['mac_members_test_current_user_id']    = 1;
+	$GLOBALS['mac_members_test_ajax_response']      = null;
 
 	$_GET    = array();
 	$_POST   = array();
@@ -256,6 +303,30 @@ function is_user_logged_in(): bool {
 	return (bool) ( $GLOBALS['mac_members_test_logged_in'] ?? false );
 }
 
+function get_current_user_id(): int {
+	return (int) ( $GLOBALS['mac_members_test_current_user_id'] ?? 0 );
+}
+
+function get_user_by( string $field, mixed $value ): WP_User|false {
+	if ( 'id' !== $field && 'ID' !== $field ) {
+		return false;
+	}
+
+	return $GLOBALS['mac_members_test_users_by_id'][ (int) $value ] ?? false;
+}
+
+function user_can( mixed $user, string $capability ): bool {
+	if ( is_int( $user ) ) {
+		$user = get_user_by( 'id', $user );
+	}
+
+	if ( ! $user instanceof WP_User ) {
+		return false;
+	}
+
+	return $user->has_cap( $capability );
+}
+
 function add_options_page(
 	string $page_title,
 	string $menu_title,
@@ -383,6 +454,30 @@ function wp_add_inline_script( string $handle, string $data, string $position = 
 
 function wp_json_encode( mixed $data, int $options = 0, int $depth = 512 ): string|false {
 	return json_encode( $data, $options, $depth );
+}
+
+function wp_send_json_success( mixed $data = null, ?int $status_code = null, int $flags = 0 ): void {
+	unset( $flags );
+
+	$GLOBALS['mac_members_test_ajax_response'] = array(
+		'success' => true,
+		'data'    => $data,
+		'status'  => $status_code ?? 200,
+	);
+
+	throw new MacMembers_Test_Ajax_Exit();
+}
+
+function wp_send_json_error( mixed $data = null, ?int $status_code = null, int $flags = 0 ): void {
+	unset( $flags );
+
+	$GLOBALS['mac_members_test_ajax_response'] = array(
+		'success' => false,
+		'data'    => $data,
+		'status'  => $status_code ?? 400,
+	);
+
+	throw new MacMembers_Test_Ajax_Exit();
 }
 
 function plugin_dir_url( string $file ): string {

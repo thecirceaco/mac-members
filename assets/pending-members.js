@@ -90,6 +90,7 @@
 		return {
 			ok: response.ok && data && data.success === true,
 			data,
+			status: response.status,
 		};
 	};
 
@@ -124,6 +125,16 @@
 
 			if (!result.ok) {
 				showNotice(root, 'error', getMessage(result.data, config.genericError || 'Something went wrong. Please try again.'));
+
+				if (result.status === 409 || (result.data && result.data.data && result.data.data.code === 'not_pending')) {
+					row.classList.add('is-success');
+					window.setTimeout(() => {
+						row.remove();
+						showEmptyStateIfNeeded(root);
+					}, 900);
+					return;
+				}
+
 				setRowProcessing(row, false);
 				return;
 			}
