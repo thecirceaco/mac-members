@@ -41,6 +41,7 @@ if ( ! class_exists( 'WP_User' ) ) {
 		public string $user_email;
 		public string $user_login;
 		public string $user_registered;
+		public string $display_name;
 
 		/**
 		 * @var array<int,string>
@@ -67,6 +68,7 @@ if ( ! class_exists( 'WP_User' ) ) {
 			$this->user_email      = (string) ( $data['user_email'] ?? '' );
 			$this->user_login      = (string) ( $data['user_login'] ?? '' );
 			$this->user_registered = (string) ( $data['user_registered'] ?? '' );
+			$this->display_name    = (string) ( $data['display_name'] ?? $this->user_login );
 			$this->roles           = array_values( array_map( 'strval', $data['roles'] ?? array() ) );
 			$this->data            = $data;
 			$this->caps            = array_map( 'boolval', $data['caps'] ?? array() );
@@ -171,12 +173,17 @@ function mac_members_tests_reset_wp_state(): void {
 	$GLOBALS['mac_members_test_inline_scripts']     = array();
 	$GLOBALS['mac_members_test_current_user_id']    = 1;
 	$GLOBALS['mac_members_test_ajax_response']      = null;
+	$GLOBALS['mac_members_test_mail']               = array();
+	$GLOBALS['mac_members_test_mail_fail_next']     = 0;
 
 	$_GET    = array();
 	$_POST   = array();
 	$_SERVER = array(
 		'REQUEST_METHOD' => 'GET',
 	);
+
+	ini_set( 'log_errors', '1' );
+	ini_set( 'error_log', sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'mac-members-test-error.log' );
 }
 
 function add_action( string $hook_name, callable $callback, int $priority = 10, int $accepted_args = 1 ): bool {
@@ -389,6 +396,12 @@ function admin_url( string $path = '' ): string {
 	return 'https://example.test/wp-admin/' . ltrim( $path, '/' );
 }
 
+function wp_login_url( string $redirect = '', bool $force_reauth = false ): string {
+	unset( $redirect, $force_reauth );
+
+	return 'https://example.test/wp-login.php';
+}
+
 function esc_url( mixed $url ): string {
 	return esc_attr( (string) $url );
 }
@@ -478,6 +491,30 @@ function wp_send_json_error( mixed $data = null, ?int $status_code = null, int $
 	);
 
 	throw new MacMembers_Test_Ajax_Exit();
+}
+
+function wp_mail(
+	string|array $to,
+	string $subject,
+	string $message,
+	string|array $headers = '',
+	array $attachments = array()
+): bool {
+	$GLOBALS['mac_members_test_mail'][] = array(
+		'to'          => $to,
+		'subject'     => $subject,
+		'message'     => $message,
+		'headers'     => $headers,
+		'attachments' => $attachments,
+	);
+
+	if ( 0 < (int) $GLOBALS['mac_members_test_mail_fail_next'] ) {
+		$GLOBALS['mac_members_test_mail_fail_next']--;
+
+		return false;
+	}
+
+	return true;
 }
 
 function plugin_dir_url( string $file ): string {

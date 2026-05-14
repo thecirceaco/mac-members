@@ -11,6 +11,8 @@ namespace MacMembers\Actions;
 
 use MacMembers\Assets\FrontendAssets;
 use MacMembers\Contracts\Service;
+use MacMembers\Email\MemberNotificationService;
+use MacMembers\Email\NotificationResult;
 use MacMembers\Settings\SettingsRepositoryInterface;
 
 final class MemberActionController implements Service
@@ -24,7 +26,8 @@ final class MemberActionController implements Service
 	private const SUCCESS_DENIED = 'denied';
 
 	public function __construct(
-		private readonly SettingsRepositoryInterface $settings
+		private readonly SettingsRepositoryInterface $settings,
+		private readonly ?MemberNotificationService $notifications = null
 	) {}
 
 	public function register(): void
@@ -83,7 +86,10 @@ final class MemberActionController implements Service
 			$this->send_error( self::ERROR_UPDATE_FAILED, 500 );
 		}
 
-		$this->send_success( $success_code );
+		$this->send_success(
+			$success_code,
+			$this->send_notifications( $success_code, $user )
+		);
 	}
 
 	private function is_valid_request( string $expected_action ): bool
@@ -118,16 +124,34 @@ final class MemberActionController implements Service
 		return '' !== $role && in_array( $role, (array) $user->roles, true );
 	}
 
-	private function send_success( string $message ): void
+	private function send_notifications( string $success_code, \WP_User $user ): ?NotificationResult
+	{
+		if ( ! $this->notifications instanceof MemberNotificationService ) {
+			return null;
+		}
+
+		return self::SUCCESS_APPROVED === $success_code
+			? $this->notifications->send_approval_notifications( $user )
+			: $this->notifications->send_denial_notifications( $user );
+	}
+
+	private function send_success( string $message, ?NotificationResult $notification_result = null ): void
 	{
 		$response_message = self::SUCCESS_APPROVED === $message
 			? __( 'Member approved successfully.', 'mac-members' )
 			: __( 'Member denied successfully.', 'mac-members' );
 
+		$response = array(
+			'message' => $response_message,
+		);
+
+		if ( $notification_result instanceof NotificationResult && $notification_result->has_failures() ) {
+			$response['warning'] = true;
+			$response['message'] = $response_message . ' ' . $notification_result->get_warning_message();
+		}
+
 		\wp_send_json_success(
-			array(
-				'message' => $response_message,
-			),
+			$response,
 			200
 		);
 	}

@@ -139,7 +139,11 @@
 				return;
 			}
 
-			showNotice(root, 'success', getMessage(result.data, config.genericSuccess || 'Member updated.'));
+			showNotice(
+				root,
+				result.data && result.data.data && result.data.data.warning ? 'warning' : 'success',
+				getMessage(result.data, config.genericSuccess || 'Member updated.')
+			);
 			row.classList.add('is-success');
 
 			window.setTimeout(() => {

@@ -11,6 +11,7 @@ namespace MacMembers\Tests\Unit;
 
 use MacMembers\Actions\MemberActionController;
 use MacMembers\Assets\FrontendAssets;
+use MacMembers\Email\MemberNotificationService;
 use MacMembers\Settings\SettingsSchema;
 use MacMembers\Settings\WordPressSettingsRepository;
 use PHPUnit\Framework\Attributes\CoversClass;
@@ -178,6 +179,41 @@ final class MemberActionControllerTest extends TestCase {
 		self::assertSame( array( 'member-pending' ), $user->roles );
 	}
 
+	public function test_approve_sends_enabled_notifications_after_role_update(): void {
+		$user = $this->store_user( 12, array( 'member-pending', 'subscriber' ) );
+		$this->prepare_ajax_request( FrontendAssets::APPROVE_ACTION, $user->ID );
+
+		$response = $this->capture_ajax_response(
+			fn (): mixed => $this->create_controller( $this->create_notification_service() )->approve()
+		);
+
+		self::assertTrue( $response['success'] );
+		self::assertSame( array( 'subscriber', 'member' ), $user->roles );
+		self::assertSame(
+			array( 'Your account has been approved', 'Member account approved' ),
+			array_column( $GLOBALS['mac_members_test_mail'], 'subject' )
+		);
+	}
+
+	public function test_email_failure_returns_warning_without_rolling_back_role_update(): void {
+		$user = $this->store_user( 12, array( 'member-pending', 'subscriber' ) );
+		$GLOBALS['mac_members_test_mail_fail_next'] = 1;
+		$this->prepare_ajax_request( FrontendAssets::APPROVE_ACTION, $user->ID );
+
+		$response = $this->capture_ajax_response(
+			fn (): mixed => $this->create_controller( $this->create_notification_service() )->approve()
+		);
+
+		self::assertTrue( $response['success'] );
+		self::assertSame( 200, $response['status'] );
+		self::assertSame( array( 'subscriber', 'member' ), $user->roles );
+		self::assertTrue( $response['data']['warning'] );
+		self::assertSame(
+			'Member approved successfully. One or more notification emails could not be sent.',
+			$response['data']['message']
+		);
+	}
+
 	/**
 	 * @param array<int,string> $roles Roles.
 	 * @param array<string,bool> $caps Caps.
@@ -223,8 +259,15 @@ final class MemberActionControllerTest extends TestCase {
 		self::fail( 'Expected wp_send_json_* to stop execution.' );
 	}
 
-	private function create_controller(): MemberActionController {
+	private function create_controller( ?MemberNotificationService $notifications = null ): MemberActionController {
 		return new MemberActionController(
+			new WordPressSettingsRepository( new SettingsSchema() ),
+			$notifications
+		);
+	}
+
+	private function create_notification_service(): MemberNotificationService {
+		return new MemberNotificationService(
 			new WordPressSettingsRepository( new SettingsSchema() )
 		);
 	}

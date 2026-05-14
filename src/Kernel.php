@@ -12,6 +12,7 @@ namespace MacMembers;
 use MacMembers\Actions\MemberActionController;
 use MacMembers\Assets\FrontendAssets;
 use MacMembers\Contracts\Service;
+use MacMembers\Email\MemberNotificationService;
 use MacMembers\PendingMembers\PendingMembersQuery;
 use MacMembers\PendingMembers\PendingMembersShortcode;
 use MacMembers\PendingMembers\PendingMembersTableRenderer;
@@ -52,9 +53,10 @@ final class Kernel
 		$settings_repository  = new WordPressSettingsRepository( $settings_schema );
 		$frontend_assets      = new FrontendAssets();
 		$pending_members_query = new PendingMembersQuery( $settings_repository );
+		$notifications        = new MemberNotificationService( $settings_repository );
 		$services             = [
 			new SettingsController( $settings_repository, $settings_schema ),
-			new MemberActionController( $settings_repository ),
+			new MemberActionController( $settings_repository, $notifications ),
 			$frontend_assets,
 			new PendingMembersShortcode(
 				$pending_members_query,
