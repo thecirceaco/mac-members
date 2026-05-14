@@ -30,6 +30,10 @@ if ( ! defined( 'MAC_MEMBERS_PATH' ) ) {
 	define( 'MAC_MEMBERS_PATH', dirname( __DIR__ ) . '/' );
 }
 
+if ( ! defined( 'MAC_MEMBERS_PLUGIN_FILE' ) ) {
+	define( 'MAC_MEMBERS_PLUGIN_FILE', MAC_MEMBERS_PATH . 'mac-members.php' );
+}
+
 if ( ! defined( 'MAC_MEMBERS_SRC_PATH' ) ) {
 	define( 'MAC_MEMBERS_SRC_PATH', MAC_MEMBERS_PATH . 'src/' );
 }
@@ -39,7 +43,7 @@ if ( ! defined( 'MAC_MEMBERS_ASSETS_PATH' ) ) {
 }
 
 if ( ! defined( 'MAC_MEMBERS_URL' ) ) {
-	define( 'MAC_MEMBERS_URL', plugin_dir_url( MAC_MEMBERS_PATH . 'mac-members.php' ) );
+	define( 'MAC_MEMBERS_URL', plugin_dir_url( MAC_MEMBERS_PLUGIN_FILE ) );
 }
 
 if ( ! defined( 'MAC_MEMBERS_ASSETS_URL' ) ) {

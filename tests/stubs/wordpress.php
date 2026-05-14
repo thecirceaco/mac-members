@@ -1,8 +1,8 @@
 <?php
 /**
- * Minimal WordPress stubs for fast unit tests.
+ * Minimal WordPress function stubs for unit tests.
  *
- * @package mac-members
+ * @package MacMembers\Tests\Stubs
  */
 
 declare(strict_types=1);
@@ -11,62 +11,232 @@ if ( ! defined( 'ABSPATH' ) ) {
 	define( 'ABSPATH', dirname( __DIR__, 2 ) . '/' );
 }
 
-function mac_members_tests_reset_wp_state(): void
-{
-	$GLOBALS['mac_members_test_actions'] = [];
-	$GLOBALS['mac_members_test_filters'] = [];
-}
+if ( ! class_exists( 'WP_Roles' ) ) {
+	final class WP_Roles {
+		/**
+		 * Registered roles.
+		 *
+		 * @var array<string,array<string,string>>
+		 */
+		public array $roles = array();
 
-mac_members_tests_reset_wp_state();
-
-if ( ! function_exists( 'add_action' ) ) {
-	function add_action( string $hook_name, mixed $callback, int $priority = 10, int $accepted_args = 1 ): true
-	{
-		$GLOBALS['mac_members_test_actions'][ $hook_name ][] = [
-			'callback'      => $callback,
-			'priority'      => $priority,
-			'accepted_args' => $accepted_args,
-		];
-
-		return true;
+		/**
+		 * Create the roles object.
+		 *
+		 * @param array<string,array<string,string>> $roles Roles.
+		 */
+		public function __construct( array $roles ) {
+			$this->roles = $roles;
+		}
 	}
 }
 
-if ( ! function_exists( 'add_filter' ) ) {
-	function add_filter( string $hook_name, mixed $callback, int $priority = 10, int $accepted_args = 1 ): true
-	{
-		$GLOBALS['mac_members_test_filters'][ $hook_name ][] = [
-			'callback'      => $callback,
-			'priority'      => $priority,
-			'accepted_args' => $accepted_args,
-		];
+function mac_members_tests_reset_wp_state(): void {
+	$GLOBALS['mac_members_test_actions']          = array();
+	$GLOBALS['mac_members_test_filters']          = array();
+	$GLOBALS['mac_members_test_activation_hooks'] = array();
+	$GLOBALS['mac_members_test_options']          = array(
+		'admin_email' => 'admin@example.test',
+	);
+	$GLOBALS['mac_members_test_bloginfo']         = array(
+		'name' => 'Example Site',
+	);
+	$GLOBALS['mac_members_test_roles']            = array(
+		'administrator'  => array( 'name' => 'Administrator' ),
+		'member-pending' => array( 'name' => 'Member Pending' ),
+		'member'         => array( 'name' => 'Member' ),
+		'member-invalid' => array( 'name' => 'Member Invalid' ),
+		'subscriber'     => array( 'name' => 'Subscriber' ),
+	);
+	$GLOBALS['mac_members_test_current_user_caps'] = array(
+		'manage_options' => true,
+		'promote_users'  => true,
+	);
+	$GLOBALS['mac_members_test_options_pages']     = array();
+	$GLOBALS['mac_members_test_settings_errors']   = array();
+	$GLOBALS['mac_members_test_nonces']            = array();
 
-		return true;
-	}
+	$_GET    = array();
+	$_POST   = array();
+	$_SERVER = array(
+		'REQUEST_METHOD' => 'GET',
+	);
 }
 
-if ( ! function_exists( 'apply_filters' ) ) {
-	function apply_filters( string $hook_name, mixed $value, mixed ...$args ): mixed
-	{
-		$filtered = $value;
+function add_action( string $hook_name, callable $callback, int $priority = 10, int $accepted_args = 1 ): bool {
+	$GLOBALS['mac_members_test_actions'][ $hook_name ][] = array(
+		'callback'      => $callback,
+		'priority'      => $priority,
+		'accepted_args' => $accepted_args,
+	);
 
-		foreach ( $GLOBALS['mac_members_test_filters'][ $hook_name ] ?? [] as $registration ) {
-			$callback = $registration['callback'] ?? null;
+	return true;
+}
 
-			if ( ! is_callable( $callback ) ) {
-				continue;
-			}
+function add_filter( string $hook_name, callable $callback, int $priority = 10, int $accepted_args = 1 ): bool {
+	$GLOBALS['mac_members_test_filters'][ $hook_name ][] = array(
+		'callback'      => $callback,
+		'priority'      => $priority,
+		'accepted_args' => $accepted_args,
+	);
 
-			$filtered = $callback( $filtered, ...$args );
+	return true;
+}
+
+function apply_filters( string $hook_name, mixed $value, mixed ...$args ): mixed {
+	foreach ( $GLOBALS['mac_members_test_filters'][ $hook_name ] ?? array() as $filter ) {
+		$value = ( $filter['callback'] )( $value, ...$args );
+	}
+
+	return $value;
+}
+
+function register_activation_hook( string $file, callable $callback ): void {
+	$GLOBALS['mac_members_test_activation_hooks'][ $file ] = $callback;
+}
+
+function get_option( string $option, mixed $default_value = false ): mixed {
+	return array_key_exists( $option, $GLOBALS['mac_members_test_options'] )
+		? $GLOBALS['mac_members_test_options'][ $option ]
+		: $default_value;
+}
+
+function update_option( string $option, mixed $value ): bool {
+	$GLOBALS['mac_members_test_options'][ $option ] = $value;
+
+	return true;
+}
+
+function delete_option( string $option ): bool {
+	unset( $GLOBALS['mac_members_test_options'][ $option ] );
+
+	return true;
+}
+
+function get_bloginfo( string $show = '' ): string {
+	return (string) ( $GLOBALS['mac_members_test_bloginfo'][ $show ] ?? '' );
+}
+
+function wp_roles(): WP_Roles {
+	return new WP_Roles( $GLOBALS['mac_members_test_roles'] ?? array() );
+}
+
+function sanitize_key( string $key ): string {
+	$key = strtolower( $key );
+
+	return preg_replace( '/[^a-z0-9_\-]/', '', $key ) ?? '';
+}
+
+function sanitize_text_field( mixed $value ): string {
+	$value = (string) $value;
+	$value = preg_replace( '/[\r\n\t]+/', ' ', $value ) ?? '';
+	$value = trim( strip_tags( $value ) );
+
+	return $value;
+}
+
+function sanitize_email( mixed $email ): string {
+	return (string) filter_var( (string) $email, FILTER_SANITIZE_EMAIL );
+}
+
+function is_email( mixed $email ): string|false {
+	$email = (string) $email;
+
+	return false !== filter_var( $email, FILTER_VALIDATE_EMAIL ) ? $email : false;
+}
+
+function wp_unslash( mixed $value ): mixed {
+	if ( is_array( $value ) ) {
+		return array_map( 'wp_unslash', $value );
+	}
+
+	return is_string( $value ) ? stripslashes( $value ) : $value;
+}
+
+function __( string $text, string $domain = 'default' ): string {
+	unset( $domain );
+
+	return $text;
+}
+
+function esc_html( mixed $text ): string {
+	return htmlspecialchars( (string) $text, ENT_QUOTES, 'UTF-8' );
+}
+
+function esc_attr( mixed $text ): string {
+	return htmlspecialchars( (string) $text, ENT_QUOTES, 'UTF-8' );
+}
+
+function esc_html__( string $text, string $domain = 'default' ): string {
+	return esc_html( __( $text, $domain ) );
+}
+
+function esc_attr__( string $text, string $domain = 'default' ): string {
+	return esc_attr( __( $text, $domain ) );
+}
+
+function current_user_can( string $capability ): bool {
+	return (bool) ( $GLOBALS['mac_members_test_current_user_caps'][ $capability ] ?? false );
+}
+
+function add_options_page(
+	string $page_title,
+	string $menu_title,
+	string $capability,
+	string $menu_slug,
+	callable $callback
+): string {
+	$GLOBALS['mac_members_test_options_pages'][ $menu_slug ] = array(
+		'page_title' => $page_title,
+		'menu_title' => $menu_title,
+		'capability' => $capability,
+		'callback'   => $callback,
+		'parent'     => 'options-general.php',
+	);
+
+	return 'settings_page_' . $menu_slug;
+}
+
+function add_settings_error( string $setting, string $code, string $message, string $type = 'error' ): void {
+	$GLOBALS['mac_members_test_settings_errors'][] = array(
+		'setting' => $setting,
+		'code'    => $code,
+		'message' => $message,
+		'type'    => $type,
+	);
+}
+
+function settings_errors( string $setting = '' ): void {
+	foreach ( $GLOBALS['mac_members_test_settings_errors'] ?? array() as $error ) {
+		if ( '' !== $setting && $setting !== $error['setting'] ) {
+			continue;
 		}
 
-		return $filtered;
+		echo '<div class="' . esc_attr( $error['type'] ) . '"><p>' . esc_html( $error['message'] ) . '</p></div>';
 	}
 }
 
-if ( ! function_exists( 'plugin_dir_url' ) ) {
-	function plugin_dir_url( string $file ): string
-	{
-		return 'https://example.test/wp-content/plugins/mac-members/';
-	}
+function wp_create_nonce( string $action ): string {
+	$nonce = 'nonce-' . $action;
+	$GLOBALS['mac_members_test_nonces'][ $nonce ] = $action;
+
+	return $nonce;
+}
+
+function wp_verify_nonce( string $nonce, string $action ): int|false {
+	return ( $GLOBALS['mac_members_test_nonces'][ $nonce ] ?? null ) === $action ? 1 : false;
+}
+
+function wp_nonce_field( string $action, string $name ): void {
+	$nonce = wp_create_nonce( $action );
+
+	echo '<input type="hidden" name="' . esc_attr( $name ) . '" value="' . esc_attr( $nonce ) . '">';
+}
+
+function submit_button( string $text = 'Save Changes' ): void {
+	echo '<button type="submit" class="button button-primary">' . esc_html( $text ) . '</button>';
+}
+
+function plugin_dir_url( string $file ): string {
+	return 'https://example.test/wp-content/plugins/' . basename( dirname( $file ) ) . '/';
 }

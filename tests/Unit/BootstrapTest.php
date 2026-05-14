@@ -40,6 +40,7 @@ final class BootstrapTest extends TestCase
 		self::assertSame( 'mac-members', MAC_MEMBERS_ADMIN_SLUG );
 		self::assertSame( 'mac_members_settings', MAC_MEMBERS_SETTINGS_OPTION );
 		self::assertSame( dirname( __DIR__, 2 ) . '/', MAC_MEMBERS_PATH );
+		self::assertSame( MAC_MEMBERS_PATH . 'mac-members.php', MAC_MEMBERS_PLUGIN_FILE );
 		self::assertSame( MAC_MEMBERS_PATH . 'src/', MAC_MEMBERS_SRC_PATH );
 		self::assertSame( MAC_MEMBERS_PATH . 'assets/', MAC_MEMBERS_ASSETS_PATH );
 		self::assertSame( 'https://example.test/wp-content/plugins/mac-members/', MAC_MEMBERS_URL );

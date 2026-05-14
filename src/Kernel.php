@@ -10,6 +10,9 @@ declare(strict_types=1);
 namespace MacMembers;
 
 use MacMembers\Contracts\Service;
+use MacMembers\Settings\SettingsController;
+use MacMembers\Settings\SettingsSchema;
+use MacMembers\Settings\WordPressSettingsRepository;
 
 final class Kernel
 {
@@ -40,7 +43,11 @@ final class Kernel
 	 */
 	private function get_services(): array
 	{
-		$services = [];
+		$settings_schema      = new SettingsSchema();
+		$settings_repository  = new WordPressSettingsRepository( $settings_schema );
+		$services             = [
+			new SettingsController( $settings_repository, $settings_schema ),
+		];
 
 		/**
 		 * Filter the runtime service list for MAC Members.
