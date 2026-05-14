@@ -9,7 +9,11 @@ declare(strict_types=1);
 
 namespace MacMembers;
 
+use MacMembers\Assets\FrontendAssets;
 use MacMembers\Contracts\Service;
+use MacMembers\PendingMembers\PendingMembersQuery;
+use MacMembers\PendingMembers\PendingMembersShortcode;
+use MacMembers\PendingMembers\PendingMembersTableRenderer;
 use MacMembers\Settings\SettingsController;
 use MacMembers\Settings\SettingsSchema;
 use MacMembers\Settings\WordPressSettingsRepository;
@@ -45,8 +49,16 @@ final class Kernel
 	{
 		$settings_schema      = new SettingsSchema();
 		$settings_repository  = new WordPressSettingsRepository( $settings_schema );
+		$frontend_assets      = new FrontendAssets();
+		$pending_members_query = new PendingMembersQuery( $settings_repository );
 		$services             = [
 			new SettingsController( $settings_repository, $settings_schema ),
+			$frontend_assets,
+			new PendingMembersShortcode(
+				$pending_members_query,
+				new PendingMembersTableRenderer(),
+				$frontend_assets
+			),
 		];
 
 		/**

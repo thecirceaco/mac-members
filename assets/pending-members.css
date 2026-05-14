@@ -1,0 +1,107 @@
+.mac-members-pending {
+	width: 100%;
+}
+
+.mac-members-notices {
+	margin-block-end: 1rem;
+}
+
+.mac-members-notice {
+	margin: 0 0 0.75rem;
+	padding: 0.75rem 1rem;
+	border-left: 4px solid #2563eb;
+	background: #eff6ff;
+	color: #111827;
+}
+
+.mac-members-notice--success {
+	border-left-color: #16a34a;
+	background: #f0fdf4;
+}
+
+.mac-members-notice--error {
+	border-left-color: #dc2626;
+	background: #fef2f2;
+}
+
+.mac-members-notice--warning {
+	border-left-color: #d97706;
+	background: #fffbeb;
+}
+
+.mac-members-table-wrap {
+	overflow-x: auto;
+}
+
+.mac-members-pending-table {
+	width: 100%;
+	border-collapse: collapse;
+	background: #ffffff;
+}
+
+.mac-members-pending-table th,
+.mac-members-pending-table td {
+	padding: 0.75rem;
+	border: 1px solid #d1d5db;
+	text-align: left;
+	vertical-align: middle;
+}
+
+.mac-members-pending-table th {
+	background: #f3f4f6;
+	color: #111827;
+	font-weight: 700;
+}
+
+.mac-members-actions {
+	display: flex;
+	gap: 0.5rem;
+	flex-wrap: wrap;
+}
+
+.mac-members-button {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	min-height: 2.25rem;
+	padding: 0.45rem 0.75rem;
+	border: 1px solid #1f2937;
+	border-radius: 4px;
+	background: #ffffff;
+	color: #111827;
+	cursor: pointer;
+	font: inherit;
+}
+
+.mac-members-button--approve {
+	border-color: #15803d;
+	background: #16a34a;
+	color: #ffffff;
+}
+
+.mac-members-button--deny {
+	border-color: #b91c1c;
+	background: #dc2626;
+	color: #ffffff;
+}
+
+.mac-members-button:disabled {
+	cursor: wait;
+	opacity: 0.65;
+}
+
+.mac-members-pending-table__row.is-processing {
+	opacity: 0.7;
+}
+
+.mac-members-pending-table__row.is-success {
+	background: #ecfdf5;
+}
+
+.mac-members-empty {
+	margin: 0;
+	padding: 1rem;
+	border: 1px solid #d1d5db;
+	background: #f9fafb;
+	color: #111827;
+}

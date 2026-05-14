@@ -31,6 +31,66 @@ if ( ! class_exists( 'WP_Roles' ) ) {
 	}
 }
 
+if ( ! class_exists( 'WP_User' ) ) {
+	final class WP_User {
+		public int $ID;
+		public string $user_email;
+		public string $user_login;
+		public string $user_registered;
+
+		/**
+		 * @var array<string,mixed>
+		 */
+		private array $data;
+
+		/**
+		 * @param array<string,mixed> $data User data.
+		 */
+		public function __construct( array $data ) {
+			$this->ID              = (int) ( $data['ID'] ?? 0 );
+			$this->user_email      = (string) ( $data['user_email'] ?? '' );
+			$this->user_login      = (string) ( $data['user_login'] ?? '' );
+			$this->user_registered = (string) ( $data['user_registered'] ?? '' );
+			$this->data            = $data;
+		}
+
+		public function get( string $key ): mixed {
+			return $this->data[ $key ] ?? null;
+		}
+	}
+}
+
+if ( ! class_exists( 'WP_User_Query' ) ) {
+	final class WP_User_Query {
+		/**
+		 * @var array<string,mixed>
+		 */
+		private array $args;
+
+		/**
+		 * @param array<string,mixed> $args Query arguments.
+		 */
+		public function __construct( array $args ) {
+			$this->args                                  = $args;
+			$GLOBALS['mac_members_test_last_user_query'] = $args;
+		}
+
+		/**
+		 * @return array<int,WP_User>
+		 */
+		public function get_results(): array {
+			return $GLOBALS['mac_members_test_users'] ?? array();
+		}
+
+		/**
+		 * @return array<string,mixed>
+		 */
+		public function get_args(): array {
+			return $this->args;
+		}
+	}
+}
+
 function mac_members_tests_reset_wp_state(): void {
 	$GLOBALS['mac_members_test_actions']          = array();
 	$GLOBALS['mac_members_test_filters']          = array();
@@ -55,6 +115,15 @@ function mac_members_tests_reset_wp_state(): void {
 	$GLOBALS['mac_members_test_options_pages']     = array();
 	$GLOBALS['mac_members_test_settings_errors']   = array();
 	$GLOBALS['mac_members_test_nonces']            = array();
+	$GLOBALS['mac_members_test_logged_in']         = true;
+	$GLOBALS['mac_members_test_shortcodes']        = array();
+	$GLOBALS['mac_members_test_users']             = array();
+	$GLOBALS['mac_members_test_last_user_query']   = null;
+	$GLOBALS['mac_members_test_registered_styles'] = array();
+	$GLOBALS['mac_members_test_registered_scripts'] = array();
+	$GLOBALS['mac_members_test_enqueued_styles']    = array();
+	$GLOBALS['mac_members_test_enqueued_scripts']   = array();
+	$GLOBALS['mac_members_test_inline_scripts']     = array();
 
 	$_GET    = array();
 	$_POST   = array();
@@ -81,6 +150,10 @@ function add_filter( string $hook_name, callable $callback, int $priority = 10, 
 	);
 
 	return true;
+}
+
+function add_shortcode( string $tag, callable $callback ): void {
+	$GLOBALS['mac_members_test_shortcodes'][ $tag ] = $callback;
 }
 
 function apply_filters( string $hook_name, mixed $value, mixed ...$args ): mixed {
@@ -179,6 +252,10 @@ function current_user_can( string $capability ): bool {
 	return (bool) ( $GLOBALS['mac_members_test_current_user_caps'][ $capability ] ?? false );
 }
 
+function is_user_logged_in(): bool {
+	return (bool) ( $GLOBALS['mac_members_test_logged_in'] ?? false );
+}
+
 function add_options_page(
 	string $page_title,
 	string $menu_title,
@@ -235,6 +312,77 @@ function wp_nonce_field( string $action, string $name ): void {
 
 function submit_button( string $text = 'Save Changes' ): void {
 	echo '<button type="submit" class="button button-primary">' . esc_html( $text ) . '</button>';
+}
+
+function admin_url( string $path = '' ): string {
+	return 'https://example.test/wp-admin/' . ltrim( $path, '/' );
+}
+
+function esc_url( mixed $url ): string {
+	return esc_attr( (string) $url );
+}
+
+function absint( mixed $value ): int {
+	return abs( (int) $value );
+}
+
+function wp_date( string $format, ?int $timestamp = null ): string {
+	return gmdate( $format, $timestamp ?? time() );
+}
+
+function wp_register_style(
+	string $handle,
+	string|false $src = false,
+	array $deps = array(),
+	string|bool|null $ver = false,
+	string $media = 'all'
+): bool {
+	$GLOBALS['mac_members_test_registered_styles'][ $handle ] = array(
+		'src'   => $src,
+		'deps'  => $deps,
+		'ver'   => $ver,
+		'media' => $media,
+	);
+
+	return true;
+}
+
+function wp_register_script(
+	string $handle,
+	string|false $src = false,
+	array $deps = array(),
+	string|bool|null $ver = false,
+	bool|array $args = false
+): bool {
+	$GLOBALS['mac_members_test_registered_scripts'][ $handle ] = array(
+		'src'  => $src,
+		'deps' => $deps,
+		'ver'  => $ver,
+		'args' => $args,
+	);
+
+	return true;
+}
+
+function wp_enqueue_style( string $handle ): void {
+	$GLOBALS['mac_members_test_enqueued_styles'][] = $handle;
+}
+
+function wp_enqueue_script( string $handle ): void {
+	$GLOBALS['mac_members_test_enqueued_scripts'][] = $handle;
+}
+
+function wp_add_inline_script( string $handle, string $data, string $position = 'after' ): bool {
+	$GLOBALS['mac_members_test_inline_scripts'][ $handle ][] = array(
+		'data'     => $data,
+		'position' => $position,
+	);
+
+	return true;
+}
+
+function wp_json_encode( mixed $data, int $options = 0, int $depth = 512 ): string|false {
+	return json_encode( $data, $options, $depth );
 }
 
 function plugin_dir_url( string $file ): string {
