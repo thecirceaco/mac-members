@@ -1,0 +1,79 @@
+name: Build release ZIP
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5.0.1
+
+      - name: Prepare release directory
+        run: |
+          mkdir -p dist/mac-members
+          rsync -av \
+            --exclude='/composer.lock' \
+            --exclude='/vendor' \
+            --exclude='node_modules' \
+            --exclude='/.env' \
+            --exclude='/.env.local' \
+            --exclude='.git*' \
+            --exclude='.github' \
+            --exclude='.codex' \
+            --exclude='.vscode' \
+            --exclude='.ddev' \
+            --exclude='/AGENTS.md' \
+            --exclude='/README.md' \
+            --exclude='/readme.txt' \
+            --exclude='/composer.json' \
+            --exclude='/phpcs.xml.dist' \
+            --exclude='/phpunit.xml.dist' \
+            --exclude='/tests' \
+            --exclude='/bin/install-wp-tests.sh' \
+            --exclude='/bin/build-dev-zip.ps1' \
+            --exclude='coverage' \
+            --exclude='.phpunit.cache' \
+            --exclude='.phpunit.result.cache' \
+            --exclude='.phpcs-cache' \
+            --exclude='dist' \
+            ./ dist/mac-members/
+
+      - name: Create ZIP
+        run: |
+          cd dist
+          zip -r mac-members-${GITHUB_REF_NAME}.zip mac-members
+
+      - name: Generate checksum and provenance
+        run: |
+          cd dist
+          sha256sum mac-members-${GITHUB_REF_NAME}.zip > mac-members-${GITHUB_REF_NAME}.zip.sha256
+          checksum=$(cut -d' ' -f1 mac-members-${GITHUB_REF_NAME}.zip.sha256)
+          built_at=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+          cat > mac-members-${GITHUB_REF_NAME}.provenance.json <<EOF
+          {
+            "tag": "${GITHUB_REF_NAME}",
+            "commit": "${GITHUB_SHA}",
+            "repository": "${GITHUB_REPOSITORY}",
+            "workflow": "${GITHUB_WORKFLOW}",
+            "run_id": "${GITHUB_RUN_ID}",
+            "run_attempt": "${GITHUB_RUN_ATTEMPT}",
+            "built_at_utc": "${built_at}",
+            "zip_file": "mac-members-${GITHUB_REF_NAME}.zip",
+            "sha256": "${checksum}"
+          }
+          EOF
+
+      - name: Upload release asset
+        uses: softprops/action-gh-release@153bb8e04406b158c6c84fc1615b65b24149a1fe # v2.6.1
+        with:
+          files: |
+            dist/mac-members-${{ github.ref_name }}.zip
+            dist/mac-members-${{ github.ref_name }}.zip.sha256
+            dist/mac-members-${{ github.ref_name }}.provenance.json
