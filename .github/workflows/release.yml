@@ -5,75 +5,129 @@ on:
     tags:
       - 'v*'
 
-permissions:
-  contents: write
+permissions: {}
+
+defaults:
+  run:
+    shell: bash
 
 jobs:
-  build:
+  verify:
+    name: Verify release
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    outputs:
+      commit: ${{ steps.check.outputs.commit }}
 
     steps:
       - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
 
-      - name: Prepare release directory
+      - name: Check tag, version and branch
+        id: check
+        env:
+          TAG: ${{ github.ref_name }}
         run: |
-          mkdir -p dist/mac-members
-          rsync -av \
-            --exclude='/composer.lock' \
-            --exclude='/vendor' \
-            --exclude='node_modules' \
-            --exclude='/.env' \
-            --exclude='/.env.local' \
-            --exclude='.git*' \
-            --exclude='.github' \
-            --exclude='.codex' \
-            --exclude='.vscode' \
-            --exclude='.ddev' \
-            --exclude='/AGENTS.md' \
-            --exclude='/README.md' \
-            --exclude='/readme.txt' \
-            --exclude='/composer.json' \
-            --exclude='/phpcs.xml.dist' \
-            --exclude='/phpunit.xml.dist' \
-            --exclude='/tests' \
-            --exclude='/bin/install-wp-tests.sh' \
-            --exclude='/bin/build-dev-zip.ps1' \
-            --exclude='coverage' \
-            --exclude='.phpunit.cache' \
-            --exclude='.phpunit.result.cache' \
-            --exclude='.phpcs-cache' \
-            --exclude='dist' \
-            ./ dist/mac-members/
+          bash .github/scripts/check-release.sh "$TAG"
+          echo "commit=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
 
-      - name: Create ZIP
-        run: |
-          cd dist
-          zip -r mac-members-${GITHUB_REF_NAME}.zip mac-members
+      - uses: shivammathur/setup-php@accd6127cb78bee3e8082180cb391013d204ef9f # 2.37.0
+        with:
+          php-version: '8.3'
+          coverage: none
+          tools: composer:v2
 
-      - name: Generate checksum and provenance
+      - name: Install dependencies
+        run: composer install --no-interaction --prefer-dist
+
+      - name: Run coding standards
+        run: composer lint
+
+      - name: Run tests
+        run: composer test
+
+  build:
+    name: Build ZIP
+    needs: verify
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    env:
+      TAG: ${{ github.ref_name }}
+      COMMIT: ${{ needs.verify.outputs.commit }}
+
+    steps:
+      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5.0.1
+        with:
+          ref: ${{ needs.verify.outputs.commit }}
+          persist-credentials: false
+
+      - name: Build ZIP and checksum
+        run: bash .github/scripts/build-release-zip.sh "$TAG" "$COMMIT"
+
+      # No build provenance attestation (actions/attest-build-provenance) here: artifact
+      # attestations need a public repository or GitHub Enterprise Cloud.
+      - name: Write provenance file
         run: |
-          cd dist
-          sha256sum mac-members-${GITHUB_REF_NAME}.zip > mac-members-${GITHUB_REF_NAME}.zip.sha256
-          checksum=$(cut -d' ' -f1 mac-members-${GITHUB_REF_NAME}.zip.sha256)
-          built_at=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
-          cat > mac-members-${GITHUB_REF_NAME}.provenance.json <<EOF
+          checksum="$(cut -d' ' -f1 "dist/mac-members-${TAG}.zip.sha256")"
+          built_at="$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
+          cat > "dist/mac-members-${TAG}.provenance.json" <<EOF
           {
-            "tag": "${GITHUB_REF_NAME}",
-            "commit": "${GITHUB_SHA}",
+            "tag": "${TAG}",
+            "commit": "${COMMIT}",
             "repository": "${GITHUB_REPOSITORY}",
             "workflow": "${GITHUB_WORKFLOW}",
             "run_id": "${GITHUB_RUN_ID}",
             "run_attempt": "${GITHUB_RUN_ATTEMPT}",
             "built_at_utc": "${built_at}",
-            "zip_file": "mac-members-${GITHUB_REF_NAME}.zip",
+            "zip_file": "mac-members-${TAG}.zip",
             "sha256": "${checksum}"
           }
           EOF
 
-      - name: Upload release asset
-        uses: softprops/action-gh-release@153bb8e04406b158c6c84fc1615b65b24149a1fe # v2.6.1
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          files: |
-            dist/mac-members-${{ github.ref_name }}.zip
-            dist/mac-members-${{ github.ref_name }}.zip.sha256
-            dist/mac-members-${{ github.ref_name }}.provenance.json
+          name: release-files
+          path: dist/
+          if-no-files-found: error
+          overwrite: true
+
+  publish:
+    name: Publish release
+    needs: [verify, build]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    env:
+      TAG: ${{ github.ref_name }}
+      COMMIT: ${{ needs.verify.outputs.commit }}
+
+    steps:
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: release-files
+          path: dist
+
+      - name: Check checksum and tag
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          (cd dist && sha256sum --check "mac-members-${TAG}.zip.sha256")
+          tag_commit="$(gh api "repos/${GITHUB_REPOSITORY}/commits/refs/tags/${TAG}" --jq .sha)"
+          if [[ "$tag_commit" != "$COMMIT" ]]; then
+            echo "::error::${TAG} points to ${tag_commit}, not to the verified commit ${COMMIT}."
+            exit 1
+          fi
+
+      - name: Create release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          gh release create "$TAG" --verify-tag --title "$TAG" --notes "" \
+            "dist/mac-members-${TAG}.zip" \
+            "dist/mac-members-${TAG}.zip.sha256" \
+            "dist/mac-members-${TAG}.provenance.json"
