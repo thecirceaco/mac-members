@@ -243,7 +243,7 @@ final class MembersTableShortcodeTest extends TestCase {
 		self::assertStringContainsString( 'data-mac-members-range-first="1" data-mac-members-range-last="24" data-mac-members-range-total="51">1-24 of 51</p>', $first );
 		// The page size select sits in the footer and belongs to the role and search form.
 		self::assertStringContainsString( '<form class="mac-members-search" id="mac-members-search-1"', $first );
-		self::assertStringContainsString( '<select class="mac-members-per-page__select" name="mac_members_per_page" form="mac-members-search-1" data-mac-members-autosubmit><option value="24" selected>24</option><option value="48">48</option><option value="96">96</option><option value="192">192</option></select>', $first );
+		self::assertStringContainsString( '<span class="mac-members-select"><select class="mac-members-per-page__select" name="mac_members_per_page" form="mac-members-search-1" data-mac-members-autosubmit><option value="24" selected>24</option><option value="48">48</option><option value="96">96</option><option value="192">192</option></select></span>', $first );
 
 		$_GET['mac_members_page'] = '3';
 		$third                    = $this->create_shortcode()->render();
@@ -377,7 +377,8 @@ final class MembersTableShortcodeTest extends TestCase {
 		self::assertStringContainsString( 'data-mac-members-count-for="approved">1</span>', $output );
 		self::assertStringContainsString( 'data-mac-members-count-for="all">2</span>', $output );
 		// Choosing a role sends the form, so the dropdown needs no button next to it.
-		self::assertStringContainsString( '<select class="mac-members-search__role" name="mac_members_role" aria-label="Role" data-mac-members-autosubmit>', $output );
+		// The span around the select draws its chevron.
+		self::assertStringContainsString( '<span class="mac-members-select"><select class="mac-members-search__role" name="mac_members_role" aria-label="Role" data-mac-members-autosubmit>', $output );
 		self::assertStringNotContainsString( '<button type="submit"', $output );
 	}
 

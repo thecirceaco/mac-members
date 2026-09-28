@@ -188,6 +188,7 @@ final class MembersTableRenderer
 		}
 
 		if ( array() !== $roles ) {
+			$output .= '<span class="mac-members-select">';
 			$output .= '<select class="mac-members-search__role" name="' . esc_attr( MembersTableShortcode::ROLE_QUERY_ARG ) . '" aria-label="' . esc_attr__( 'Role', 'mac-members' ) . '" data-mac-members-autosubmit>';
 			$output .= '<option value="">' . esc_html__( 'All roles', 'mac-members' ) . '</option>';
 
@@ -195,7 +196,7 @@ final class MembersTableRenderer
 				$output .= '<option value="' . esc_attr( (string) $slug ) . '"' . ( (string) $slug === $role ? ' selected' : '' ) . '>' . esc_html( $name ) . '</option>';
 			}
 
-			$output .= '</select>';
+			$output .= '</select></span>';
 		}
 
 		$output .= '<input class="mac-members-search__input" type="search" name="' . esc_attr( MembersTableShortcode::SEARCH_QUERY_ARG ) . '" value="' . esc_attr( $search ) . '" maxlength="' . esc_attr( (string) MembersQuery::SEARCH_MAX_LENGTH ) . '" placeholder="' . esc_attr__( 'Search by name, email or username', 'mac-members' ) . '" aria-label="' . esc_attr__( 'Search members', 'mac-members' ) . '">';
@@ -288,13 +289,14 @@ final class MembersTableRenderer
 	{
 		$output  = '<label class="mac-members-per-page">';
 		$output .= '<span class="mac-members-per-page__label">' . esc_html__( 'Per page', 'mac-members' ) . '</span>';
+		$output .= '<span class="mac-members-select">';
 		$output .= '<select class="mac-members-per-page__select" name="' . esc_attr( MembersTableShortcode::PER_PAGE_QUERY_ARG ) . '" form="' . esc_attr( $form_id ) . '" data-mac-members-autosubmit>';
 
 		foreach ( MembersQuery::PER_PAGE_OPTIONS as $option ) {
 			$output .= '<option value="' . esc_attr( (string) $option ) . '"' . ( $option === $per_page ? ' selected' : '' ) . '>' . esc_html( (string) $option ) . '</option>';
 		}
 
-		$output .= '</select>';
+		$output .= '</select></span>';
 		$output .= '</label>';
 
 		return $output;

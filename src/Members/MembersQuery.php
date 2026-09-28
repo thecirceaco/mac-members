@@ -52,7 +52,7 @@ final class MembersQuery
 	) {}
 
 	/**
-	 * Pending requests are listed oldest first, like a queue; the other views newest first.
+	 * Every view lists the newest registrations first.
 	 *
 	 * @param MemberStatus|null $status   Status to list, or null for every member.
 	 * @param string            $role     A role the members must also hold, or '' for any role.
@@ -68,7 +68,7 @@ final class MembersQuery
 			'number'      => max( 1, $per_page ),
 			'paged'       => max( 1, $page ),
 			'orderby'     => 'registered',
-			'order'       => MemberStatus::Pending === $status ? 'ASC' : 'DESC',
+			'order'       => 'DESC',
 			'fields'      => 'all',
 			'count_total' => true,
 		);

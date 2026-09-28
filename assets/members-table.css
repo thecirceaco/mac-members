@@ -53,9 +53,9 @@
 	list-style: none;
 }
 
-/* ACSS gives buttons a minimum width. The filters only take the width of their text, as ACSS does for its skip link. */
+/* ACSS gives buttons a minimum width. The filters have none. */
 .mac-members-filter {
-	--btn-min-width: fit-content;
+	--btn-min-width: auto;
 	gap: 0.75ch;
 }
 
@@ -108,16 +108,24 @@
 	background-color: var(--danger-hover);
 }
 
-/* The wrapper draws the outer border and rounds the corners, and the cells only draw the lines between them. */
+/*
+ * The wrapper draws the outer border and rounds the corners, and the cells only draw the lines between them.
+ * The table scrolls inside the wrapper, both ways, up to 80% of the screen height: a sticky header and first
+ * column stick to their nearest scroll box, which is this wrapper.
+ */
 .mac-members-table-wrap {
-	overflow-x: auto;
+	overflow: auto;
+	max-block-size: 80vh;
 	border: var(--border);
 	border-radius: var(--card-radius, var(--radius));
+	background-color: var(--body-bg-color);
 }
 
+/* Separate borders, because collapsed borders stay behind when a sticky cell moves. */
 .mac-members-list {
 	inline-size: 100%;
-	border-collapse: collapse;
+	border-collapse: separate;
+	border-spacing: 0;
 	font-size: var(--text-s);
 }
 
@@ -153,32 +161,61 @@
 	background-color: var(--bg-ultra-light);
 }
 
+/* The header stays at the top and the User ID column at the left while the table scrolls. */
+.mac-members-list thead th {
+	position: sticky;
+	inset-block-start: 0;
+	z-index: 2;
+}
+
+/* Sticky cells need their own background, or the cells scrolling under them show through. */
+.mac-members-list tbody td:first-child {
+	position: sticky;
+	inset-inline-start: 0;
+	z-index: 1;
+	background-color: var(--body-bg-color);
+}
+
+.mac-members-list tbody tr:nth-child(even) > td:first-child {
+	background-color: var(--bg-ultra-light);
+}
+
+.mac-members-list thead th:first-child {
+	inset-inline-start: 0;
+	z-index: 3;
+}
+
+/* Each status label has a border in its status color, so it stands out on both stripe colors. */
 .mac-members-status__label {
 	display: inline-block;
 	padding-block: 0.25ch;
 	padding-inline: 0.75ch;
+	border: var(--border);
 	border-radius: var(--radius);
 	font-weight: 700;
 	white-space: nowrap;
 }
 
 .mac-members-status__label--pending {
+	border-color: var(--warning);
 	background: var(--warning-ultra-light);
 	color: var(--warning-semi-dark);
 }
 
 .mac-members-status__label--approved {
+	border-color: var(--success);
 	background: var(--success-ultra-light);
 	color: var(--success-semi-dark);
 }
 
-/* Neutral light, because the striped rows use --bg-ultra-light, which is neutral ultra-light by default. */
 .mac-members-status__label--inactive {
-	background: var(--neutral-light);
+	border-color: var(--neutral);
+	background: var(--neutral-ultra-light);
 	color: var(--neutral-semi-dark);
 }
 
 .mac-members-status__label--denied {
+	border-color: var(--danger);
 	background: var(--danger-ultra-light);
 	color: var(--danger-semi-dark);
 }
@@ -214,7 +251,7 @@
 	opacity: 0.7;
 }
 
-.mac-members-list__row.is-success > td {
+.mac-members-list tbody tr.mac-members-list__row.is-success > td {
 	background: var(--success-ultra-light);
 }
 
@@ -256,9 +293,9 @@
 	gap: 0.5ch;
 }
 
-/* Page links take the width of their text, like the filters. */
+/* Page links have no minimum width either, like the filters. */
 .mac-members-page-link {
-	--btn-min-width: fit-content;
+	--btn-min-width: auto;
 }
 
 .mac-members-per-page {
@@ -284,17 +321,39 @@
 }
 
 /*
- * The browser draws a select's arrow against the border, and padding does not move it. The selects draw
- * their own arrow instead, in the text color, with room between it and the border.
+ * The browser draws a select's arrow against the border, and padding does not move it. The selects hide it,
+ * and the span around each select draws a chevron in the text color, with room between it and the border.
  */
+.mac-members-select {
+	position: relative;
+	display: inline-flex;
+	color: var(--text-dark);
+}
+
+.mac-members-select::after {
+	content: "";
+	position: absolute;
+	inset-block: 0;
+	inset-inline-end: 0.75em;
+	inline-size: 1em;
+	background-color: currentColor;
+	-webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M6 9l6 6 6-6' fill='none' stroke='%23000' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center / contain no-repeat;
+	mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M6 9l6 6 6-6' fill='none' stroke='%23000' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center / contain no-repeat;
+	pointer-events: none;
+}
+
+.mac-members-search .mac-members-select {
+	font-size: var(--text-m);
+}
+
+.mac-members-per-page .mac-members-select {
+	font-size: var(--text-s);
+}
+
 .mac-members-search__role,
 .mac-members-per-page__select {
 	-webkit-appearance: none;
 	appearance: none;
-	padding-inline-end: 2.25em;
-	background-image: linear-gradient(45deg, transparent 50%, currentColor 50%), linear-gradient(135deg, currentColor 50%, transparent 50%);
-	background-position: calc(100% - 1.2em) 50%, calc(100% - 0.85em) 50%;
-	background-size: 0.35em 0.35em;
-	background-repeat: no-repeat;
+	padding-inline-end: 2.5em;
 	cursor: pointer;
 }
