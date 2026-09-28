@@ -89,8 +89,9 @@
 
 	const createButton = (transitionKey, userId) => {
 		const button = document.createElement('button');
+		const classes = (transitions[transitionKey] && transitions[transitionKey].classes) || '';
 		button.type = 'button';
-		button.className = `mac-members-button mac-members-button--${transitionKey}`;
+		button.className = `mac-members-button mac-members-button--${transitionKey} ${classes}`.trim();
 		button.dataset.macMembersAction = transitionKey;
 		button.dataset.macMembersUserId = userId;
 		button.textContent = (transitions[transitionKey] && transitions[transitionKey].label) || transitionKey;

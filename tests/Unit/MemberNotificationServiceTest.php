@@ -51,7 +51,9 @@ final class MemberNotificationServiceTest extends TestCase {
 		// Tags are removed from the applicant's value, and what is left is still escaped.
 		self::assertStringContainsString( 'Hi Mia &amp; &quot;Co&quot;,', $mail['message'] );
 		self::assertStringContainsString( 'Your account has been approved and your membership is now active.', $mail['message'] );
-		self::assertStringContainsString( 'https://example.test/wp-login.php', $mail['message'] );
+		// The site's home page, not wp-login.php: many sites use their own login pages.
+		self::assertStringContainsString( 'https://example.test/', $mail['message'] );
+		self::assertStringNotContainsString( 'wp-login.php', $mail['message'] );
 		self::assertStringContainsString( 'Best,<br>', $mail['message'] );
 		self::assertStringContainsString( 'Example &lt;Site&gt;', $mail['message'] );
 		self::assertStringNotContainsString( '<Admin>', $mail['message'] );
@@ -98,7 +100,7 @@ final class MemberNotificationServiceTest extends TestCase {
 
 		$message = $GLOBALS['mac_members_test_mail'][1]['message'];
 
-		self::assertStringContainsString( "First Name: Mia Member<br>\nLast Name: Bold Last<br>\nUsername: mia member<br>\nEmail Address: pending@example.test<br>\nUser ID: 42<br>", $message );
+		self::assertStringContainsString( "User ID: 42<br>\nFirst Name: Mia Member<br>\nLast Name: Bold Last<br>\nUsername: mia member<br>\nEmail Address: pending@example.test<br>\nProfile: ", $message );
 	}
 
 	public function test_applicant_values_are_capped_at_100_characters(): void {
@@ -213,11 +215,22 @@ final class MemberNotificationServiceTest extends TestCase {
 		self::assertSame( 'Your membership is no longer active', $member['subject'] );
 		self::assertStringContainsString( 'Hi Mia,', $member['message'] );
 		self::assertStringContainsString( 'Your membership on Example Site is no longer active.', $member['message'] );
+		self::assertStringContainsString( "<br>\nhttps://example.test/<br>", $member['message'] );
 		self::assertSame( 'admin@example.test', $admin['to'] );
 		self::assertSame( 'Member account deactivated', $admin['subject'] );
 		self::assertStringContainsString( 'A member account has been deactivated on Example Site.', $admin['message'] );
 		self::assertStringContainsString( 'user-edit.php?user_id=12', $admin['message'] );
 		self::assertContains( 'Reply-To: pending@example.test', $admin['headers'] );
+	}
+
+	public function test_denial_email_links_to_the_site(): void {
+		$this->create_service()->send_denial_notifications( $this->create_user() );
+
+		$member = $GLOBALS['mac_members_test_mail'][0];
+
+		self::assertSame( 'Your account request was not approved', $member['subject'] );
+		self::assertStringContainsString( "<br>\nhttps://example.test/<br>", $member['message'] );
+		self::assertStringStartsWith( "Hi,<br>\n<br>\nA pending member account has been denied on Example Site.<br>\n<br>\nUser ID: 12<br>", $GLOBALS['mac_members_test_mail'][1]['message'] );
 	}
 
 	public function test_toggle_settings_control_the_deactivation_notifications(): void {

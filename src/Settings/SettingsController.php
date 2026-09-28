@@ -9,6 +9,7 @@ declare(strict_types=1);
 
 namespace MacMembers\Settings;
 
+use MacMembers\Admin\MenuIcon;
 use MacMembers\Contracts\Service;
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -22,9 +23,19 @@ final class SettingsController implements Service
 
 	private const ACTION_SAVE_SETTINGS = 'save_settings';
 
+	/**
+	 * Whether this request registered the page as a top-level menu item, or under Settings.
+	 */
+	private ?bool $top_level = null;
+
+	/**
+	 * @param \Closure|null $end_request Runs instead of exiting after the redirect that follows a save. Tests
+	 *                                   pass a closure that throws, to see where the request ended.
+	 */
 	public function __construct(
 		private readonly SettingsRepositoryInterface $settings,
-		private readonly SettingsSchema $schema
+		private readonly SettingsSchema $schema,
+		private readonly ?\Closure $end_request = null
 	) {}
 
 	public function register(): void
@@ -40,8 +51,27 @@ final class SettingsController implements Service
 		$this->settings->ensure_defaults();
 	}
 
+	/**
+	 * Adds the settings page under Settings, or as a top-level menu item when that setting is on.
+	 */
 	public function register_settings_page(): void
 	{
+		$this->top_level = $this->wants_top_level();
+
+		if ( $this->top_level ) {
+			\add_menu_page(
+				__( 'MAC Members', 'mac-members' ),
+				__( 'MAC Members', 'mac-members' ),
+				'manage_options',
+				MAC_MEMBERS_ADMIN_SLUG,
+				array( $this, 'render_settings_page' ),
+				MenuIcon::url(),
+				null
+			);
+
+			return;
+		}
+
 		\add_options_page(
 			__( 'MAC Members', 'mac-members' ),
 			__( 'MAC Members', 'mac-members' ),
@@ -84,22 +114,22 @@ final class SettingsController implements Service
 
 		$role_errors = $this->settings->validate_roles( $submitted );
 
-		if ( array() !== $role_errors ) {
-			foreach ( $role_errors as $code => $message ) {
-				$this->add_settings_error( $code, $message );
-			}
+		if ( array() === $role_errors ) {
+			$this->settings->save( $submitted );
 
-			return;
+			\add_settings_error(
+				MAC_MEMBERS_SETTINGS_OPTION,
+				'settings_saved',
+				__( 'MAC Members settings saved.', 'mac-members' ),
+				'success'
+			);
 		}
 
-		$this->settings->save( $submitted );
+		foreach ( $role_errors as $code => $message ) {
+			$this->add_settings_error( $code, $message );
+		}
 
-		\add_settings_error(
-			MAC_MEMBERS_SETTINGS_OPTION,
-			'settings_saved',
-			__( 'MAC Members settings saved.', 'mac-members' ),
-			'success'
-		);
+		$this->redirect_to_settings_page();
 	}
 
 	public function render_settings_page(): void
@@ -113,7 +143,10 @@ final class SettingsController implements Service
 		echo '<div class="wrap">';
 		echo '<h1>' . esc_html__( 'MAC Members', 'mac-members' ) . '</h1>';
 
-		\settings_errors( MAC_MEMBERS_SETTINGS_OPTION );
+		// Under Settings, WordPress already shows settings notices on its own (options-head.php).
+		if ( $this->is_top_level() ) {
+			\settings_errors( MAC_MEMBERS_SETTINGS_OPTION );
+		}
 
 		echo '<form method="post" action="">';
 		echo '<input type="hidden" name="mac_members_action" value="' . esc_attr( self::ACTION_SAVE_SETTINGS ) . '">';
@@ -129,7 +162,7 @@ final class SettingsController implements Service
 		}
 
 		echo '</tbody></table>';
-		\submit_button( __( 'Save MAC Members settings', 'mac-members' ) );
+		\submit_button( __( 'Save Settings', 'mac-members' ) );
 		echo '</form>';
 		echo '</div>';
 	}
@@ -141,8 +174,41 @@ final class SettingsController implements Service
 		}
 
 		echo '<div class="notice notice-warning"><p>';
-		echo esc_html__( 'MAC Members: One or more configured roles do not exist. Please review Settings > MAC Members.', 'mac-members' );
+		echo esc_html__( 'MAC Members: One or more configured roles do not exist. Please review the MAC Members settings.', 'mac-members' );
 		echo '</p></div>';
+	}
+
+	/**
+	 * Sends the browser back to the settings page after a save, as WordPress does for its own settings, so a
+	 * reload does not post the form again. The notices travel in the settings_errors transient, which
+	 * settings_errors() reads on the next request. When the save moved the page between Settings and the
+	 * top level, this also sends the browser to the page's new address.
+	 */
+	private function redirect_to_settings_page(): void
+	{
+		\set_transient( 'settings_errors', \get_settings_errors(), 30 );
+		\wp_safe_redirect( \add_query_arg( array( 'settings-updated' => 'true' ), $this->get_page_url( $this->wants_top_level() ) ) );
+
+		if ( null !== $this->end_request ) {
+			( $this->end_request )();
+		}
+
+		exit;
+	}
+
+	private function get_page_url( bool $top_level ): string
+	{
+		return \admin_url( ( $top_level ? 'admin.php' : 'options-general.php' ) . '?page=' . MAC_MEMBERS_ADMIN_SLUG );
+	}
+
+	private function wants_top_level(): bool
+	{
+		return true === (bool) $this->settings->get( 'top_level_menu', false );
+	}
+
+	private function is_top_level(): bool
+	{
+		return $this->top_level ?? $this->wants_top_level();
 	}
 
 	private function render_field( string $key, array $field, mixed $value ): string

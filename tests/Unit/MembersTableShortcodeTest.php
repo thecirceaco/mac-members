@@ -118,7 +118,7 @@ final class MembersTableShortcodeTest extends TestCase {
 
 		self::assertStringContainsString( 'data-mac-members-view="pending"', $output );
 		self::assertStringContainsString( 'aria-label="Member status"', $output );
-		self::assertStringContainsString( '<a class="mac-members-filter is-current" href="/members/?tab=x&amp;mac_members_status=pending" aria-current="page">Pending <span class="mac-members-count" data-mac-members-count-for="pending">2</span></a>', $output );
+		self::assertStringContainsString( '<a class="mac-members-filter btn--primary is-current btn--s" href="/members/?tab=x&amp;mac_members_status=pending" aria-current="page">Pending <span class="mac-members-count" data-mac-members-count-for="pending">2</span></a>', $output );
 		self::assertStringContainsString( 'href="/members/?tab=x&amp;mac_members_status=approved">Approved <span class="mac-members-count" data-mac-members-count-for="approved">1</span>', $output );
 		self::assertStringContainsString( 'data-mac-members-count-for="inactive">0</span>', $output );
 		self::assertStringContainsString( 'data-mac-members-count-for="denied">1</span>', $output );
@@ -175,6 +175,29 @@ final class MembersTableShortcodeTest extends TestCase {
 		}
 	}
 
+	public function test_columns_start_with_the_user_id_and_end_with_status_and_actions(): void {
+		$this->store_members( array( 7 => 'mac_members_pending' ) );
+
+		$output = $this->create_shortcode()->render();
+
+		self::assertSame( 9, preg_match_all( '/<th scope="col">([^<]+)<\/th>/', $output, $headers ) );
+		self::assertSame(
+			array( 'User ID', 'Email', 'First Name', 'Last Name', 'Username', 'Registered', 'Profile', 'Status', 'Actions' ),
+			$headers[1]
+		);
+		self::assertStringContainsString( '<tr class="mac-members-list__row" data-mac-members-user-id="7" data-mac-members-status="pending"><td>7</td><td>member7@example.test</td>', $output );
+	}
+
+	public function test_buttons_use_automatic_css_classes(): void {
+		$this->store_members( array( 7 => 'mac_members_pending' ) );
+
+		$output = $this->create_shortcode()->render();
+
+		self::assertStringContainsString( 'class="mac-members-button mac-members-button--approve btn--primary btn--s"', $output );
+		self::assertStringContainsString( 'class="mac-members-button mac-members-button--deny btn--primary btn--outline btn--s"', $output );
+		self::assertStringContainsString( 'class="mac-members-filter btn--primary btn--outline btn--s" href="/?mac_members_status=approved"', $output );
+	}
+
 	public function test_unknown_status_query_argument_falls_back_to_pending(): void {
 		$_GET['mac_members_status'] = 'administrator';
 
@@ -219,7 +242,7 @@ final class MembersTableShortcodeTest extends TestCase {
 		$first = $this->create_shortcode()->render();
 
 		self::assertStringContainsString( '<span class="mac-members-page-count">Page 1 of 2</span>', $first );
-		self::assertStringContainsString( '<a class="mac-members-page-link" href="/members/?mac_members_status=approved&amp;mac_members_page=2">Next</a>', $first );
+		self::assertStringContainsString( '<a class="mac-members-page-link btn--primary btn--outline btn--s" href="/members/?mac_members_status=approved&amp;mac_members_page=2">Next</a>', $first );
 		self::assertStringNotContainsString( '>Previous</a>', $first );
 
 		$_GET['mac_members_page'] = '2';
@@ -394,7 +417,7 @@ final class MembersTableShortcodeTest extends TestCase {
 
 		self::assertStringContainsString( 'mac-members-notice--warning', $output );
 		self::assertStringContainsString(
-			'MAC Members: One or more configured roles do not exist (mac_members_pending, mac_members_denied). Status changes that need a missing role are blocked. Please review Settings &gt; MAC Members.',
+			'MAC Members: One or more configured roles do not exist (mac_members_pending, mac_members_denied). Status changes that need a missing role are blocked. Please review the MAC Members settings.',
 			$output
 		);
 	}

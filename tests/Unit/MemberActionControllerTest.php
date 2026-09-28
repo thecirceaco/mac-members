@@ -721,7 +721,7 @@ final class MemberActionControllerTest extends TestCase {
 		self::assertFalse( $response['success'] );
 		self::assertSame( 500, $response['status'] );
 		self::assertSame( 'missing_role', $response['data']['code'] );
-		self::assertSame( 'A role needed for this action does not exist. Please review Settings > MAC Members.', $response['data']['message'] );
+		self::assertSame( 'A role needed for this action does not exist. Please review the MAC Members settings.', $response['data']['message'] );
 		self::assertSame( array( 'mac_members_pending', 'subscriber' ), $user->roles );
 		self::assertSame( array(), $GLOBALS['mac_members_test_cleaned_user_cache'] );
 	}

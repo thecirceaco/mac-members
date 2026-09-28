@@ -87,6 +87,11 @@ final class SettingsSchema
 				'type'    => self::TYPE_TOGGLE,
 				'default' => true,
 			),
+			'top_level_menu' => array(
+				'label'   => __( 'Show MAC Members as a top-level admin menu item', 'mac-members' ),
+				'type'    => self::TYPE_TOGGLE,
+				'default' => false,
+			),
 		);
 	}
 

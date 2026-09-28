@@ -487,6 +487,9 @@ function mac_members_tests_reset_wp_state(): void {
 	$GLOBALS['mac_members_test_after_lock_insert']        = null;
 	$GLOBALS['wpdb']                                      = new MacMembers_Test_Wpdb();
 	$GLOBALS['mac_members_test_options_pages']     = array();
+	$GLOBALS['mac_members_test_menu_pages']        = array();
+	$GLOBALS['mac_members_test_transients']        = array();
+	$GLOBALS['mac_members_test_redirect']          = null;
 	$GLOBALS['mac_members_test_settings_errors']   = array();
 	$GLOBALS['mac_members_test_nonces']            = array();
 	$GLOBALS['mac_members_test_logged_in']         = true;
@@ -799,6 +802,60 @@ function add_options_page(
 	);
 
 	return 'settings_page_' . $menu_slug;
+}
+
+function add_menu_page(
+	string $page_title,
+	string $menu_title,
+	string $capability,
+	string $menu_slug,
+	callable $callback,
+	string $icon_url = '',
+	int|float|null $position = null
+): string {
+	$GLOBALS['mac_members_test_menu_pages'][ $menu_slug ] = array(
+		'page_title' => $page_title,
+		'menu_title' => $menu_title,
+		'capability' => $capability,
+		'callback'   => $callback,
+		'icon_url'   => $icon_url,
+		'position'   => $position,
+	);
+
+	return 'toplevel_page_' . $menu_slug;
+}
+
+/**
+ * @return array<int,array<string,string>>
+ */
+function get_settings_errors( string $setting = '' ): array {
+	return array_values(
+		array_filter(
+			$GLOBALS['mac_members_test_settings_errors'] ?? array(),
+			static fn ( array $error ): bool => '' === $setting || $setting === $error['setting']
+		)
+	);
+}
+
+function set_transient( string $transient, mixed $value, int $expiration = 0 ): bool {
+	unset( $expiration );
+
+	$GLOBALS['mac_members_test_transients'][ $transient ] = $value;
+
+	return true;
+}
+
+function wp_safe_redirect( string $location, int $status = 302 ): bool {
+	$GLOBALS['mac_members_test_redirect'] = array(
+		'location' => $location,
+		'status'   => $status,
+	);
+
+	return true;
+}
+
+function home_url( string $path = '' ): string {
+	return 'https://example.test/' . ltrim( $path, '/' );
 }
 
 function add_settings_error( string $setting, string $code, string $message, string $type = 'error' ): void {

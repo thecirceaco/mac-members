@@ -77,7 +77,7 @@ final class SettingsControllerTest extends TestCase {
 			),
 		);
 
-		$controller->handle_save();
+		$this->run_save( $controller );
 
 		$settings = $GLOBALS['mac_members_test_options'][ MAC_MEMBERS_SETTINGS_OPTION ];
 
@@ -112,7 +112,7 @@ final class SettingsControllerTest extends TestCase {
 			),
 		);
 
-		$this->create_controller()->handle_save();
+		$this->run_save( $this->create_controller() );
 
 		self::assertArrayNotHasKey( MAC_MEMBERS_SETTINGS_OPTION, $GLOBALS['mac_members_test_options'] );
 		self::assertSame(
@@ -185,16 +185,114 @@ final class SettingsControllerTest extends TestCase {
 		$output = (string) ob_get_clean();
 
 		self::assertStringContainsString(
-			'MAC Members: One or more configured roles do not exist. Please review Settings &gt; MAC Members.',
+			'MAC Members: One or more configured roles do not exist. Please review the MAC Members settings.',
 			$output
 		);
 		self::assertStringContainsString( 'notice notice-warning', $output );
+	}
+
+	public function test_settings_page_is_under_settings_by_default(): void {
+		$this->create_controller()->register_settings_page();
+
+		self::assertArrayHasKey( MAC_MEMBERS_ADMIN_SLUG, $GLOBALS['mac_members_test_options_pages'] );
+		self::assertSame( array(), $GLOBALS['mac_members_test_menu_pages'] );
+	}
+
+	public function test_settings_page_is_a_top_level_menu_item_when_that_setting_is_on(): void {
+		$GLOBALS['mac_members_test_options'][ MAC_MEMBERS_SETTINGS_OPTION ] = array( 'top_level_menu' => true );
+
+		$controller = $this->create_controller();
+		$controller->register_settings_page();
+
+		$page = $GLOBALS['mac_members_test_menu_pages'][ MAC_MEMBERS_ADMIN_SLUG ];
+
+		self::assertSame( array(), $GLOBALS['mac_members_test_options_pages'] );
+		self::assertSame( 'MAC Members', $page['menu_title'] );
+		self::assertSame( 'manage_options', $page['capability'] );
+		self::assertSame( array( $controller, 'render_settings_page' ), $page['callback'] );
+		self::assertStringStartsWith( 'data:image/svg+xml;base64,', $page['icon_url'] );
+		self::assertStringContainsString( 'viewBox="0 0 128 128"', (string) base64_decode( substr( $page['icon_url'], strlen( 'data:image/svg+xml;base64,' ) ) ) );
+	}
+
+	/**
+	 * Under Settings, WordPress prints settings notices itself, so the page must not print them again.
+	 */
+	public function test_page_prints_settings_notices_only_as_a_top_level_menu_item(): void {
+		\add_settings_error( MAC_MEMBERS_SETTINGS_OPTION, 'settings_saved', 'MAC Members settings saved.', 'success' );
+
+		$under_settings = $this->render_page( false );
+		$top_level      = $this->render_page( true );
+
+		self::assertSame( 0, substr_count( $under_settings, 'MAC Members settings saved.' ) );
+		self::assertSame( 1, substr_count( $top_level, 'MAC Members settings saved.' ) );
+		self::assertStringContainsString( '>Save Settings</button>', $top_level );
+	}
+
+	public function test_save_redirects_back_to_the_page_with_the_notices_in_a_transient(): void {
+		$this->prepare_save( array( 'from_email' => 'from@example.test' ) );
+
+		$this->run_save( $this->create_controller() );
+
+		self::assertSame( 'https://example.test/wp-admin/options-general.php?page=mac-members&settings-updated=true', $GLOBALS['mac_members_test_redirect']['location'] );
+		self::assertSame( 'settings_saved', $GLOBALS['mac_members_test_transients']['settings_errors'][0]['code'] );
+	}
+
+	public function test_turning_on_the_top_level_menu_redirects_to_its_new_address(): void {
+		$this->prepare_save( array( 'top_level_menu' => '1' ) );
+
+		$this->run_save( $this->create_controller() );
+
+		self::assertTrue( $GLOBALS['mac_members_test_options'][ MAC_MEMBERS_SETTINGS_OPTION ]['top_level_menu'] );
+		self::assertSame( 'https://example.test/wp-admin/admin.php?page=mac-members&settings-updated=true', $GLOBALS['mac_members_test_redirect']['location'] );
+	}
+
+	/**
+	 * @param array<string,string> $settings Submitted settings.
+	 */
+	private function prepare_save( array $settings ): void {
+		$_GET['page']              = MAC_MEMBERS_ADMIN_SLUG;
+		$_SERVER['REQUEST_METHOD'] = 'POST';
+		$_POST                     = array(
+			'mac_members_action'         => 'save_settings',
+			'mac_members_settings_nonce' => wp_create_nonce( SettingsController::NONCE_ACTION ),
+			'mac_members_settings'       => $settings,
+		);
+	}
+
+	private function render_page( bool $top_level ): string {
+		$GLOBALS['mac_members_test_options'][ MAC_MEMBERS_SETTINGS_OPTION ] = array( 'top_level_menu' => $top_level );
+
+		$controller = $this->create_controller();
+		$controller->register_settings_page();
+
+		ob_start();
+		$controller->render_settings_page();
+
+		return (string) ob_get_clean();
+	}
+
+	/**
+	 * Runs handle_save() and checks that it ended the request after its redirect.
+	 */
+	private function run_save( SettingsController $controller ): void {
+		try {
+			$controller->handle_save();
+			self::fail( 'The save did not end the request after redirecting.' );
+		} catch ( \MacMembers_Test_Request_Ended ) {
+			// The controller redirected and ended the request.
+		}
 	}
 
 	private function create_controller(): SettingsController {
 		$schema     = new SettingsSchema();
 		$repository = new WordPressSettingsRepository( $schema );
 
-		return new SettingsController( $repository, $schema );
+		return new SettingsController(
+			$repository,
+			$schema,
+			static function (): never {
+				throw new \MacMembers_Test_Request_Ended();
+			}
+		);
 	}
 }

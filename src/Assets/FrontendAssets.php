@@ -85,6 +85,7 @@ final class FrontendAssets implements Service
 				'action'  => $transition->ajax_action(),
 				'label'   => $transition->label(),
 				'confirm' => $transition->confirm_message(),
+				'classes' => $transition->button_classes(),
 			);
 		}
 

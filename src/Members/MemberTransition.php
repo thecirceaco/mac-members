@@ -61,6 +61,19 @@ enum MemberTransition: string
 	}
 
 	/**
+	 * Automatic.css button classes: a solid primary button for changes that give access, an outline one for
+	 * changes that take it away. The primary color is active on every ACSS site, so the buttons always match
+	 * the site's own buttons.
+	 */
+	public function button_classes(): string
+	{
+		return match ( $this ) {
+			self::Approve, self::Reactivate => 'btn--primary btn--s',
+			self::Deny, self::Deactivate    => 'btn--primary btn--outline btn--s',
+		};
+	}
+
+	/**
 	 * Question the members table asks before it makes this change.
 	 */
 	public function confirm_message(): string

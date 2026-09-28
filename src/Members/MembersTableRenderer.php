@@ -43,14 +43,14 @@ final class MembersTableRenderer
 			$output .= '<div class="mac-members-table-wrap">';
 			$output .= '<table class="mac-members-list">';
 			$output .= '<thead><tr>';
+			$output .= '<th scope="col">' . esc_html__( 'User ID', 'mac-members' ) . '</th>';
 			$output .= '<th scope="col">' . esc_html__( 'Email', 'mac-members' ) . '</th>';
 			$output .= '<th scope="col">' . esc_html__( 'First Name', 'mac-members' ) . '</th>';
 			$output .= '<th scope="col">' . esc_html__( 'Last Name', 'mac-members' ) . '</th>';
 			$output .= '<th scope="col">' . esc_html__( 'Username', 'mac-members' ) . '</th>';
-			$output .= '<th scope="col">' . esc_html__( 'User ID', 'mac-members' ) . '</th>';
-			$output .= '<th scope="col">' . esc_html__( 'Registered Date', 'mac-members' ) . '</th>';
-			$output .= '<th scope="col">' . esc_html__( 'Status', 'mac-members' ) . '</th>';
+			$output .= '<th scope="col">' . esc_html__( 'Registered', 'mac-members' ) . '</th>';
 			$output .= '<th scope="col">' . esc_html__( 'Profile', 'mac-members' ) . '</th>';
+			$output .= '<th scope="col">' . esc_html__( 'Status', 'mac-members' ) . '</th>';
 			$output .= '<th scope="col">' . esc_html__( 'Actions', 'mac-members' ) . '</th>';
 			$output .= '</tr></thead>';
 			$output .= '<tbody>' . $body . '</tbody>';
@@ -95,14 +95,14 @@ final class MembersTableRenderer
 			}
 
 			$output .= '<tr class="mac-members-list__row" data-mac-members-user-id="' . esc_attr( (string) $id ) . '" data-mac-members-status="' . esc_attr( $status->value ) . '">';
+			$output .= '<td>' . esc_html( (string) $id ) . '</td>';
 			$output .= '<td>' . esc_html( $this->get_user_value( $user, 'user_email' ) ) . '</td>';
 			$output .= '<td>' . esc_html( $this->get_user_value( $user, 'first_name' ) ) . '</td>';
 			$output .= '<td>' . esc_html( $this->get_user_value( $user, 'last_name' ) ) . '</td>';
 			$output .= '<td>' . esc_html( $this->get_user_value( $user, 'user_login' ) ) . '</td>';
-			$output .= '<td>' . esc_html( (string) $id ) . '</td>';
 			$output .= '<td>' . esc_html( $this->format_registered_date( $this->get_user_value( $user, 'user_registered' ) ) ) . '</td>';
-			$output .= '<td class="mac-members-status"><span class="mac-members-status__label mac-members-status__label--' . esc_attr( $status->value ) . '">' . esc_html( $status->label() ) . '</span></td>';
 			$output .= '<td><a class="mac-members-profile-link" href="' . esc_url( $this->get_profile_url( $id ) ) . '" target="_blank" rel="noopener noreferrer">' . esc_html__( 'View profile', 'mac-members' ) . '</a></td>';
+			$output .= '<td class="mac-members-status"><span class="mac-members-status__label mac-members-status__label--' . esc_attr( $status->value ) . '">' . esc_html( $status->label() ) . '</span></td>';
 			$output .= '<td class="mac-members-actions">';
 
 			foreach ( MemberTransition::available_for( $status ) as $transition ) {
@@ -130,8 +130,9 @@ final class MembersTableRenderer
 		foreach ( $filters as $filter ) {
 			$current = ! empty( $filter['current'] );
 
+			// The current filter is a solid ACSS button, the others outline buttons.
 			$output .= '<li>';
-			$output .= '<a class="mac-members-filter' . ( $current ? ' is-current' : '' ) . '" href="' . esc_url( $filter['url'] ) . '"' . ( $current ? ' aria-current="page"' : '' ) . '>';
+			$output .= '<a class="mac-members-filter btn--primary' . ( $current ? ' is-current' : ' btn--outline' ) . ' btn--s" href="' . esc_url( $filter['url'] ) . '"' . ( $current ? ' aria-current="page"' : '' ) . '>';
 			$output .= esc_html( $filter['label'] ) . ' ';
 			$output .= '<span class="mac-members-count" data-mac-members-count-for="' . esc_attr( $filter['view'] ) . '">' . esc_html( (string) (int) $filter['count'] ) . '</span>';
 			$output .= '</a>';
@@ -158,7 +159,7 @@ final class MembersTableRenderer
 		$output = '<nav class="mac-members-pagination" aria-label="' . esc_attr__( 'Members table pages', 'mac-members' ) . '">';
 
 		if ( '' !== ( $pagination['previous_url'] ?? '' ) ) {
-			$output .= '<a class="mac-members-page-link" href="' . esc_url( $pagination['previous_url'] ) . '">' . esc_html__( 'Previous', 'mac-members' ) . '</a>';
+			$output .= '<a class="mac-members-page-link btn--primary btn--outline btn--s" href="' . esc_url( $pagination['previous_url'] ) . '">' . esc_html__( 'Previous', 'mac-members' ) . '</a>';
 		}
 
 		$output .= '<span class="mac-members-page-count">' . esc_html(
@@ -171,7 +172,7 @@ final class MembersTableRenderer
 		) . '</span>';
 
 		if ( '' !== ( $pagination['next_url'] ?? '' ) ) {
-			$output .= '<a class="mac-members-page-link" href="' . esc_url( $pagination['next_url'] ) . '">' . esc_html__( 'Next', 'mac-members' ) . '</a>';
+			$output .= '<a class="mac-members-page-link btn--primary btn--outline btn--s" href="' . esc_url( $pagination['next_url'] ) . '">' . esc_html__( 'Next', 'mac-members' ) . '</a>';
 		}
 
 		$output .= '</nav>';
@@ -190,7 +191,7 @@ final class MembersTableRenderer
 
 		$message = sprintf(
 			/* translators: %s: comma-separated list of role slugs. */
-			__( 'MAC Members: One or more configured roles do not exist (%s). Status changes that need a missing role are blocked. Please review Settings > MAC Members.', 'mac-members' ),
+			__( 'MAC Members: One or more configured roles do not exist (%s). Status changes that need a missing role are blocked. Please review the MAC Members settings.', 'mac-members' ),
 			implode( ', ', $missing_roles )
 		);
 
@@ -199,7 +200,7 @@ final class MembersTableRenderer
 
 	private function render_action_button( MemberTransition $transition, int $user_id ): string
 	{
-		return '<button type="button" class="mac-members-button mac-members-button--' . esc_attr( $transition->value ) . '" data-mac-members-action="' . esc_attr( $transition->value ) . '" data-mac-members-user-id="' . esc_attr( (string) $user_id ) . '">' . esc_html( $transition->label() ) . '</button>';
+		return '<button type="button" class="mac-members-button mac-members-button--' . esc_attr( $transition->value ) . ' ' . esc_attr( $transition->button_classes() ) . '" data-mac-members-action="' . esc_attr( $transition->value ) . '" data-mac-members-user-id="' . esc_attr( (string) $user_id ) . '">' . esc_html( $transition->label() ) . '</button>';
 	}
 
 	private function get_user_id( object $user ): int

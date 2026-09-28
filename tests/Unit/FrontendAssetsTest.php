@@ -66,21 +66,25 @@ final class FrontendAssetsTest extends TestCase {
 					'action'  => 'mac_members_approve_user',
 					'label'   => 'Approve',
 					'confirm' => 'Are you sure you want to approve this member?',
+					'classes' => 'btn--primary btn--s',
 				),
 				'deny'       => array(
 					'action'  => 'mac_members_deny_user',
 					'label'   => 'Deny',
 					'confirm' => 'Are you sure you want to deny this member?',
+					'classes' => 'btn--primary btn--outline btn--s',
 				),
 				'deactivate' => array(
 					'action'  => 'mac_members_deactivate_user',
 					'label'   => 'Deactivate',
 					'confirm' => 'Are you sure you want to deactivate this member?',
+					'classes' => 'btn--primary btn--outline btn--s',
 				),
 				'reactivate' => array(
 					'action'  => 'mac_members_reactivate_user',
 					'label'   => 'Reactivate',
 					'confirm' => 'Are you sure you want to reactivate this member?',
+					'classes' => 'btn--primary btn--s',
 				),
 			),
 			$config['transitions']

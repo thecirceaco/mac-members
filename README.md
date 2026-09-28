@@ -8,6 +8,7 @@ It provides a small admin settings page, a protected members table shortcode wit
 
 - WordPress 6.x
 - PHP 8.3+
+- Automatic.css 4 on the front end: the members table takes its colors, borders, radius, spacing and buttons from ACSS variables and button classes (`btn--primary`, `btn--outline`, `btn--s`), so it follows each site's design system
 
 ## Installation
 
@@ -26,7 +27,7 @@ A role that already exists keeps its name and capabilities. A site that updates 
 
 ## Settings
 
-MAC Members stores its settings under `Settings > MAC Members`.
+The settings page is under `Settings > MAC Members`. Turn on "Show MAC Members as a top-level admin menu item" to give it its own menu item with the MAC icon instead; it's off by default. Saving sends you back to the page, at its new address when this setting changed.
 
 | Setting | Default role |
 | --- | --- |
@@ -63,7 +64,7 @@ The table has a filter for each status (Pending, Approved, Inactive, Denied) and
 [mac_members_table status="pending"]
 ```
 
-Pending requests are listed oldest first, like a queue; the other views show the newest registrations first. The table shows 50 members per page, with Previous and Next links (`mac_members_page`). Each row includes account details, the member's status, a profile link and the status changes that status allows.
+Pending requests are listed oldest first, like a queue; the other views show the newest registrations first. The table shows 50 members per page, with Previous and Next links (`mac_members_page`). The columns are User ID, Email, First Name, Last Name, Username, Registered, Profile, Status and Actions; the Actions column has only the status changes the member's status allows.
 
 After a change, a row that no longer belongs in a filtered view disappears, and in the All view the row shows its new status and buttons. The filter counts follow the changes.
 
@@ -100,6 +101,8 @@ The current notification types are:
 - admin approval email, also sent on reactivation
 - admin denial email
 - admin deactivation email
+
+Member emails link to the site's home page rather than `wp-login.php`, because many sites have their own login, registration and password pages. Admin emails list the member's details with the User ID first, then first name, last name, username, email address and profile link.
 
 Each notification type can be toggled from the settings page. Email delivery failures do not roll back the role update; the action response includes a warning and the failure is logged with lightweight action and user ID context.
 
