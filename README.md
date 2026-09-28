@@ -46,6 +46,7 @@ The settings page also includes:
 - member and admin approval email toggles
 - member and admin denial email toggles
 - member and admin deactivation email toggles
+- delete plugin data on uninstall, off by default (see Review capability below)
 
 All email notification toggles are enabled by default.
 
@@ -138,7 +139,7 @@ The plugin does not expose public unauthenticated endpoints and does not provide
 
 Activating the plugin gives the `administrator` role the `mac_members_review` capability. A site that updates the plugin without reactivating it gets the same step once, on the next request. To let another role review members, give it `mac_members_review` and `promote_users` with a role editor.
 
-Deleting the plugin from the Plugins screen removes `mac_members_review` from every role, and removes the four member roles that no user holds. Roles that users still hold stay, so nobody is left without a role.
+Deleting the plugin from the Plugins screen keeps its data, like MAC Core, unless "Delete plugin data on uninstall" is on in the settings; it is off by default. With it on, deleting the plugin removes the settings, `mac_members_review` from every role, and the four member roles that no user holds. Roles that users still hold stay, so nobody is left without a role. The per-user lock rows always go, because they only exist while a status change runs.
 
 ## Development
 

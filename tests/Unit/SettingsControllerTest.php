@@ -236,6 +236,13 @@ final class SettingsControllerTest extends TestCase {
 		self::assertStringContainsString( '<p class="description" id="mac-members-role_filter_exclusions-description">Comma-separated role slugs, role names or capabilities, for example administrator, manage_options.', $output );
 	}
 
+	public function test_settings_page_has_the_uninstall_checkbox_off_with_its_description(): void {
+		$output = $this->render_page( false );
+
+		self::assertStringContainsString( '<input type="checkbox" id="mac-members-delete_data_on_uninstall" name="mac_members_settings[delete_data_on_uninstall]" value="1" aria-describedby="mac-members-delete_data_on_uninstall-description"> Delete plugin data on uninstall</label>', $output );
+		self::assertStringContainsString( '<p class="description" id="mac-members-delete_data_on_uninstall-description">When the plugin is deleted, remove its settings, the review capability and the member roles that no user holds.', $output );
+	}
+
 	public function test_save_redirects_back_to_the_page_with_the_notices_in_a_transient(): void {
 		$this->prepare_save( array( 'from_email' => 'from@example.test' ) );
 

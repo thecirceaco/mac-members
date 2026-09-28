@@ -216,7 +216,7 @@ final class SettingsController implements Service
 		return match ( $field['type'] ) {
 			SettingsSchema::TYPE_ROLE   => $this->render_role_select( $key, (string) $value ),
 			SettingsSchema::TYPE_EMAIL  => $this->render_email_input( $key, (string) $value ),
-			SettingsSchema::TYPE_TOGGLE => $this->render_toggle( $key, (bool) $value, (string) $field['label'] ),
+			SettingsSchema::TYPE_TOGGLE => $this->render_toggle( $key, (bool) $value, (string) $field['label'], isset( $field['description'] ) ),
 			SettingsSchema::TYPE_LIST   => $this->render_list_input( $key, (string) $value, isset( $field['description'] ) ),
 			default                     => '',
 		};
@@ -261,9 +261,11 @@ final class SettingsController implements Service
 		return '<input type="email" class="regular-text" id="mac-members-' . esc_attr( $key ) . '" name="mac_members_settings[' . esc_attr( $key ) . ']" value="' . esc_attr( $value ) . '">';
 	}
 
-	private function render_toggle( string $key, bool $value, string $label ): string
+	private function render_toggle( string $key, bool $value, string $label, bool $described = false ): string
 	{
-		return '<label><input type="checkbox" id="mac-members-' . esc_attr( $key ) . '" name="mac_members_settings[' . esc_attr( $key ) . ']" value="1"' . $this->checked_attr( $value ) . '> ' . esc_html( $label ) . '</label>';
+		$describedby = $described ? ' aria-describedby="mac-members-' . esc_attr( $key ) . '-description"' : '';
+
+		return '<label><input type="checkbox" id="mac-members-' . esc_attr( $key ) . '" name="mac_members_settings[' . esc_attr( $key ) . ']" value="1"' . $this->checked_attr( $value ) . $describedby . '> ' . esc_html( $label ) . '</label>';
 	}
 
 	private function selected_attr( bool $selected ): string

@@ -99,6 +99,12 @@ final class SettingsSchema
 				'type'    => self::TYPE_TOGGLE,
 				'default' => false,
 			),
+			'delete_data_on_uninstall' => array(
+				'label'       => __( 'Delete plugin data on uninstall', 'mac-members' ),
+				'type'        => self::TYPE_TOGGLE,
+				'default'     => false,
+				'description' => __( 'When the plugin is deleted, remove its settings, the review capability and the member roles that no user holds. Roles that users still hold are kept, so nobody is left without a role.', 'mac-members' ),
+			),
 		);
 	}
 

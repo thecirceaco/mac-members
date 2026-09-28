@@ -48,6 +48,7 @@ final class SettingsRepositoryTest extends TestCase {
 		self::assertTrue( $settings['send_admin_denial_email'] );
 		self::assertTrue( $settings['send_member_deactivation_email'] );
 		self::assertTrue( $settings['send_admin_deactivation_email'] );
+		self::assertFalse( $settings['delete_data_on_uninstall'] );
 		self::assertSame( 'Example Site', $repository->get_from_name() );
 	}
 

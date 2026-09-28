@@ -81,16 +81,29 @@ final class Installer implements Service
 
 	/**
 	 * Uninstall callback. WordPress stores it in an option, so it has to be static.
+	 *
+	 * The per-user lock rows always go, because they only exist while a status change runs. Everything else
+	 * stays, like in MAC Core, unless "Delete plugin data on uninstall" is on. Then the settings, the install
+	 * version, the review capability and the member roles that no user holds go too. Roles that users still
+	 * hold stay, so nobody is left without a role.
 	 */
 	public static function uninstall(): void
 	{
+		MemberLock::delete_all();
+
+		$settings = \get_option( MAC_MEMBERS_SETTINGS_OPTION, array() );
+
+		if ( ! \is_array( $settings ) || true !== ( $settings['delete_data_on_uninstall'] ?? false ) ) {
+			return;
+		}
+
 		foreach ( \wp_roles()->role_objects as $role ) {
 			$role->remove_cap( Capabilities::REVIEW );
 		}
 
 		Roles::remove_unused();
 		\delete_option( self::VERSION_OPTION );
-		MemberLock::delete_all();
+		\delete_option( MAC_MEMBERS_SETTINGS_OPTION );
 	}
 
 	private function grant_review_capability(): void

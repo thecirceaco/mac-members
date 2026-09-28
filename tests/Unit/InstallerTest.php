@@ -82,9 +82,25 @@ final class InstallerTest extends TestCase {
 		self::assertArrayNotHasKey( Capabilities::REVIEW, $GLOBALS['mac_members_test_roles']['administrator']['capabilities'] );
 	}
 
-	public function test_uninstall_removes_the_review_capability_from_every_role(): void {
+	public function test_uninstall_keeps_the_data_unless_that_setting_is_on(): void {
+		( new Installer() )->install();
+		$GLOBALS['mac_members_test_options'][ MAC_MEMBERS_SETTINGS_OPTION ] = array( 'delete_data_on_uninstall' => false );
+		$GLOBALS['wpdb']->rows['mac_members_lock_12']                      = '1:dead-request';
+
+		Installer::uninstall();
+
+		self::assertTrue( $GLOBALS['mac_members_test_roles']['administrator']['capabilities'][ Capabilities::REVIEW ] );
+		self::assertArrayHasKey( 'mac_members_pending', $GLOBALS['mac_members_test_roles'] );
+		self::assertArrayHasKey( Installer::VERSION_OPTION, $GLOBALS['mac_members_test_options'] );
+		self::assertArrayHasKey( MAC_MEMBERS_SETTINGS_OPTION, $GLOBALS['mac_members_test_options'] );
+		// Lock rows only exist while a status change runs, so they always go.
+		self::assertSame( array(), $GLOBALS['wpdb']->rows );
+	}
+
+	public function test_uninstall_with_that_setting_removes_the_settings_and_the_review_capability(): void {
 		( new Installer() )->install();
 		get_role( 'mac_members_approved' )->add_cap( Capabilities::REVIEW );
+		$this->turn_on_data_deletion();
 
 		Installer::uninstall();
 
@@ -93,6 +109,7 @@ final class InstallerTest extends TestCase {
 		}
 
 		self::assertArrayNotHasKey( Installer::VERSION_OPTION, $GLOBALS['mac_members_test_options'] );
+		self::assertArrayNotHasKey( MAC_MEMBERS_SETTINGS_OPTION, $GLOBALS['mac_members_test_options'] );
 	}
 
 	public function test_install_creates_the_missing_member_roles_with_read_only(): void {
@@ -147,10 +164,11 @@ final class InstallerTest extends TestCase {
 		self::assertArrayNotHasKey( 'mac_members_inactive', $GLOBALS['mac_members_test_roles'] );
 	}
 
-	public function test_uninstall_removes_only_the_member_roles_that_no_user_holds(): void {
+	public function test_uninstall_with_that_setting_removes_only_the_member_roles_that_no_user_holds(): void {
 		$GLOBALS['mac_members_test_users'] = array(
 			new \WP_User( array( 'ID' => 12, 'roles' => array( 'mac_members_approved', 'subscriber' ) ) ),
 		);
+		$this->turn_on_data_deletion();
 
 		Installer::uninstall();
 
@@ -168,6 +186,10 @@ final class InstallerTest extends TestCase {
 		Installer::uninstall();
 
 		self::assertSame( array(), $GLOBALS['wpdb']->rows );
+	}
+
+	private function turn_on_data_deletion(): void {
+		$GLOBALS['mac_members_test_options'][ MAC_MEMBERS_SETTINGS_OPTION ] = array( 'delete_data_on_uninstall' => true );
 	}
 
 	private function remove_member_roles(): void {
