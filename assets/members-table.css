@@ -1,0 +1,185 @@
+.mac-members-table {
+	width: 100%;
+}
+
+.mac-members-notices {
+	margin-block-end: 1rem;
+}
+
+.mac-members-notice {
+	margin: 0 0 0.75rem;
+	padding: 0.75rem 1rem;
+	border-left: 4px solid #2563eb;
+	background: #eff6ff;
+	color: #111827;
+}
+
+.mac-members-notice--success {
+	border-left-color: #16a34a;
+	background: #f0fdf4;
+}
+
+.mac-members-notice--error {
+	border-left-color: #dc2626;
+	background: #fef2f2;
+}
+
+.mac-members-notice--warning {
+	border-left-color: #d97706;
+	background: #fffbeb;
+}
+
+.mac-members-filters {
+	margin-block-end: 1rem;
+}
+
+.mac-members-filters ul {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 0.5rem;
+	margin: 0;
+	padding: 0;
+	list-style: none;
+}
+
+.mac-members-filter {
+	display: inline-flex;
+	align-items: center;
+	gap: 0.4rem;
+	padding: 0.4rem 0.75rem;
+	border: 1px solid #d1d5db;
+	border-radius: 999px;
+	background: #ffffff;
+	color: #111827;
+	text-decoration: none;
+}
+
+.mac-members-filter.is-current {
+	border-color: #111827;
+	background: #111827;
+	color: #ffffff;
+}
+
+.mac-members-count {
+	font-weight: 700;
+}
+
+.mac-members-table-wrap {
+	overflow-x: auto;
+}
+
+.mac-members-list {
+	width: 100%;
+	border-collapse: collapse;
+	background: #ffffff;
+}
+
+.mac-members-list th,
+.mac-members-list td {
+	padding: 0.75rem;
+	border: 1px solid #d1d5db;
+	text-align: left;
+	vertical-align: middle;
+}
+
+.mac-members-list th {
+	background: #f3f4f6;
+	color: #111827;
+	font-weight: 700;
+}
+
+.mac-members-status__label {
+	display: inline-block;
+	padding: 0.15rem 0.5rem;
+	border-radius: 999px;
+	background: #f3f4f6;
+	color: #111827;
+	white-space: nowrap;
+}
+
+.mac-members-status__label--pending {
+	background: #fffbeb;
+	color: #92400e;
+}
+
+.mac-members-status__label--approved {
+	background: #f0fdf4;
+	color: #166534;
+}
+
+.mac-members-status__label--inactive {
+	background: #f3f4f6;
+	color: #374151;
+}
+
+.mac-members-status__label--denied {
+	background: #fef2f2;
+	color: #991b1b;
+}
+
+.mac-members-actions {
+	display: flex;
+	gap: 0.5rem;
+	flex-wrap: wrap;
+}
+
+.mac-members-button {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	min-height: 2.25rem;
+	padding: 0.45rem 0.75rem;
+	border: 1px solid #1f2937;
+	border-radius: 4px;
+	background: #ffffff;
+	color: #111827;
+	cursor: pointer;
+	font: inherit;
+}
+
+.mac-members-button--approve,
+.mac-members-button--reactivate {
+	border-color: #15803d;
+	background: #16a34a;
+	color: #ffffff;
+}
+
+.mac-members-button--deny {
+	border-color: #b91c1c;
+	background: #dc2626;
+	color: #ffffff;
+}
+
+.mac-members-button--deactivate {
+	border-color: #92400e;
+	background: #b45309;
+	color: #ffffff;
+}
+
+.mac-members-button:disabled {
+	cursor: wait;
+	opacity: 0.65;
+}
+
+.mac-members-list__row.is-processing {
+	opacity: 0.7;
+}
+
+.mac-members-list__row.is-success {
+	background: #ecfdf5;
+}
+
+.mac-members-empty {
+	margin: 0;
+	padding: 1rem;
+	border: 1px solid #d1d5db;
+	background: #f9fafb;
+	color: #111827;
+}
+
+.mac-members-pagination {
+	display: flex;
+	align-items: center;
+	gap: 0.75rem;
+	margin-block-start: 1rem;
+}

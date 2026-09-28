@@ -12,7 +12,7 @@ namespace MacMembers\Tests\Unit;
 use MacMembers\Actions\MemberActionController;
 use MacMembers\Assets\FrontendAssets;
 use MacMembers\Email\MemberNotificationService;
-use MacMembers\PendingMembers\RenderToken;
+use MacMembers\Members\RenderToken;
 use MacMembers\Settings\SettingsSchema;
 use MacMembers\Settings\WordPressSettingsRepository;
 use PHPUnit\Framework\Attributes\CoversClass;

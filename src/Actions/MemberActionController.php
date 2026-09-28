@@ -15,7 +15,7 @@ use MacMembers\Email\MemberNotificationService;
 use MacMembers\Email\NotificationResult;
 use MacMembers\Members\MemberStatus;
 use MacMembers\Members\MemberTransition;
-use MacMembers\PendingMembers\RenderToken;
+use MacMembers\Members\RenderToken;
 use MacMembers\Security\Capabilities;
 use MacMembers\Settings\SettingsRepositoryInterface;
 

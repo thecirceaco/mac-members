@@ -1,6 +1,6 @@
 <?php
 /**
- * Tests for the pending members table render token.
+ * Tests for the members table render token.
  *
  * @package MacMembers\Tests\Unit
  */
@@ -9,7 +9,7 @@ declare(strict_types=1);
 
 namespace MacMembers\Tests\Unit;
 
-use MacMembers\PendingMembers\RenderToken;
+use MacMembers\Members\RenderToken;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\TestCase;
 

@@ -1,13 +1,13 @@
 <?php
 /**
- * Token that ties approve and deny requests to a table the plugin rendered.
+ * Token that ties status changes to a members table the plugin rendered.
  *
  * @package mac-members
  */
 
 declare(strict_types=1);
 
-namespace MacMembers\PendingMembers;
+namespace MacMembers\Members;
 
 if ( ! defined( 'ABSPATH' ) ) {
 	exit; // Exit if accessed directly.
@@ -18,7 +18,7 @@ final class RenderToken
 	/**
 	 * Keeps these signatures apart from other signatures made with the same salt.
 	 */
-	private const CONTEXT = 'mac_members_pending_table';
+	private const CONTEXT = 'mac_members_table';
 
 	/**
 	 * @param int $lifetime Seconds a rendered table can be used for.

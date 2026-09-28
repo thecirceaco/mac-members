@@ -1,0 +1,239 @@
+(function () {
+	'use strict';
+
+	const config = window.macMembers || {};
+	const transitions = config.transitions || {};
+	const statuses = config.statuses || {};
+	const genericError = config.genericError || 'Something went wrong. Please try again.';
+	const genericSuccess = config.genericSuccess || 'Member updated.';
+	const rootSelector = '[data-mac-members-table]';
+	const rowSelector = 'tr[data-mac-members-user-id]';
+	const actionSelector = '[data-mac-members-action][data-mac-members-user-id]';
+
+	const getMessage = (response, fallback) => {
+		if (response && response.data && typeof response.data.message === 'string') {
+			return response.data.message;
+		}
+
+		return fallback;
+	};
+
+	const getErrorCode = (response) => {
+		if (response && response.data && typeof response.data.code === 'string') {
+			return response.data.code;
+		}
+
+		return '';
+	};
+
+	const showNotice = (root, type, message) => {
+		const notices = root.querySelector('.mac-members-notices');
+
+		if (!notices) {
+			return;
+		}
+
+		notices.innerHTML = '';
+
+		const notice = document.createElement('div');
+		notice.className = `mac-members-notice mac-members-notice--${type}`;
+		notice.textContent = message;
+		notices.appendChild(notice);
+	};
+
+	const setRowProcessing = (row, isProcessing) => {
+		row.classList.toggle('is-processing', isProcessing);
+		row.querySelectorAll('button').forEach((button) => {
+			button.disabled = isProcessing;
+		});
+	};
+
+	const showEmptyStateIfNeeded = (root) => {
+		const tbody = root.querySelector('tbody');
+
+		if (tbody && tbody.querySelector('tr')) {
+			return;
+		}
+
+		const tableWrap = root.querySelector('.mac-members-table-wrap');
+
+		if (tableWrap) {
+			tableWrap.remove();
+		}
+
+		const empty = root.querySelector('.mac-members-empty');
+
+		if (empty) {
+			empty.hidden = false;
+		}
+	};
+
+	// Keeps the numbers in the status filters in step with the rows that change status.
+	const changeCount = (root, view, delta) => {
+		if (!view) {
+			return;
+		}
+
+		const count = root.querySelector(`[data-mac-members-count-for="${view}"]`);
+
+		if (!count) {
+			return;
+		}
+
+		const value = parseInt(count.textContent, 10);
+
+		if (!Number.isNaN(value)) {
+			count.textContent = String(Math.max(0, value + delta));
+		}
+	};
+
+	const createButton = (transitionKey, userId) => {
+		const button = document.createElement('button');
+		button.type = 'button';
+		button.className = `mac-members-button mac-members-button--${transitionKey}`;
+		button.dataset.macMembersAction = transitionKey;
+		button.dataset.macMembersUserId = userId;
+		button.textContent = (transitions[transitionKey] && transitions[transitionKey].label) || transitionKey;
+
+		return button;
+	};
+
+	// In the "All" view the row stays: show its new status and the changes that status allows.
+	const updateRowStatus = (row, status, statusLabel) => {
+		row.dataset.macMembersStatus = status;
+
+		const label = row.querySelector('.mac-members-status__label');
+
+		if (label) {
+			label.className = `mac-members-status__label mac-members-status__label--${status}`;
+			label.textContent = statusLabel;
+		}
+
+		const actions = row.querySelector('.mac-members-actions');
+
+		if (!actions) {
+			return;
+		}
+
+		actions.textContent = '';
+
+		((statuses[status] && statuses[status].transitions) || []).forEach((transitionKey) => {
+			if (transitions[transitionKey]) {
+				actions.appendChild(createButton(transitionKey, row.dataset.macMembersUserId));
+			}
+		});
+	};
+
+	const removeRow = (root, row) => {
+		row.classList.add('is-success');
+
+		window.setTimeout(() => {
+			row.remove();
+			showEmptyStateIfNeeded(root);
+		}, 900);
+	};
+
+	const parseJsonResponse = async (response) => {
+		try {
+			return await response.json();
+		} catch (error) {
+			console.warn('MAC Members: unexpected AJAX response', error);
+
+			return null;
+		}
+	};
+
+	const sendAction = async (ajaxAction, userId, renderToken) => {
+		const body = new URLSearchParams();
+		body.set('action', ajaxAction);
+		body.set('nonce', config.nonce || '');
+		body.set('user_id', userId);
+		body.set('render_token', renderToken);
+
+		const response = await window.fetch(config.ajaxUrl, {
+			method: 'POST',
+			credentials: 'same-origin',
+			headers: {
+				'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
+			},
+			body,
+		});
+
+		const data = await parseJsonResponse(response);
+
+		if (!response.ok || !data || data.success !== true) {
+			console.warn('MAC Members: AJAX action failed', data);
+		}
+
+		return {
+			ok: response.ok && data && data.success === true,
+			data,
+			status: response.status,
+		};
+	};
+
+	document.addEventListener('click', async (event) => {
+		const button = event.target.closest(actionSelector);
+
+		if (!button) {
+			return;
+		}
+
+		const root = button.closest(rootSelector);
+		const row = button.closest(rowSelector);
+
+		if (!root || !row || !config.ajaxUrl) {
+			return;
+		}
+
+		const transition = transitions[button.dataset.macMembersAction];
+
+		if (!transition || !transition.action || (transition.confirm && !window.confirm(transition.confirm))) {
+			return;
+		}
+
+		const userId = button.dataset.macMembersUserId;
+		const renderToken = root.dataset.macMembersRenderToken || '';
+		const previousStatus = row.dataset.macMembersStatus || '';
+		const isAllView = root.dataset.macMembersView === 'all';
+
+		setRowProcessing(row, true);
+
+		try {
+			const result = await sendAction(transition.action, userId, renderToken);
+
+			if (!result.ok) {
+				showNotice(root, 'error', getMessage(result.data, genericError));
+
+				// The member's status changed elsewhere, so this row no longer belongs in a filtered view.
+				if (getErrorCode(result.data) === 'status_changed' && !isAllView) {
+					removeRow(root, row);
+					return;
+				}
+
+				setRowProcessing(row, false);
+				return;
+			}
+
+			const data = (result.data && result.data.data) || {};
+
+			showNotice(root, data.warning ? 'warning' : 'success', getMessage(result.data, genericSuccess));
+			changeCount(root, previousStatus, -1);
+			changeCount(root, data.status, 1);
+
+			if (isAllView && data.status) {
+				updateRowStatus(row, data.status, data.status_label || data.status);
+				setRowProcessing(row, false);
+				row.classList.add('is-success');
+				window.setTimeout(() => row.classList.remove('is-success'), 900);
+				return;
+			}
+
+			removeRow(root, row);
+		} catch (error) {
+			console.warn('MAC Members: AJAX action failed', error);
+			showNotice(root, 'error', genericError);
+			setRowProcessing(row, false);
+		}
+	});
+})();

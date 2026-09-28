@@ -13,9 +13,9 @@ use MacMembers\Actions\MemberActionController;
 use MacMembers\Assets\FrontendAssets;
 use MacMembers\Contracts\Service;
 use MacMembers\Email\MemberNotificationService;
-use MacMembers\PendingMembers\PendingMembersQuery;
-use MacMembers\PendingMembers\PendingMembersShortcode;
-use MacMembers\PendingMembers\PendingMembersTableRenderer;
+use MacMembers\Members\MembersQuery;
+use MacMembers\Members\MembersTableRenderer;
+use MacMembers\Members\MembersTableShortcode;
 use MacMembers\Settings\SettingsController;
 use MacMembers\Settings\SettingsSchema;
 use MacMembers\Settings\WordPressSettingsRepository;
@@ -56,16 +56,16 @@ final class Kernel
 		$settings_schema      = new SettingsSchema();
 		$settings_repository  = new WordPressSettingsRepository( $settings_schema );
 		$frontend_assets      = new FrontendAssets();
-		$pending_members_query = new PendingMembersQuery( $settings_repository );
+		$members_query        = new MembersQuery( $settings_repository );
 		$notifications        = new MemberNotificationService( $settings_repository );
 		$services             = [
 			new Installer(),
 			new SettingsController( $settings_repository, $settings_schema ),
 			new MemberActionController( $settings_repository, $notifications ),
 			$frontend_assets,
-			new PendingMembersShortcode(
-				$pending_members_query,
-				new PendingMembersTableRenderer(),
+			new MembersTableShortcode(
+				$members_query,
+				new MembersTableRenderer(),
 				$frontend_assets,
 				$settings_repository
 			),

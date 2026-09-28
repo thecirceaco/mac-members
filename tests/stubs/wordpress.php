@@ -545,6 +545,55 @@ function add_shortcode( string $tag, callable $callback ): void {
 	$GLOBALS['mac_members_test_shortcodes'][ $tag ] = $callback;
 }
 
+/**
+ * @param array<string,mixed>        $pairs Supported attributes and their defaults.
+ * @param array<string,mixed>|string $atts  Attributes from the shortcode tag.
+ *
+ * @return array<string,mixed>
+ */
+function shortcode_atts( array $pairs, array|string $atts, string $shortcode = '' ): array {
+	unset( $shortcode );
+
+	$atts = (array) $atts;
+	$out  = array();
+
+	foreach ( $pairs as $name => $default ) {
+		$out[ $name ] = array_key_exists( $name, $atts ) ? $atts[ $name ] : $default;
+	}
+
+	return $out;
+}
+
+/**
+ * Array form only: add_query_arg( array $args, string $url ). A false value removes the argument.
+ *
+ * @param array<string,mixed> $args Query arguments.
+ */
+function add_query_arg( array $args, ?string $url = null ): string {
+	$url   = $url ?? (string) ( $_SERVER['REQUEST_URI'] ?? '/' );
+	$parts = explode( '?', $url, 2 );
+	$query = array();
+
+	parse_str( $parts[1] ?? '', $query );
+
+	foreach ( $args as $key => $value ) {
+		if ( false === $value ) {
+			unset( $query[ $key ] );
+		} else {
+			$query[ $key ] = $value;
+		}
+	}
+
+	return $parts[0] . ( array() === $query ? '' : '?' . http_build_query( $query ) );
+}
+
+/**
+ * @param string|array<int,string> $key Arguments to remove.
+ */
+function remove_query_arg( string|array $key, ?string $url = null ): string {
+	return add_query_arg( array_fill_keys( (array) $key, false ), $url );
+}
+
 function apply_filters( string $hook_name, mixed $value, mixed ...$args ): mixed {
 	foreach ( $GLOBALS['mac_members_test_filters'][ $hook_name ] ?? array() as $filter ) {
 		$value = ( $filter['callback'] )( $value, ...$args );

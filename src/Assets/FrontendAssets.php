@@ -10,6 +10,8 @@ declare(strict_types=1);
 namespace MacMembers\Assets;
 
 use MacMembers\Contracts\Service;
+use MacMembers\Members\MemberStatus;
+use MacMembers\Members\MemberTransition;
 
 if ( ! defined( 'ABSPATH' ) ) {
 	exit; // Exit if accessed directly.
@@ -17,8 +19,8 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 final class FrontendAssets implements Service
 {
-	public const STYLE_HANDLE  = 'mac-members-pending-members';
-	public const SCRIPT_HANDLE = 'mac-members-pending-members';
+	public const STYLE_HANDLE  = 'mac-members-table';
+	public const SCRIPT_HANDLE = 'mac-members-table';
 	public const NONCE_ACTION  = 'mac_members_member_action';
 	public const APPROVE_ACTION    = 'mac_members_approve_user';
 	public const DENY_ACTION       = 'mac_members_deny_user';
@@ -34,21 +36,21 @@ final class FrontendAssets implements Service
 	{
 		\wp_register_style(
 			self::STYLE_HANDLE,
-			MAC_MEMBERS_ASSETS_URL . 'pending-members.css',
+			MAC_MEMBERS_ASSETS_URL . 'members-table.css',
 			array(),
 			MAC_MEMBERS_VERSION
 		);
 
 		\wp_register_script(
 			self::SCRIPT_HANDLE,
-			MAC_MEMBERS_ASSETS_URL . 'pending-members.js',
+			MAC_MEMBERS_ASSETS_URL . 'members-table.js',
 			array(),
 			MAC_MEMBERS_VERSION,
 			true
 		);
 	}
 
-	public function enqueue_pending_members(): void
+	public function enqueue_members_table(): void
 	{
 		$this->register_assets();
 
@@ -56,7 +58,7 @@ final class FrontendAssets implements Service
 		\wp_enqueue_script( self::SCRIPT_HANDLE );
 
 		$settings = \wp_json_encode(
-			$this->get_pending_members_config(),
+			$this->get_members_table_config(),
 			JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT
 		);
 
@@ -72,20 +74,39 @@ final class FrontendAssets implements Service
 	}
 
 	/**
-	 * @return array<string,string>
+	 * @return array<string,mixed>
 	 */
-	private function get_pending_members_config(): array
+	private function get_members_table_config(): array
 	{
+		$transitions = array();
+
+		foreach ( MemberTransition::cases() as $transition ) {
+			$transitions[ $transition->value ] = array(
+				'action'  => $transition->ajax_action(),
+				'label'   => $transition->label(),
+				'confirm' => $transition->confirm_message(),
+			);
+		}
+
+		$statuses = array();
+
+		foreach ( MemberStatus::cases() as $status ) {
+			$statuses[ $status->value ] = array(
+				'label'       => $status->label(),
+				'transitions' => array_map(
+					static fn ( MemberTransition $transition ): string => $transition->value,
+					MemberTransition::available_for( $status )
+				),
+			);
+		}
+
 		return array(
-			'ajaxUrl'         => \admin_url( 'admin-ajax.php' ),
-			'nonce'           => \wp_create_nonce( self::NONCE_ACTION ),
-			'approveAction'   => self::APPROVE_ACTION,
-			'denyAction'      => self::DENY_ACTION,
-			'confirmApprove'  => __( 'Are you sure you want to approve this member?', 'mac-members' ),
-			'confirmDeny'     => __( 'Are you sure you want to deny this member?', 'mac-members' ),
-			'genericError'    => __( 'Something went wrong. Please try again.', 'mac-members' ),
-			'genericSuccess'  => __( 'Member updated.', 'mac-members' ),
-			'emptyStateText'  => __( 'There are no pending members.', 'mac-members' ),
+			'ajaxUrl'        => \admin_url( 'admin-ajax.php' ),
+			'nonce'          => \wp_create_nonce( self::NONCE_ACTION ),
+			'transitions'    => $transitions,
+			'statuses'       => $statuses,
+			'genericError'   => __( 'Something went wrong. Please try again.', 'mac-members' ),
+			'genericSuccess' => __( 'Member updated.', 'mac-members' ),
 		);
 	}
 }

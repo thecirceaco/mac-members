@@ -1,6 +1,6 @@
 <?php
 /**
- * Tests for pending members frontend assets.
+ * Tests for the members table frontend assets.
  *
  * @package MacMembers\Tests\Unit
  */
@@ -33,30 +33,87 @@ final class FrontendAssetsTest extends TestCase {
 		self::assertArrayHasKey( 'wp_enqueue_scripts', $GLOBALS['mac_members_test_actions'] );
 	}
 
-	public function test_enqueue_pending_members_assets_provides_window_config(): void {
-		$assets = new FrontendAssets();
-
-		$assets->enqueue_pending_members();
+	public function test_enqueue_members_table_registers_the_files_and_enqueues_them(): void {
+		( new FrontendAssets() )->enqueue_members_table();
 
 		self::assertSame(
-			MAC_MEMBERS_ASSETS_URL . 'pending-members.css',
+			MAC_MEMBERS_ASSETS_URL . 'members-table.css',
 			$GLOBALS['mac_members_test_registered_styles'][ FrontendAssets::STYLE_HANDLE ]['src']
 		);
 		self::assertSame(
-			MAC_MEMBERS_ASSETS_URL . 'pending-members.js',
+			MAC_MEMBERS_ASSETS_URL . 'members-table.js',
 			$GLOBALS['mac_members_test_registered_scripts'][ FrontendAssets::SCRIPT_HANDLE ]['src']
 		);
 		self::assertContains( FrontendAssets::STYLE_HANDLE, $GLOBALS['mac_members_test_enqueued_styles'] );
 		self::assertContains( FrontendAssets::SCRIPT_HANDLE, $GLOBALS['mac_members_test_enqueued_scripts'] );
+	}
+
+	public function test_window_config_lists_every_status_change_and_what_each_status_allows(): void {
+		( new FrontendAssets() )->enqueue_members_table();
 
 		$inline = $GLOBALS['mac_members_test_inline_scripts'][ FrontendAssets::SCRIPT_HANDLE ][0];
 
 		self::assertSame( 'before', $inline['position'] );
-		self::assertStringContainsString( 'window.macMembers', $inline['data'] );
-		self::assertStringContainsString( 'https:\/\/example.test\/wp-admin\/admin-ajax.php', $inline['data'] );
-		self::assertStringContainsString( 'mac_members_approve_user', $inline['data'] );
-		self::assertStringContainsString( 'mac_members_deny_user', $inline['data'] );
-		self::assertStringContainsString( 'Are you sure you want to approve this member?', $inline['data'] );
-		self::assertStringContainsString( 'Are you sure you want to deny this member?', $inline['data'] );
+		self::assertStringStartsWith( 'window.macMembers = ', $inline['data'] );
+
+		$config = json_decode( substr( $inline['data'], strlen( 'window.macMembers = ' ), -1 ), true );
+
+		self::assertSame( 'https://example.test/wp-admin/admin-ajax.php', $config['ajaxUrl'] );
+		self::assertSame( 'nonce-' . FrontendAssets::NONCE_ACTION, $config['nonce'] );
+		self::assertSame(
+			array(
+				'approve'    => array(
+					'action'  => 'mac_members_approve_user',
+					'label'   => 'Approve',
+					'confirm' => 'Are you sure you want to approve this member?',
+				),
+				'deny'       => array(
+					'action'  => 'mac_members_deny_user',
+					'label'   => 'Deny',
+					'confirm' => 'Are you sure you want to deny this member?',
+				),
+				'deactivate' => array(
+					'action'  => 'mac_members_deactivate_user',
+					'label'   => 'Deactivate',
+					'confirm' => 'Are you sure you want to deactivate this member?',
+				),
+				'reactivate' => array(
+					'action'  => 'mac_members_reactivate_user',
+					'label'   => 'Reactivate',
+					'confirm' => 'Are you sure you want to reactivate this member?',
+				),
+			),
+			$config['transitions']
+		);
+		self::assertSame(
+			array(
+				'pending'  => array(
+					'label'       => 'Pending',
+					'transitions' => array( 'approve', 'deny' ),
+				),
+				'approved' => array(
+					'label'       => 'Approved',
+					'transitions' => array( 'deactivate' ),
+				),
+				'inactive' => array(
+					'label'       => 'Inactive',
+					'transitions' => array( 'reactivate' ),
+				),
+				'denied'   => array(
+					'label'       => 'Denied',
+					'transitions' => array( 'approve' ),
+				),
+			),
+			$config['statuses']
+		);
+	}
+
+	public function test_window_config_escapes_markup_for_the_inline_script(): void {
+		( new FrontendAssets() )->enqueue_members_table();
+
+		$inline = $GLOBALS['mac_members_test_inline_scripts'][ FrontendAssets::SCRIPT_HANDLE ][0]['data'];
+
+		self::assertStringNotContainsString( '</', $inline );
+		self::assertStringNotContainsString( "'", substr( $inline, strlen( 'window.macMembers = ' ) ) );
 	}
 }

@@ -48,6 +48,32 @@ enum MemberTransition: string
 	}
 
 	/**
+	 * Button label in the members table.
+	 */
+	public function label(): string
+	{
+		return match ( $this ) {
+			self::Approve    => __( 'Approve', 'mac-members' ),
+			self::Deny       => __( 'Deny', 'mac-members' ),
+			self::Deactivate => __( 'Deactivate', 'mac-members' ),
+			self::Reactivate => __( 'Reactivate', 'mac-members' ),
+		};
+	}
+
+	/**
+	 * Question the members table asks before it makes this change.
+	 */
+	public function confirm_message(): string
+	{
+		return match ( $this ) {
+			self::Approve    => __( 'Are you sure you want to approve this member?', 'mac-members' ),
+			self::Deny       => __( 'Are you sure you want to deny this member?', 'mac-members' ),
+			self::Deactivate => __( 'Are you sure you want to deactivate this member?', 'mac-members' ),
+			self::Reactivate => __( 'Are you sure you want to reactivate this member?', 'mac-members' ),
+		};
+	}
+
+	/**
 	 * The authenticated AJAX action that makes this change.
 	 */
 	public function ajax_action(): string
