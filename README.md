@@ -1,8 +1,8 @@
 # MAC Members
 
-MAC Members is a company standard WordPress plugin for reviewing pending member accounts and moving them into approved or denied roles.
+MAC Members is a company standard WordPress plugin for reviewing member accounts: it moves users between a pending, approved, inactive and denied role.
 
-It provides a small admin settings page, a protected pending-members table shortcode, authenticated approve/deny actions, and hardcoded notification emails for the first release line.
+It provides a small admin settings page, a protected members table shortcode with a filter for each status, authenticated status changes, and hardcoded notification emails. Access to members-only content stays with the site's membership rules, for example SureMembers rules by role; MAC Members only assigns the roles.
 
 ## Requirements
 
@@ -13,73 +13,93 @@ It provides a small admin settings page, a protected pending-members table short
 
 Install MAC Members from the GitHub release ZIP, then activate the plugin in WordPress.
 
-After activation, review the configured roles in `Settings > MAC Members`. The plugin expects the selected roles to already exist on the site.
+Activation creates the four member roles if they don't exist yet, each with only the `read` capability:
+
+| Role | Name |
+| --- | --- |
+| `mac_members_pending` | Member (Pending) |
+| `mac_members_approved` | Member |
+| `mac_members_inactive` | Member (Inactive) |
+| `mac_members_denied` | Member (Denied) |
+
+A role that already exists keeps its name and capabilities. A site that updates the plugin without reactivating it gets the missing roles once, on the next request. New registrations need the pending role, for example from the registration form's user action.
 
 ## Settings
 
 MAC Members stores its settings under `Settings > MAC Members`.
 
-The role defaults are:
-
 | Setting | Default role |
 | --- | --- |
-| Pending role | `member-pending` |
-| Approved role | `member` |
-| Denied role | `member-invalid` |
+| Pending role | `mac_members_pending` |
+| Approved role | `mac_members_approved` |
+| Inactive role | `mac_members_inactive` |
+| Denied role | `mac_members_denied` |
 
-The pending, approved and denied roles must be three different roles, and the approved and denied roles must not grant administrative capabilities such as `manage_options`, `edit_users`, `promote_users`, `delete_users`, `unfiltered_html`, `edit_plugins`, `edit_themes`, `install_plugins` or `activate_plugins` (the full list is in `src/Security/Capabilities.php`). Settings that break these rules are not saved, and the settings page shows why. Approve and deny check the same rules again before they change a user, because a role can gain capabilities after the settings are saved.
+The four roles must be different roles, and the approved, inactive and denied roles must not grant administrative capabilities such as `manage_options`, `edit_users`, `promote_users`, `delete_users`, `unfiltered_html`, `edit_plugins`, `edit_themes`, `install_plugins` or `activate_plugins` (the full list is in `src/Security/Capabilities.php`). Settings that break these rules are not saved, and the settings page shows why. Every status change checks the same rules again before it changes a user, because a role can gain capabilities after the settings are saved.
 
 The settings page also includes:
 
 - admin notification email
 - from email
-- member approval email toggle
-- member denial email toggle
-- admin approval email toggle
-- admin denial email toggle
+- member and admin approval email toggles
+- member and admin denial email toggles
+- member and admin deactivation email toggles
 
 All email notification toggles are enabled by default.
 
-## Pending Members Table
+## Members Table
 
-Add the pending-members table to a protected admin or internal page with:
+Add the members table to a protected admin or internal page with:
 
 ```text
-[mac_members_pending_table]
+[mac_members_table]
 ```
 
-The shortcode shows pending users to logged-in users who have the `mac_members_review` capability and can `promote_users`. Other users see no output.
+The shortcode shows the table to logged-in users who have the `mac_members_review` capability and can `promote_users`. Other users see no output.
 
-The table lists pending users by the configured pending role and shows the oldest registrations first. Each row includes account details, a profile link, and approve/deny actions.
+The table has a filter for each status (Pending, Approved, Inactive, Denied) and one for All, each with its number of members, and opens on Pending. The view is kept in the `mac_members_status` query argument. To show a single view without the filters, set the `status` attribute to `pending`, `approved`, `inactive`, `denied` or `all`:
 
-Each time the table is rendered it gets a token that lists the users it shows and is signed for the current user and login session. Approve and deny requests must send that token, and the server only acts on users the token lists, so buttons or requests that did not come from a rendered table are refused. A token is valid for 12 hours; after that the table has to be reloaded.
+```text
+[mac_members_table status="pending"]
+```
 
-On a page whose content contains the shortcode, the plugin defines `DONOTCACHEPAGE` and sends `Cache-Control: no-store` and `Content-Security-Policy: frame-ancestors 'self'` from `template_redirect`, before any output. When the shortcode is placed outside the post content, for example by a page builder or in a template, return `true` from the `mac_members_is_pending_table_page` filter for that request. The shortcode also sends these headers when it renders, if output has not started yet.
+Pending requests are listed oldest first, like a queue; the other views show the newest registrations first. The table shows 50 members per page, with Previous and Next links (`mac_members_page`). Each row includes account details, the member's status, a profile link and the status changes that status allows.
 
-## Approval and Denial
+After a change, a row that no longer belongs in a filtered view disappears, and in the All view the row shows its new status and buttons. The filter counts follow the changes.
 
-Approving a pending user removes the configured pending and denied roles and adds the configured approved role.
+Each time the table is rendered it gets a token that lists the users it shows and is signed for the current user and login session. Status change requests must send that token, and the server only acts on users the token lists, so buttons or requests that did not come from a rendered table are refused. A token is valid for 12 hours; after that the table has to be reloaded.
 
-Denying a pending user removes the configured pending and approved roles and adds the configured denied role. Denied users are not deleted.
+On a page whose content contains the shortcode, the plugin defines `DONOTCACHEPAGE` and sends `Cache-Control: no-store` and `Content-Security-Policy: frame-ancestors 'self'` from `template_redirect`, before any output. When the shortcode is placed outside the post content, for example by a page builder or in a template, return `true` from the `mac_members_is_table_page` filter for that request. The shortcode also sends these headers when it renders, if output has not started yet.
 
-Approve and deny exclude each other, so a user who is moved back to pending never keeps the outcome role of an earlier review.
+## Status Changes
 
-Before any change, the plugin checks that the pending role and the role being added exist. After the change it reads the user's roles again, and if they are not what was expected it restores the roles the user had before and returns an error. When a configured role is missing, the pending-members table shows a warning as well as the settings page.
+| Change | From | To | Emails |
+| --- | --- | --- | --- |
+| Approve | Pending or Denied | Approved | approval |
+| Deny | Pending | Denied | denial |
+| Deactivate | Approved | Inactive | deactivation |
+| Reactivate | Inactive | Approved | approval |
 
-Only one approve or deny can change a user at a time. The plugin takes a per-user lock, a `mac_members_lock_<user ID>` row in the options table created with an atomic `INSERT IGNORE`, reads the user's roles again, and releases the lock when the change is done. A second request for the same user gets a "being updated" error while the lock is held, and "no longer pending" after that. A lock left behind by a request that died expires after 30 seconds.
+Denied means a request that was refused; inactive means someone who was a member and no longer is. Approve on a denied member corrects a denial. Nobody is deleted.
 
-Existing unrelated roles are preserved in both flows.
+The statuses exclude each other: each change adds the role of the new status and removes every other status role the user holds, so a user who goes back to pending never keeps the outcome of an earlier review. Existing unrelated roles, such as Subscriber, are preserved. WordPress's user edit screen has a single Role dropdown that replaces all of a user's roles, so change member statuses from the members table.
+
+Before any change, the plugin checks that the role being added exists, and that the user still has a status the change applies to. After the change it reads the user's roles again, and if they are not what was expected it restores the roles the user had before and returns an error. When a configured role is missing, the members table shows a warning as well as the settings page.
+
+Only one status change can change a user at a time. The plugin takes a per-user lock, a `mac_members_lock_<user ID>` row in the options table created with an atomic `INSERT IGNORE`, reads the user's roles again, and releases the lock when the change is done. A second request for the same user gets a "being updated" error while the lock is held, and "status has changed" after that. A lock left behind by a request that died expires after 30 seconds.
 
 ## Email Notifications
 
-MAC Members sends hardcoded HTML emails after successful approval or denial actions.
+MAC Members sends hardcoded HTML emails after successful status changes.
 
 The current notification types are:
 
-- member approval email
+- member approval email, also sent on reactivation
 - member denial email
-- admin approval email
+- member deactivation email
+- admin approval email, also sent on reactivation
 - admin denial email
+- admin deactivation email
 
 Each notification type can be toggled from the settings page. Email delivery failures do not roll back the role update; the action response includes a warning and the failure is logged with lightweight action and user ID context.
 
@@ -87,15 +107,17 @@ Values the applicant controls (first name, last name, display name, username and
 
 ## Security
 
-MAC Members uses authenticated WordPress AJAX actions for approval and denial. It checks the nonce with `check_ajax_referer()` and requires the acting user to have the `mac_members_review` capability and `promote_users`. For each target user it checks `current_user_can( 'promote_user', $user_id )` and that every role the action adds or removes is in `get_editable_roles()`. It verifies that the target user is still pending, blocks self-actions, and blocks actions against target users who hold any of the sensitive capabilities listed under Settings.
+MAC Members uses authenticated WordPress AJAX actions for the four status changes (`mac_members_approve_user`, `mac_members_deny_user`, `mac_members_deactivate_user` and `mac_members_reactivate_user`). It checks the nonce with `check_ajax_referer()` and requires the acting user to have the `mac_members_review` capability and `promote_users`. For each target user it checks `current_user_can( 'promote_user', $user_id )` and that every role the change adds or removes is in `get_editable_roles()`. It verifies that the target user still has a status the change applies to, blocks self-actions, and blocks actions against target users who hold any of the sensitive capabilities listed under Settings.
 
 Every check that fails sends an error and ends the request, and so does the success response, so a failed check can never reach the role change, even when a `wp_die` handler does not exit.
 
-The plugin does not expose public unauthenticated approval endpoints and does not provide a REST API in v0.2.0.
+The plugin does not expose public unauthenticated endpoints and does not provide a REST API.
 
 ### Review capability
 
-Activating the plugin gives the `administrator` role the `mac_members_review` capability. A site that updates the plugin without reactivating it gets the same step once, on the next request. To let another role review members, give it `mac_members_review` and `promote_users` with a role editor. Deleting the plugin from the Plugins screen removes `mac_members_review` from every role.
+Activating the plugin gives the `administrator` role the `mac_members_review` capability. A site that updates the plugin without reactivating it gets the same step once, on the next request. To let another role review members, give it `mac_members_review` and `promote_users` with a role editor.
+
+Deleting the plugin from the Plugins screen removes `mac_members_review` from every role, and removes the four member roles that no user holds. Roles that users still hold stay, so nobody is left without a role.
 
 ## Development
 
