@@ -568,11 +568,12 @@ function sanitize_key( string $key ): string {
 }
 
 function sanitize_text_field( mixed $value ): string {
-	$value = (string) $value;
-	$value = preg_replace( '/[\r\n\t]+/', ' ', $value ) ?? '';
-	$value = trim( strip_tags( $value ) );
+	$original = (string) $value;
+	$value    = strip_tags( $original );
+	// Like WordPress: line breaks, tabs and runs of spaces become one space.
+	$value = preg_replace( '/[\r\n\t ]+/', ' ', $value ) ?? '';
 
-	return $value;
+	return (string) apply_filters( 'sanitize_text_field', trim( $value ), $original );
 }
 
 function sanitize_email( mixed $email ): string {

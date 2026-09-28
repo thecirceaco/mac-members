@@ -83,6 +83,8 @@ The current notification types are:
 
 Each notification type can be toggled from the settings page. Email delivery failures do not roll back the role update; the action response includes a warning and the failure is logged with lightweight action and user ID context.
 
+Values the applicant controls (first name, last name, display name, username and email address) are cleaned before they go into a template: they pass through `sanitize_text_field()`, line breaks are removed, and each is cut to 100 characters. The rendered body is still escaped as a whole.
+
 ## Security
 
 MAC Members uses authenticated WordPress AJAX actions for approval and denial. It checks the nonce with `check_ajax_referer()` and requires the acting user to have the `mac_members_review` capability and `promote_users`. For each target user it checks `current_user_can( 'promote_user', $user_id )` and that every role the action adds or removes is in `get_editable_roles()`. It verifies that the target user is still pending, blocks self-actions, and blocks actions against target users who hold any of the sensitive capabilities listed under Settings.
