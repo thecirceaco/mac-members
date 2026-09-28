@@ -70,6 +70,11 @@ final class MemberActionControllerTest extends TestCase {
 		self::assertSame( $expected_code, $GLOBALS['mac_members_test_ajax_responses'][0]['data']['code'] );
 		self::assertSame( array(), $GLOBALS['mac_members_test_role_changes'] );
 		self::assertSame( $roles_before, $GLOBALS['mac_members_test_user_roles'][12] );
+
+		if ( 'busy' !== $gate ) {
+			// Every other check runs before the lock row, the first write.
+			self::assertSame( array(), $GLOBALS['wpdb']->queries );
+		}
 	}
 
 	/**
@@ -91,6 +96,7 @@ final class MemberActionControllerTest extends TestCase {
 			'unsafe roles'    => array( 'unsafe roles', 'invalid_role_settings' ),
 			'not editable'    => array( 'not editable', 'permission_denied' ),
 			'stale table'     => array( 'stale table', 'stale_table' ),
+			'busy'            => array( 'busy', 'busy' ),
 		);
 	}
 
@@ -178,6 +184,88 @@ final class MemberActionControllerTest extends TestCase {
 			self::assertTrue( $response['success'], (string) $user_id );
 			self::assertSame( array( 'member' ), $user->roles );
 		}
+	}
+
+	public function test_member_locked_by_another_request_is_busy(): void {
+		$GLOBALS['wpdb']->rows['mac_members_lock_12'] = ( time() + 30 ) . ':other-request';
+
+		$user = $this->store_user( 12, array( 'member-pending' ) );
+		$this->prepare_ajax_request( FrontendAssets::APPROVE_ACTION, $user->ID );
+
+		$response = $this->capture_ajax_response(
+			fn (): mixed => $this->create_controller()->approve()
+		);
+
+		self::assertFalse( $response['success'] );
+		self::assertSame( 409, $response['status'] );
+		self::assertSame( 'busy', $response['data']['code'] );
+		self::assertSame( 'This member is being updated in another request. Please wait a moment and reload the page.', $response['data']['message'] );
+		self::assertSame( array( 'member-pending' ), $user->roles );
+		self::assertSame( array(), $GLOBALS['mac_members_test_role_changes'] );
+		self::assertSame( ( time() + 30 ) . ':other-request', $GLOBALS['wpdb']->rows['mac_members_lock_12'] );
+	}
+
+	public function test_expired_lock_does_not_block_the_action(): void {
+		$GLOBALS['wpdb']->rows['mac_members_lock_12'] = ( time() - 1 ) . ':dead-request';
+
+		$user = $this->store_user( 12, array( 'member-pending' ) );
+		$this->prepare_ajax_request( FrontendAssets::APPROVE_ACTION, $user->ID );
+
+		$response = $this->capture_ajax_response(
+			fn (): mixed => $this->create_controller()->approve()
+		);
+
+		self::assertTrue( $response['success'] );
+		self::assertSame( array(), $GLOBALS['wpdb']->rows );
+	}
+
+	public function test_lock_is_released_after_success_and_after_a_failed_write(): void {
+		$approved = $this->store_user( 12, array( 'member-pending' ) );
+		$this->prepare_ajax_request( FrontendAssets::APPROVE_ACTION, $approved->ID );
+
+		self::assertTrue( $this->capture_ajax_response( fn (): mixed => $this->create_controller()->approve() )['success'] );
+		self::assertSame( array(), $GLOBALS['wpdb']->rows );
+
+		$failed = $this->store_user( 13, array( 'member-pending' ), array(), true, array( 'blocked_roles' => array( 'member' ) ) );
+		$this->prepare_ajax_request( FrontendAssets::APPROVE_ACTION, $failed->ID );
+
+		self::assertSame( 'role_update_failed', $this->capture_ajax_response( fn (): mixed => $this->create_controller()->approve() )['data']['code'] );
+		self::assertSame( array(), $GLOBALS['wpdb']->rows );
+	}
+
+	public function test_roles_are_read_again_after_the_lock_is_taken(): void {
+		$user = $this->store_user( 12, array( 'member-pending' ) );
+		$this->prepare_ajax_request( FrontendAssets::APPROVE_ACTION, $user->ID );
+
+		// Another request denies the user after this one checked the roles and before it took the lock.
+		$GLOBALS['mac_members_test_after_lock_insert'] = static function (): void {
+			$GLOBALS['mac_members_test_user_roles'][12] = array( 'member-invalid' );
+		};
+
+		$response = $this->capture_ajax_response(
+			fn (): mixed => $this->create_controller()->approve()
+		);
+
+		self::assertFalse( $response['success'] );
+		self::assertSame( 409, $response['status'] );
+		self::assertSame( 'not_pending', $response['data']['code'] );
+		self::assertSame( array(), $GLOBALS['mac_members_test_role_changes'] );
+		self::assertSame( array( 'member-invalid' ), $GLOBALS['mac_members_test_user_roles'][12] );
+		self::assertSame( array(), $GLOBALS['wpdb']->rows );
+	}
+
+	public function test_second_action_on_the_same_member_finds_it_no_longer_pending(): void {
+		$user  = $this->store_user( 12, array( 'member-pending' ) );
+		$token = ( new RenderToken() )->issue( array( 12 ) );
+
+		$this->prepare_ajax_request( FrontendAssets::APPROVE_ACTION, $user->ID, $token );
+		self::assertTrue( $this->capture_ajax_response( fn (): mixed => $this->create_controller()->approve() )['success'] );
+
+		$this->prepare_ajax_request( FrontendAssets::DENY_ACTION, $user->ID, $token );
+		$response = $this->capture_ajax_response( fn (): mixed => $this->create_controller()->deny() );
+
+		self::assertSame( 'not_pending', $response['data']['code'] );
+		self::assertSame( array( 'member' ), $user->roles );
 	}
 
 	public function test_capability_denial_returns_permission_error(): void {
@@ -702,6 +790,9 @@ final class MemberActionControllerTest extends TestCase {
 				break;
 			case 'stale table':
 				$_POST['render_token'] = ( new RenderToken() )->issue( array( 13 ) );
+				break;
+			case 'busy':
+				$GLOBALS['wpdb']->rows['mac_members_lock_12'] = ( time() + 30 ) . ':other-request';
 				break;
 			case 'elevated target':
 				$this->store_user( 12, array( 'member-pending' ), array( 'manage_options' => true ) );

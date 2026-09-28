@@ -224,6 +224,140 @@ if ( ! class_exists( 'WP_User' ) ) {
 	}
 }
 
+if ( ! class_exists( 'MacMembers_Test_Wpdb' ) ) {
+	/**
+	 * Enough of wpdb for the member lock: an options table whose option_name is unique, as in MySQL.
+	 * Any other query throws, so a test notices when the plugin sends SQL this fake does not know.
+	 */
+	final class MacMembers_Test_Wpdb {
+		public string $options = 'wp_options';
+
+		/**
+		 * Rows of the options table written through queries, by option_name.
+		 *
+		 * @var array<string,string>
+		 */
+		public array $rows = array();
+
+		/**
+		 * @var array<int,string>
+		 */
+		public array $queries = array();
+
+		/**
+		 * When true, the next query fails like a database error.
+		 */
+		public bool $fail_next_query = false;
+
+		public function prepare( string $query, mixed ...$args ): string {
+			return vsprintf(
+				$query,
+				array_map(
+					static fn ( mixed $arg ): string => "'" . addslashes( (string) $arg ) . "'",
+					$args
+				)
+			);
+		}
+
+		public function esc_like( string $text ): string {
+			return addcslashes( $text, '_%\\' );
+		}
+
+		public function query( string $query ): int|false {
+			$this->queries[] = $query;
+
+			if ( $this->fail_next_query ) {
+				$this->fail_next_query = false;
+
+				return false;
+			}
+
+			$values = $this->get_quoted_values( $query );
+
+			if ( str_starts_with( $query, "INSERT IGNORE INTO {$this->options} (option_name, option_value, autoload) VALUES (" ) ) {
+				if ( isset( $this->rows[ $values[0] ] ) ) {
+					return 0;
+				}
+
+				$this->rows[ $values[0] ] = $values[1];
+
+				// Lets a test change data at the moment a lock is taken, as a concurrent request could.
+				if ( is_callable( $GLOBALS['mac_members_test_after_lock_insert'] ?? null ) ) {
+					( $GLOBALS['mac_members_test_after_lock_insert'] )( $values[0] );
+				}
+
+				return 1;
+			}
+
+			if ( str_starts_with( $query, "DELETE FROM {$this->options} WHERE option_name = " ) && str_contains( $query, ' AND option_value = ' ) ) {
+				if ( ( $this->rows[ $values[0] ] ?? null ) !== $values[1] ) {
+					return 0;
+				}
+
+				unset( $this->rows[ $values[0] ] );
+
+				return 1;
+			}
+
+			if ( str_starts_with( $query, "DELETE FROM {$this->options} WHERE option_name LIKE " ) ) {
+				$pattern = $this->like_to_regex( $values[0] );
+				$deleted = 0;
+
+				foreach ( array_keys( $this->rows ) as $name ) {
+					if ( 1 === preg_match( $pattern, $name ) ) {
+						unset( $this->rows[ $name ] );
+						++$deleted;
+					}
+				}
+
+				return $deleted;
+			}
+
+			throw new RuntimeException( 'Unexpected query: ' . $query );
+		}
+
+		public function get_var( string $query ): ?string {
+			$this->queries[] = $query;
+
+			if ( str_starts_with( $query, "SELECT option_value FROM {$this->options} WHERE option_name = " ) ) {
+				return $this->rows[ $this->get_quoted_values( $query )[0] ] ?? null;
+			}
+
+			throw new RuntimeException( 'Unexpected query: ' . $query );
+		}
+
+		/**
+		 * @return array<int,string>
+		 */
+		private function get_quoted_values( string $query ): array {
+			preg_match_all( "/'((?:[^'\\\\]|\\\\.)*)'/", $query, $matches );
+
+			return array_map( 'stripslashes', $matches[1] );
+		}
+
+		private function like_to_regex( string $pattern ): string {
+			$regex  = '';
+			$length = strlen( $pattern );
+
+			for ( $i = 0; $i < $length; $i++ ) {
+				$char = $pattern[ $i ];
+
+				if ( '\\' === $char && $i + 1 < $length ) {
+					$regex .= preg_quote( $pattern[ ++$i ], '/' );
+				} elseif ( '%' === $char ) {
+					$regex .= '.*';
+				} elseif ( '_' === $char ) {
+					$regex .= '.';
+				} else {
+					$regex .= preg_quote( $char, '/' );
+				}
+			}
+
+			return '/^' . $regex . '$/s';
+		}
+	}
+}
+
 if ( ! class_exists( 'WP_User_Query' ) ) {
 	final class WP_User_Query {
 		/**
@@ -306,6 +440,8 @@ function mac_members_tests_reset_wp_state(): void {
 	$GLOBALS['mac_members_test_is_singular']              = false;
 	$GLOBALS['mac_members_test_queried_object']           = null;
 	$GLOBALS['mac_members_test_nocache_headers_calls']    = 0;
+	$GLOBALS['mac_members_test_after_lock_insert']        = null;
+	$GLOBALS['wpdb']                                      = new MacMembers_Test_Wpdb();
 	$GLOBALS['mac_members_test_options_pages']     = array();
 	$GLOBALS['mac_members_test_settings_errors']   = array();
 	$GLOBALS['mac_members_test_nonces']            = array();

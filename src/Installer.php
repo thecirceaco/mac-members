@@ -9,6 +9,7 @@ declare(strict_types=1);
 
 namespace MacMembers;
 
+use MacMembers\Actions\MemberLock;
 use MacMembers\Contracts\Service;
 use MacMembers\Security\Capabilities;
 
@@ -70,5 +71,6 @@ final class Installer implements Service
 		}
 
 		\delete_option( self::VERSION_OPTION );
+		MemberLock::delete_all();
 	}
 }

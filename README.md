@@ -66,6 +66,8 @@ Approve and deny exclude each other, so a user who is moved back to pending neve
 
 Before any change, the plugin checks that the pending role and the role being added exist. After the change it reads the user's roles again, and if they are not what was expected it restores the roles the user had before and returns an error. When a configured role is missing, the pending-members table shows a warning as well as the settings page.
 
+Only one approve or deny can change a user at a time. The plugin takes a per-user lock, a `mac_members_lock_<user ID>` row in the options table created with an atomic `INSERT IGNORE`, reads the user's roles again, and releases the lock when the change is done. A second request for the same user gets a "being updated" error while the lock is held, and "no longer pending" after that. A lock left behind by a request that died expires after 30 seconds.
+
 Existing unrelated roles are preserved in both flows.
 
 ## Email Notifications

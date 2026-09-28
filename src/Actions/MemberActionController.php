@@ -27,6 +27,7 @@ final class MemberActionController implements Service
 	private const ERROR_MISSING_ROLE = 'missing_role';
 	private const ERROR_ROLE_SETTINGS = 'invalid_role_settings';
 	private const ERROR_STALE_TABLE = 'stale_table';
+	private const ERROR_BUSY = 'busy';
 	private const SUCCESS_APPROVED = 'approved';
 	private const SUCCESS_DENIED = 'denied';
 
@@ -39,6 +40,7 @@ final class MemberActionController implements Service
 		private readonly SettingsRepositoryInterface $settings,
 		private readonly ?MemberNotificationService $notifications = null,
 		private readonly RenderToken $render_token = new RenderToken(),
+		private readonly MemberLock $lock = new MemberLock(),
 		private readonly ?\Closure $end_request = null
 	) {}
 
@@ -125,7 +127,27 @@ final class MemberActionController implements Service
 			return;
 		}
 
-		if ( ! $this->change_roles( $user, $pending_role, $target_role, $other_role ) ) {
+		// Only one approve or deny can change this user at a time.
+		if ( ! $this->lock->acquire( $user_id ) ) {
+			$this->send_error( self::ERROR_BUSY, 409 );
+			return;
+		}
+
+		try {
+			// Read the user again under the lock: another request may have changed the roles since the checks above.
+			$user    = $this->read_user( $user_id );
+			$pending = $user instanceof \WP_User && $this->user_has_role( $user, $pending_role );
+			$changed = $pending && $this->change_roles( $user, $pending_role, $target_role, $other_role );
+		} finally {
+			$this->lock->release( $user_id );
+		}
+
+		if ( ! $pending ) {
+			$this->send_error( self::ERROR_NOT_PENDING, 409 );
+			return;
+		}
+
+		if ( ! $changed ) {
 			$this->send_error( self::ERROR_UPDATE_FAILED, 500 );
 			return;
 		}
@@ -353,6 +375,7 @@ final class MemberActionController implements Service
 			self::ERROR_MISSING_ROLE => __( 'A role needed for this action does not exist. Please review Settings > MAC Members.', 'mac-members' ),
 			self::ERROR_ROLE_SETTINGS => __( 'The role settings are not allowed: the three roles must differ, and the role being added must not grant administrative capabilities. Please review Settings > MAC Members.', 'mac-members' ),
 			self::ERROR_STALE_TABLE => __( 'This table is out of date. Please reload the page and try again.', 'mac-members' ),
+			self::ERROR_BUSY => __( 'This member is being updated in another request. Please wait a moment and reload the page.', 'mac-members' ),
 			default => __( 'Invalid request.', 'mac-members' ),
 		};
 	}

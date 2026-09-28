@@ -92,4 +92,12 @@ final class InstallerTest extends TestCase {
 
 		self::assertArrayNotHasKey( Installer::VERSION_OPTION, $GLOBALS['mac_members_test_options'] );
 	}
+
+	public function test_uninstall_removes_lock_rows_left_by_requests_that_died(): void {
+		$GLOBALS['wpdb']->rows['mac_members_lock_12'] = '1:dead-request';
+
+		Installer::uninstall();
+
+		self::assertSame( array(), $GLOBALS['wpdb']->rows );
+	}
 }
