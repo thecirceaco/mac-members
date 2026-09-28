@@ -220,6 +220,10 @@
 	color: var(--danger-semi-dark);
 }
 
+.mac-members-profile-link {
+	font-weight: 700;
+}
+
 .mac-members-actions {
 	white-space: nowrap;
 }
