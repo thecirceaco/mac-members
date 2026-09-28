@@ -306,6 +306,37 @@
 		document.cookie = `${columnsCookie}=${encodeURIComponent(hidden.join(','))}; path=/; max-age=31536000; SameSite=Lax${secure}`;
 	});
 
+	// When the table fits its frame, the frame stops scrolling and the header sticks to the page instead. The check
+	// runs with the frame marked, so the frame's own scrollbar does not change the answer. It runs again when the
+	// frame or the table changes size, for example when the window narrows or a column is hidden.
+	const fitFrame = (wrap) => {
+		const table = wrap.querySelector('table');
+
+		if (!table) {
+			return;
+		}
+
+		wrap.classList.add('is-page-sticky');
+		wrap.classList.toggle('is-page-sticky', table.offsetWidth <= wrap.clientWidth);
+	};
+
+	document.querySelectorAll('.mac-members-table-wrap').forEach((wrap) => {
+		fitFrame(wrap);
+
+		if (typeof window.ResizeObserver !== 'function') {
+			return;
+		}
+
+		const observer = new window.ResizeObserver(() => window.requestAnimationFrame(() => fitFrame(wrap)));
+		const table = wrap.querySelector('table');
+
+		observer.observe(wrap);
+
+		if (table) {
+			observer.observe(table);
+		}
+	});
+
 	// The role and search form leaves out empty fields, so the page address only has the choices that are set.
 	document.querySelectorAll('form.mac-members-search').forEach((form) => {
 		form.addEventListener('formdata', (event) => {

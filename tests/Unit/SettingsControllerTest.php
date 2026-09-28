@@ -243,6 +243,19 @@ final class SettingsControllerTest extends TestCase {
 		self::assertStringContainsString( '<p class="description" id="mac-members-delete_data_on_uninstall-description">When the plugin is deleted, remove its settings, the review capability and the member roles that no user holds.', $output );
 	}
 
+	public function test_settings_page_has_the_table_size_choice(): void {
+		$GLOBALS['mac_members_test_options'][ MAC_MEMBERS_SETTINGS_OPTION ] = array( 'table_size' => 'small' );
+
+		$controller = $this->create_controller();
+		$controller->register_settings_page();
+		ob_start();
+		$controller->render_settings_page();
+		$output = (string) ob_get_clean();
+
+		self::assertStringContainsString( '<select id="mac-members-table_size" name="mac_members_settings[table_size]" aria-describedby="mac-members-table_size-description"><option value="mixed">Mixed</option><option value="small" selected="selected">Small</option><option value="medium">Medium</option></select>', $output );
+		self::assertStringContainsString( '<p class="description" id="mac-members-table_size-description">Mixed: the search, the dropdowns and the page size and range under the table in the normal text size', $output );
+	}
+
 	public function test_uninstall_setting_shows_how_many_users_hold_each_member_role(): void {
 		$GLOBALS['mac_members_test_users'] = array(
 			new \WP_User( array( 'ID' => 1, 'roles' => array( 'mac_members_approved' ) ) ),

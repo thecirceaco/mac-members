@@ -5,11 +5,31 @@
  * warning and info) and the neutral color turned on.
  */
 
+/*
+ * Sizes, from the "Members table size" setting. Mixed: the search, the dropdowns, the page size and the range
+ * in --text-m, and the table, the column checkboxes and the buttons in --text-s. Small: everything in
+ * --text-s. Medium: everything in --text-m.
+ */
 .mac-members-table {
+	--mac-members-control-size: var(--text-m);
+	--mac-members-table-size: var(--text-s);
 	display: flex;
 	flex-direction: column;
 	gap: 1em;
 	inline-size: 100%;
+}
+
+.mac-members-table--small {
+	--mac-members-control-size: var(--text-s);
+}
+
+.mac-members-table--medium {
+	--mac-members-table-size: var(--text-m);
+}
+
+/* The buttons keep ACSS's btn--s class, and the medium size gives them ACSS's own button font size in --text-m. */
+.mac-members-table--medium [class*="btn--"] {
+	--btn-font-size: var(--text-m);
 }
 
 .mac-members-notices:empty {
@@ -65,7 +85,7 @@
 	flex-wrap: wrap;
 	align-items: center;
 	gap: 0.5ch 1.5ch;
-	font-size: var(--text-s);
+	font-size: var(--mac-members-table-size);
 }
 
 .mac-members-columns__label {
@@ -116,7 +136,7 @@
 	background-color: var(--white);
 	color: var(--text-dark);
 	font-family: var(--text-font-family);
-	font-size: var(--text-m);
+	font-size: var(--mac-members-control-size);
 	line-height: var(--text-line-height);
 }
 
@@ -159,12 +179,26 @@
 	background-color: var(--body-bg-color);
 }
 
+/*
+ * When the table fits its frame, the script marks the frame and the frame stops scrolling. The header then
+ * sticks to the page, under the admin bar and a sticky site header, so there is no scroll box inside the page.
+ * overflow: clip still rounds the corners, and unlike auto it does not make a scroll box.
+ */
+.mac-members-table-wrap.is-page-sticky {
+	overflow: clip;
+	max-block-size: none;
+}
+
+.mac-members-table-wrap.is-page-sticky .mac-members-list thead th {
+	inset-block-start: calc(var(--admin-bar-height, 0px) + var(--header-height, 0px));
+}
+
 /* Separate borders, because collapsed borders stay behind when a sticky cell moves. */
 .mac-members-list {
 	inline-size: 100%;
 	border-collapse: separate;
 	border-spacing: 0;
-	font-size: var(--text-s);
+	font-size: var(--mac-members-table-size);
 }
 
 .mac-members-list th,
@@ -334,7 +368,7 @@
 	flex-wrap: wrap;
 	align-items: center;
 	gap: 1em;
-	font-size: var(--text-s);
+	font-size: var(--mac-members-control-size);
 }
 
 .mac-members-footer[hidden] {
@@ -375,7 +409,7 @@
 	background-color: var(--white);
 	color: var(--text-dark);
 	font-family: var(--text-font-family);
-	font-size: var(--text-s);
+	font-size: var(--mac-members-control-size);
 	line-height: var(--text-line-height);
 }
 
@@ -405,12 +439,9 @@
 	pointer-events: none;
 }
 
-.mac-members-search .mac-members-select {
-	font-size: var(--text-m);
-}
-
+.mac-members-search .mac-members-select,
 .mac-members-per-page .mac-members-select {
-	font-size: var(--text-s);
+	font-size: var(--mac-members-control-size);
 }
 
 .mac-members-search__role,

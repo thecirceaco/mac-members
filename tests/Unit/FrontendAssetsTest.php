@@ -97,13 +97,13 @@ final class FrontendAssetsTest extends TestCase {
 					'action'  => 'mac_members_deactivate_user',
 					'label'   => 'Deactivate',
 					'confirm' => 'Are you sure you want to deactivate this member?',
-					'classes' => 'btn--warning btn--s',
+					'classes' => 'btn--warning btn--outline btn--s',
 				),
 				'reactivate' => array(
 					'action'  => 'mac_members_reactivate_user',
 					'label'   => 'Reactivate',
 					'confirm' => 'Are you sure you want to reactivate this member?',
-					'classes' => 'btn--info btn--s',
+					'classes' => 'btn--info btn--outline btn--s',
 				),
 			),
 			$config['transitions']

@@ -225,6 +225,7 @@ final class SettingsController implements Service
 			SettingsSchema::TYPE_EMAIL  => $this->render_email_input( $key, (string) $value ),
 			SettingsSchema::TYPE_TOGGLE => $this->render_toggle( $key, (bool) $value, (string) $field['label'], isset( $field['description'] ) ),
 			SettingsSchema::TYPE_LIST   => $this->render_list_input( $key, (string) $value, isset( $field['description'] ) ),
+			SettingsSchema::TYPE_CHOICE => $this->render_choice_select( $key, (string) $value, $field['choices'] ?? array(), isset( $field['description'] ) ),
 			default                     => '',
 		};
 	}
@@ -266,6 +267,21 @@ final class SettingsController implements Service
 		}
 
 		return '<p class="description" id="mac-members-' . esc_attr( $key ) . '-description">' . esc_html( (string) $field['description'] ) . '</p>';
+	}
+
+	/**
+	 * @param array<string,string> $choices Choice labels keyed by value.
+	 */
+	private function render_choice_select( string $key, string $value, array $choices, bool $described ): string
+	{
+		$describedby = $described ? ' aria-describedby="mac-members-' . esc_attr( $key ) . '-description"' : '';
+		$output      = '<select id="mac-members-' . esc_attr( $key ) . '" name="mac_members_settings[' . esc_attr( $key ) . ']"' . $describedby . '>';
+
+		foreach ( $choices as $choice => $label ) {
+			$output .= '<option value="' . esc_attr( (string) $choice ) . '"' . $this->selected_attr( (string) $choice === $value ) . '>' . esc_html( $label ) . '</option>';
+		}
+
+		return $output . '</select>';
 	}
 
 	private function render_list_input( string $key, string $value, bool $described ): string

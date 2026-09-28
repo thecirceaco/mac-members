@@ -205,6 +205,7 @@ final class WordPressSettingsRepository implements SettingsRepositoryInterface
 				SettingsSchema::TYPE_EMAIL  => $this->sanitize_email( $value ),
 				SettingsSchema::TYPE_TOGGLE => $this->sanitize_toggle( $value ),
 				SettingsSchema::TYPE_LIST   => $this->sanitize_list( $value, (string) $field['default'] ),
+				SettingsSchema::TYPE_CHOICE => $this->sanitize_choice( $value, array_keys( $field['choices'] ?? array() ), (string) $field['default'] ),
 				default                     => $field['default'],
 			};
 		}
@@ -263,6 +264,18 @@ final class WordPressSettingsRepository implements SettingsRepositoryInterface
 		$normalized = filter_var( $value, FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE );
 
 		return \is_bool( $normalized ) ? $normalized : false;
+	}
+
+	/**
+	 * @param array<int,string> $choices The values the setting allows.
+	 *
+	 * @return string One of the choices, or the default.
+	 */
+	private function sanitize_choice( mixed $value, array $choices, string $default ): string
+	{
+		$value = \is_scalar( $value ) ? \sanitize_key( (string) $value ) : '';
+
+		return in_array( $value, $choices, true ) ? $value : $default;
 	}
 
 	/**

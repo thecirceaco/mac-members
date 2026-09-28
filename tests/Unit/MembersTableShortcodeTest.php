@@ -164,8 +164,8 @@ final class MembersTableShortcodeTest extends TestCase {
 
 		self::assertStringContainsString( 'data-mac-members-view="all"', $output );
 		self::assertMatchesRegularExpression( '/data-mac-members-user-id="1" data-mac-members-status="pending">.*data-mac-members-action="approve".*data-mac-members-action="deny"/s', $output );
-		self::assertStringContainsString( 'class="mac-members-button mac-members-button--deactivate btn--warning btn--s" data-mac-members-action="deactivate" data-mac-members-user-id="2"', $output );
-		self::assertStringContainsString( 'class="mac-members-button mac-members-button--reactivate btn--info btn--s" data-mac-members-action="reactivate" data-mac-members-user-id="3"', $output );
+		self::assertStringContainsString( 'class="mac-members-button mac-members-button--deactivate btn--warning btn--outline btn--s" data-mac-members-action="deactivate" data-mac-members-user-id="2"', $output );
+		self::assertStringContainsString( 'class="mac-members-button mac-members-button--reactivate btn--info btn--outline btn--s" data-mac-members-action="reactivate" data-mac-members-user-id="3"', $output );
 		self::assertStringContainsString( 'data-mac-members-action="approve" data-mac-members-user-id="4"', $output );
 		self::assertStringNotContainsString( 'data-mac-members-action="deny" data-mac-members-user-id="4"', $output );
 		self::assertStringNotContainsString( 'data-mac-members-user-id="5"', $output );
@@ -231,6 +231,28 @@ final class MembersTableShortcodeTest extends TestCase {
 		self::assertStringContainsString( '<input type="checkbox" value="user_id" data-mac-members-column-toggle checked>', $output );
 		// Hidden columns are still rendered: the stylesheet hides them while their checkbox is unchecked.
 		self::assertStringContainsString( '<td data-mac-members-column="email">member1@example.test</td>', $output );
+	}
+
+	/**
+	 * @param mixed $setting Stored table size.
+	 */
+	#[DataProvider( 'provide_table_sizes' )]
+	public function test_table_size_setting_sets_the_size_class( mixed $setting, string $class ): void {
+		$GLOBALS['mac_members_test_options'][ MAC_MEMBERS_SETTINGS_OPTION ] = array( 'table_size' => $setting );
+
+		self::assertStringContainsString( '<div class="mac-members-table ' . $class . '" data-mac-members-table', $this->create_shortcode()->render() );
+	}
+
+	/**
+	 * @return array<string,array{0:mixed,1:string}>
+	 */
+	public static function provide_table_sizes(): array {
+		return array(
+			'mixed by default' => array( null, 'mac-members-table--mixed' ),
+			'small'            => array( 'small', 'mac-members-table--small' ),
+			'medium'           => array( 'medium', 'mac-members-table--medium' ),
+			'unknown'          => array( 'huge', 'mac-members-table--mixed' ),
+		);
 	}
 
 	public function test_empty_view_has_no_column_checkboxes(): void {
@@ -663,7 +685,7 @@ final class MembersTableShortcodeTest extends TestCase {
 
 		$output = $this->create_shortcode()->render();
 
-		self::assertStringContainsString( 'class="mac-members-table"', $output );
+		self::assertStringContainsString( 'class="mac-members-table mac-members-table--mixed"', $output );
 		self::assertStringContainsString( 'class="mac-members-list"', $output );
 		self::assertStringContainsString( 'data-mac-members-user-id="123"', $output );
 		self::assertStringContainsString( 'pending@example.test', $output );

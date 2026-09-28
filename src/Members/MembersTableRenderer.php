@@ -29,6 +29,7 @@ final class MembersTableRenderer
 	 * @param string                                                 $render_token Token that status changes from this table must send.
 	 * @param array{action?:string,hidden?:array<string,string>,roles?:array<string,string>,role?:string,search?:string} $search_form Role and search form; empty hides it.
 	 * @param array<int,string>                                      $hidden_columns Keys of the columns the viewer hid.
+	 * @param string                                                 $size Table size: mixed, small or medium.
 	 */
 	public function render(
 		array $rows,
@@ -38,14 +39,15 @@ final class MembersTableRenderer
 		array $missing_roles = array(),
 		string $render_token = '',
 		array $search_form = array(),
-		array $hidden_columns = array()
+		array $hidden_columns = array(),
+		string $size = 'mixed'
 	): string {
 		$body     = $this->render_rows( $rows );
 		$narrowed = '' !== ( $search_form['role'] ?? '' ) || '' !== ( $search_form['search'] ?? '' );
 		// The page size select in the footer belongs to this form, so changing it keeps the role and search.
 		$form_id = array() === $search_form ? '' : \wp_unique_id( 'mac-members-search-' );
 
-		$output  = '<div class="mac-members-table" data-mac-members-table data-mac-members-view="' . esc_attr( $view ) . '" data-mac-members-render-token="' . esc_attr( $render_token ) . '">';
+		$output  = '<div class="mac-members-table mac-members-table--' . esc_attr( $size ) . '" data-mac-members-table data-mac-members-view="' . esc_attr( $view ) . '" data-mac-members-render-token="' . esc_attr( $render_token ) . '">';
 		$output .= $this->render_missing_roles_warning( $missing_roles );
 		$output .= $this->render_filters( $filters );
 		$output .= $this->render_search_form( $search_form, $form_id );

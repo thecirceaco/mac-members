@@ -13,6 +13,7 @@ use MacMembers\Assets\FrontendAssets;
 use MacMembers\Contracts\Service;
 use MacMembers\Security\Capabilities;
 use MacMembers\Settings\SettingsRepositoryInterface;
+use MacMembers\Settings\SettingsSchema;
 
 if ( ! defined( 'ABSPATH' ) ) {
 	exit; // Exit if accessed directly.
@@ -111,7 +112,8 @@ final class MembersTableShortcode implements Service
 			$this->settings->get_missing_role_slugs(),
 			$this->render_token->issue( $this->get_user_ids( $members['users'] ) ),
 			$this->get_search_form( null === $fixed_view ? $view : null, $base_url, $roles, $role, $search ),
-			$this->get_hidden_columns()
+			$this->get_hidden_columns(),
+			$this->get_size()
 		);
 	}
 
@@ -213,6 +215,16 @@ final class MembersTableShortcode implements Service
 		}
 
 		return $rows;
+	}
+
+	/**
+	 * @return string The table size from the settings: mixed, small or medium.
+	 */
+	private function get_size(): string
+	{
+		$size = (string) $this->settings->get( 'table_size', 'mixed' );
+
+		return in_array( $size, SettingsSchema::TABLE_SIZES, true ) ? $size : 'mixed';
 	}
 
 	/**

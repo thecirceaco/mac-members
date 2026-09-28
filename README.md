@@ -8,7 +8,7 @@ It provides a small admin settings page, a protected members table shortcode wit
 
 - WordPress 6.x
 - PHP 8.3+
-- Automatic.css 4 on the front end, with the status colors (success, danger, warning and info) and the neutral color turned on: every color, border and radius in the members table is an ACSS token, and its buttons are ACSS buttons (`btn--success` to approve, `btn--danger` to deny, `btn--warning` to deactivate, `btn--info` to reactivate, and `btn--neutral`, `btn--outline` and `btn--s` for the filters and page links), so it follows each site's ACSS settings. Spacing inside the table is in `em` and `ch`, because the ACSS space tokens are too large at this size
+- Automatic.css 4 on the front end, with the status colors (success, danger, warning and info) and the neutral color turned on: every color, border and radius in the members table is an ACSS token, and its buttons are ACSS buttons (`btn--success` to approve, `btn--danger` to deny, `btn--warning btn--outline` to deactivate, `btn--info btn--outline` to reactivate, and `btn--neutral`, `btn--outline` and `btn--s` for the filters and page links), so it follows each site's ACSS settings. Spacing inside the table is in `em` and `ch`, because the ACSS space tokens are too large at this size
 
 ## Installation
 
@@ -46,6 +46,7 @@ The settings page also includes:
 - member and admin approval email toggles
 - member and admin denial email toggles
 - member and admin deactivation email toggles
+- members table size: Mixed by default, Small or Medium (see Members Table below)
 - delete plugin data on uninstall, off by default (see Review capability below)
 
 All email notification toggles are enabled by default.
@@ -83,7 +84,9 @@ ACSS keeps its `btn--` classes in a cascade layer, while its reset `input, butto
 
 After a change, a row that no longer belongs in a filtered view disappears, and in the All view the row shows its new status and buttons. The filter counts and the range follow the changes. When the last row of a page goes and members are left on other pages, the page loads again to show them.
 
-The table scrolls inside its frame, both ways, up to 80% of the screen height, and keeps its header and the User ID column in view. A sticky element sticks to its nearest scroll box, and the frame has to scroll sideways on narrow screens, so the table scrolls inside it rather than with the page.
+When the table fits its frame, the header sticks to the page, under the admin bar and a sticky site header (ACSS's `--admin-bar-height` and `--header-height`). When it doesn't fit, for example on a narrow screen or with many columns, the table scrolls inside its frame, both ways, up to 80% of the screen height, and keeps its header and first visible column in view. The script checks the fit when the page loads and again when the frame or the table changes size.
+
+The "Members table size" setting sets the text and button sizes: Mixed, the default, keeps the search, the dropdowns, the page size and the range in `--text-m`, and the table, the column checkboxes and the buttons in `--text-s`; Small puts everything in `--text-s`; Medium puts everything in `--text-m`. The buttons keep ACSS's `btn--s` class, and Medium sets ACSS's `--btn-font-size`.
 
 The stylesheet and the script are versioned with the plugin version and the file's modification time, so a new build reaches browsers and CDNs that keep the old files for a year.
 

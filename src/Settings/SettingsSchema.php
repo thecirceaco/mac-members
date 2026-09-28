@@ -21,9 +21,15 @@ final class SettingsSchema
 	public const TYPE_EMAIL  = 'email';
 	public const TYPE_TOGGLE = 'toggle';
 	public const TYPE_LIST   = 'list';
+	public const TYPE_CHOICE = 'choice';
 
 	/**
-	 * @return array<string,array{label:string,type:string,default:mixed,description?:string}>
+	 * Sizes of the members table: see the "Members table size" setting.
+	 */
+	public const TABLE_SIZES = array( 'mixed', 'small', 'medium' );
+
+	/**
+	 * @return array<string,array{label:string,type:string,default:mixed,description?:string,choices?:array<string,string>}>
 	 */
 	public function get_fields(): array
 	{
@@ -53,6 +59,16 @@ final class SettingsSchema
 				'type'        => self::TYPE_LIST,
 				'default'     => 'administrator',
 				'description' => __( 'Comma-separated role slugs, role names or capabilities, for example administrator, manage_options. The members table offers every role its members hold, except the status roles and the roles that match this list or have one of these capabilities.', 'mac-members' ),
+			),
+			'table_size' => array(
+				'label'       => __( 'Members table size', 'mac-members' ),
+				'type'        => self::TYPE_CHOICE,
+				'default'     => 'mixed',
+				'choices'     => array_combine(
+					self::TABLE_SIZES,
+					array( __( 'Mixed', 'mac-members' ), __( 'Small', 'mac-members' ), __( 'Medium', 'mac-members' ) )
+				),
+				'description' => __( 'Mixed: the search, the dropdowns and the page size and range under the table in the normal text size, and the table, the column checkboxes and the buttons small. Small: everything small. Medium: everything in the normal text size.', 'mac-members' ),
 			),
 			'admin_notification_email' => array(
 				'label'   => __( 'Admin notification email', 'mac-members' ),
