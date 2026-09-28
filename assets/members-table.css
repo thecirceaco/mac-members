@@ -1,14 +1,14 @@
 /*
- * MAC Members table. Colors, borders, radius, spacing and text sizes come from Automatic.css variables, and
- * the buttons use ACSS button classes in the markup, so the table follows each site's design system. The
- * fallbacks only matter when a site turned off one of the status colors.
+ * MAC Members table. Every color, border, radius, space and text size is an Automatic.css token, and every
+ * button is an ACSS button, so the table follows each site's ACSS settings. It needs ACSS with the status
+ * colors (success, danger, warning and info) and the neutral color turned on.
  */
 
 .mac-members-table {
 	display: flex;
 	flex-direction: column;
 	gap: var(--space-s);
-	width: 100%;
+	inline-size: 100%;
 }
 
 .mac-members-notices:empty {
@@ -17,26 +17,30 @@
 
 .mac-members-notice {
 	margin: 0;
-	padding: var(--space-xs) var(--space-s);
-	border-inline-start: calc(var(--border-size) * 4) solid var(--info, var(--primary));
+	padding-block: var(--space-xs);
+	padding-inline: var(--space-s);
+	border: var(--border-size) var(--border-style) var(--info);
 	border-radius: var(--radius);
-	background: var(--info-ultra-light, var(--base-ultra-light));
-	color: var(--text-dark);
+	background: var(--info-ultra-light);
+	color: var(--info-ultra-dark);
 }
 
 .mac-members-notice--success {
-	border-inline-start-color: var(--success, var(--primary));
-	background: var(--success-ultra-light, var(--base-ultra-light));
+	border-color: var(--success);
+	background: var(--success-ultra-light);
+	color: var(--success-ultra-dark);
 }
 
 .mac-members-notice--error {
-	border-inline-start-color: var(--danger, var(--primary));
-	background: var(--danger-ultra-light, var(--base-ultra-light));
+	border-color: var(--danger);
+	background: var(--danger-ultra-light);
+	color: var(--danger-ultra-dark);
 }
 
 .mac-members-notice--warning {
-	border-inline-start-color: var(--warning, var(--primary));
-	background: var(--warning-ultra-light, var(--base-ultra-light));
+	border-color: var(--warning);
+	background: var(--warning-ultra-light);
+	color: var(--warning-ultra-dark);
 }
 
 .mac-members-filters ul {
@@ -48,12 +52,33 @@
 	list-style: none;
 }
 
+/* ACSS gives buttons a minimum width. The filters only take the width of their text, as ACSS does for its skip link. */
 .mac-members-filter {
+	--btn-min-width: fit-content;
 	gap: var(--space-xs);
 }
 
-.mac-members-count {
-	font-weight: 700;
+.mac-members-search {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: end;
+	gap: var(--space-s);
+}
+
+.mac-members-search__field {
+	display: flex;
+	flex-direction: column;
+	gap: var(--space-xs);
+	font-size: var(--text-s);
+}
+
+.mac-members-search__field select,
+.mac-members-search__field input {
+	padding-block: var(--space-xs);
+	padding-inline: var(--space-s);
+	border: var(--border);
+	border-radius: var(--radius);
+	font: inherit;
 }
 
 .mac-members-table-wrap {
@@ -61,14 +86,15 @@
 }
 
 .mac-members-list {
-	width: 100%;
+	inline-size: 100%;
 	border-collapse: collapse;
 	font-size: var(--text-s);
 }
 
 .mac-members-list th,
 .mac-members-list td {
-	padding: var(--space-xs) var(--space-s);
+	padding-block: var(--space-xs);
+	padding-inline: var(--space-s);
 	border: var(--border);
 	text-align: start;
 	vertical-align: middle;
@@ -77,37 +103,34 @@
 .mac-members-list th {
 	background: var(--base-ultra-light);
 	color: var(--text-dark);
-	font-weight: 700;
 	white-space: nowrap;
 }
 
 .mac-members-status__label {
 	display: inline-block;
-	padding: calc(var(--space-xs) / 2) var(--space-xs);
+	padding-inline: var(--space-xs);
 	border-radius: var(--radius);
-	background: var(--base-ultra-light);
-	color: var(--text-dark);
 	white-space: nowrap;
 }
 
 .mac-members-status__label--pending {
-	background: var(--warning-ultra-light, var(--base-ultra-light));
-	color: var(--warning-ultra-dark, var(--text-dark));
+	background: var(--warning-ultra-light);
+	color: var(--warning-ultra-dark);
 }
 
 .mac-members-status__label--approved {
-	background: var(--success-ultra-light, var(--base-ultra-light));
-	color: var(--success-ultra-dark, var(--text-dark));
+	background: var(--success-ultra-light);
+	color: var(--success-ultra-dark);
 }
 
 .mac-members-status__label--inactive {
-	background: var(--neutral-ultra-light, var(--base-ultra-light));
-	color: var(--neutral-ultra-dark, var(--text-dark));
+	background: var(--neutral-ultra-light);
+	color: var(--neutral-ultra-dark);
 }
 
 .mac-members-status__label--denied {
-	background: var(--danger-ultra-light, var(--base-ultra-light));
-	color: var(--danger-ultra-dark, var(--text-dark));
+	background: var(--danger-ultra-light);
+	color: var(--danger-ultra-dark);
 }
 
 .mac-members-actions {
@@ -128,7 +151,7 @@
 }
 
 .mac-members-list__row.is-success > td {
-	background: var(--success-ultra-light, var(--base-ultra-light));
+	background: var(--success-ultra-light);
 }
 
 .mac-members-empty {

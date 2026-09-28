@@ -61,15 +61,14 @@ enum MemberTransition: string
 	}
 
 	/**
-	 * Automatic.css button classes: a solid primary button for changes that give access, an outline one for
-	 * changes that take it away. The primary color is active on every ACSS site, so the buttons always match
-	 * the site's own buttons.
+	 * Automatic.css button classes: the success button for changes that give access, the danger button for
+	 * changes that take it away. The colors come from the site's ACSS status colors.
 	 */
 	public function button_classes(): string
 	{
 		return match ( $this ) {
-			self::Approve, self::Reactivate => 'btn--primary btn--s',
-			self::Deny, self::Deactivate    => 'btn--primary btn--outline btn--s',
+			self::Approve, self::Reactivate => 'btn--success btn--s',
+			self::Deny, self::Deactivate    => 'btn--danger btn--s',
 		};
 	}
 

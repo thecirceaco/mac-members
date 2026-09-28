@@ -48,6 +48,23 @@ final class FrontendAssetsTest extends TestCase {
 		self::assertContains( FrontendAssets::SCRIPT_HANDLE, $GLOBALS['mac_members_test_enqueued_scripts'] );
 	}
 
+	public function test_assets_are_versioned_with_the_plugin_version_and_the_file_time(): void {
+		( new FrontendAssets() )->enqueue_members_table();
+
+		self::assertSame(
+			MAC_MEMBERS_VERSION . '.' . filemtime( MAC_MEMBERS_ASSETS_PATH . 'members-table.css' ),
+			$GLOBALS['mac_members_test_registered_styles'][ FrontendAssets::STYLE_HANDLE ]['ver']
+		);
+		self::assertSame(
+			MAC_MEMBERS_VERSION . '.' . filemtime( MAC_MEMBERS_ASSETS_PATH . 'members-table.js' ),
+			$GLOBALS['mac_members_test_registered_scripts'][ FrontendAssets::SCRIPT_HANDLE ]['ver']
+		);
+	}
+
+	public function test_asset_version_is_the_plugin_version_when_the_file_is_missing(): void {
+		self::assertSame( MAC_MEMBERS_VERSION, ( new FrontendAssets() )->get_asset_version( 'missing.css' ) );
+	}
+
 	public function test_window_config_lists_every_status_change_and_what_each_status_allows(): void {
 		( new FrontendAssets() )->enqueue_members_table();
 
@@ -66,25 +83,25 @@ final class FrontendAssetsTest extends TestCase {
 					'action'  => 'mac_members_approve_user',
 					'label'   => 'Approve',
 					'confirm' => 'Are you sure you want to approve this member?',
-					'classes' => 'btn--primary btn--s',
+					'classes' => 'btn--success btn--s',
 				),
 				'deny'       => array(
 					'action'  => 'mac_members_deny_user',
 					'label'   => 'Deny',
 					'confirm' => 'Are you sure you want to deny this member?',
-					'classes' => 'btn--primary btn--outline btn--s',
+					'classes' => 'btn--danger btn--s',
 				),
 				'deactivate' => array(
 					'action'  => 'mac_members_deactivate_user',
 					'label'   => 'Deactivate',
 					'confirm' => 'Are you sure you want to deactivate this member?',
-					'classes' => 'btn--primary btn--outline btn--s',
+					'classes' => 'btn--danger btn--s',
 				),
 				'reactivate' => array(
 					'action'  => 'mac_members_reactivate_user',
 					'label'   => 'Reactivate',
 					'confirm' => 'Are you sure you want to reactivate this member?',
-					'classes' => 'btn--primary btn--s',
+					'classes' => 'btn--success btn--s',
 				),
 			),
 			$config['transitions']

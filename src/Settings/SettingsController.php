@@ -157,7 +157,7 @@ final class SettingsController implements Service
 			echo '<tr>';
 			echo '<th scope="row"><label for="mac-members-' . esc_attr( $key ) . '">' . esc_html( $field['label'] ) . '</label></th>';
 			// phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- render_field() returns escaped admin form controls.
-			echo '<td>' . $this->render_field( $key, $field, $settings[ $key ] ?? null ) . '</td>';
+			echo '<td>' . $this->render_field( $key, $field, $settings[ $key ] ?? null ) . $this->render_description( $key, $field ) . '</td>';
 			echo '</tr>';
 		}
 
@@ -217,8 +217,25 @@ final class SettingsController implements Service
 			SettingsSchema::TYPE_ROLE   => $this->render_role_select( $key, (string) $value ),
 			SettingsSchema::TYPE_EMAIL  => $this->render_email_input( $key, (string) $value ),
 			SettingsSchema::TYPE_TOGGLE => $this->render_toggle( $key, (bool) $value, (string) $field['label'] ),
+			SettingsSchema::TYPE_LIST   => $this->render_list_input( $key, (string) $value, isset( $field['description'] ) ),
 			default                     => '',
 		};
+	}
+
+	private function render_description( string $key, array $field ): string
+	{
+		if ( ! isset( $field['description'] ) || '' === $field['description'] ) {
+			return '';
+		}
+
+		return '<p class="description" id="mac-members-' . esc_attr( $key ) . '-description">' . esc_html( (string) $field['description'] ) . '</p>';
+	}
+
+	private function render_list_input( string $key, string $value, bool $described ): string
+	{
+		$describedby = $described ? ' aria-describedby="mac-members-' . esc_attr( $key ) . '-description"' : '';
+
+		return '<input type="text" class="regular-text" id="mac-members-' . esc_attr( $key ) . '" name="mac_members_settings[' . esc_attr( $key ) . ']" value="' . esc_attr( $value ) . '"' . $describedby . '>';
 	}
 
 	private function render_role_select( string $key, string $value ): string

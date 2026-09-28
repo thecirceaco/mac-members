@@ -22,6 +22,7 @@ final class MembersTableRenderer
 	 * @param array{page?:int,pages?:int,previous_url?:string,next_url?:string} $pagination Pagination.
 	 * @param array<int,string>                                      $missing_roles Configured role slugs that do not exist.
 	 * @param string                                                 $render_token Token that status changes from this table must send.
+	 * @param array{action?:string,hidden?:array<string,string>,roles?:array<string,string>,role?:string,search?:string,clear_url?:string} $search_form Role and search form; empty hides it.
 	 */
 	public function render(
 		array $rows,
@@ -29,15 +30,18 @@ final class MembersTableRenderer
 		array $filters = array(),
 		array $pagination = array(),
 		array $missing_roles = array(),
-		string $render_token = ''
+		string $render_token = '',
+		array $search_form = array()
 	): string {
-		$body = $this->render_rows( $rows );
+		$body     = $this->render_rows( $rows );
+		$narrowed = '' !== ( $search_form['role'] ?? '' ) || '' !== ( $search_form['search'] ?? '' );
 
 		$output  = '<div class="mac-members-table" data-mac-members-table data-mac-members-view="' . esc_attr( $view ) . '" data-mac-members-render-token="' . esc_attr( $render_token ) . '">';
 		$output .= $this->render_missing_roles_warning( $missing_roles );
 		$output .= $this->render_filters( $filters );
+		$output .= $this->render_search_form( $search_form );
 		$output .= '<div class="mac-members-notices" aria-live="polite" aria-atomic="true"></div>';
-		$output .= '<p class="mac-members-empty"' . ( '' === $body ? '' : ' hidden' ) . '>' . esc_html( $this->get_empty_text( $view ) ) . '</p>';
+		$output .= '<p class="mac-members-empty"' . ( '' === $body ? '' : ' hidden' ) . '>' . esc_html( $this->get_empty_text( $view, $narrowed ) ) . '</p>';
 
 		if ( '' !== $body ) {
 			$output .= '<div class="mac-members-table-wrap">';
@@ -66,9 +70,15 @@ final class MembersTableRenderer
 
 	/**
 	 * Text shown when the view has no members. The script shows it too, after the last row goes.
+	 *
+	 * @param bool $narrowed Whether a role or a search narrows the view.
 	 */
-	public function get_empty_text( string $view ): string
+	public function get_empty_text( string $view, bool $narrowed = false ): string
 	{
+		if ( $narrowed ) {
+			return __( 'No members match these filters.', 'mac-members' );
+		}
+
 		return match ( $view ) {
 			'approved' => __( 'There are no approved members.', 'mac-members' ),
 			'inactive' => __( 'There are no inactive members.', 'mac-members' ),
@@ -140,6 +150,56 @@ final class MembersTableRenderer
 		}
 
 		$output .= '</ul></nav>';
+
+		return $output;
+	}
+
+	/**
+	 * A GET form: the role filter when members hold other roles, the search, and Filter. Clear shows while a
+	 * role or search is set.
+	 *
+	 * @param array{action?:string,hidden?:array<string,string>,roles?:array<string,string>,role?:string,search?:string,clear_url?:string} $form Role and search form.
+	 */
+	private function render_search_form( array $form ): string
+	{
+		if ( array() === $form ) {
+			return '';
+		}
+
+		$roles  = $form['roles'] ?? array();
+		$role   = (string) ( $form['role'] ?? '' );
+		$search = (string) ( $form['search'] ?? '' );
+		$output = '<form class="mac-members-search" method="get" action="' . esc_url( (string) ( $form['action'] ?? '' ) ) . '" role="search" aria-label="' . esc_attr__( 'Filter members', 'mac-members' ) . '">';
+
+		foreach ( $form['hidden'] ?? array() as $name => $value ) {
+			$output .= '<input type="hidden" name="' . esc_attr( (string) $name ) . '" value="' . esc_attr( (string) $value ) . '">';
+		}
+
+		if ( array() !== $roles ) {
+			$output .= '<label class="mac-members-search__field">';
+			$output .= '<span class="mac-members-search__label">' . esc_html__( 'Role', 'mac-members' ) . '</span>';
+			$output .= '<select name="' . esc_attr( MembersTableShortcode::ROLE_QUERY_ARG ) . '">';
+			$output .= '<option value="">' . esc_html__( 'All roles', 'mac-members' ) . '</option>';
+
+			foreach ( $roles as $slug => $name ) {
+				$output .= '<option value="' . esc_attr( (string) $slug ) . '"' . ( (string) $slug === $role ? ' selected' : '' ) . '>' . esc_html( $name ) . '</option>';
+			}
+
+			$output .= '</select>';
+			$output .= '</label>';
+		}
+
+		$output .= '<label class="mac-members-search__field">';
+		$output .= '<span class="mac-members-search__label">' . esc_html__( 'Search', 'mac-members' ) . '</span>';
+		$output .= '<input type="search" name="' . esc_attr( MembersTableShortcode::SEARCH_QUERY_ARG ) . '" value="' . esc_attr( $search ) . '" maxlength="' . esc_attr( (string) MembersQuery::SEARCH_MAX_LENGTH ) . '" placeholder="' . esc_attr__( 'Name, email or username', 'mac-members' ) . '">';
+		$output .= '</label>';
+		$output .= '<button type="submit" class="mac-members-search__submit btn--primary btn--s">' . esc_html__( 'Filter', 'mac-members' ) . '</button>';
+
+		if ( '' !== $role || '' !== $search ) {
+			$output .= '<a class="mac-members-search__clear btn--primary btn--outline btn--s" href="' . esc_url( (string) ( $form['clear_url'] ?? '' ) ) . '">' . esc_html__( 'Clear', 'mac-members' ) . '</a>';
+		}
+
+		$output .= '</form>';
 
 		return $output;
 	}

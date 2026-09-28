@@ -14,6 +14,7 @@ use MacMembers\Members\MemberStatus;
 use MacMembers\Settings\SettingsSchema;
 use MacMembers\Settings\WordPressSettingsRepository;
 use PHPUnit\Framework\Attributes\CoversClass;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 
 use function mac_members_tests_reset_wp_state;
@@ -102,6 +103,117 @@ final class MembersQueryTest extends TestCase {
 		);
 	}
 
+	public function test_a_role_narrows_the_query_and_include_limits_it(): void {
+		$args = ( new MembersQuery( $this->create_settings_repository() ) )->get_query_args( MemberStatus::Approved, 1, 'officer', array( 4, 9 ) );
+
+		self::assertSame( array( 'mac_members_approved' ), $args['role__in'] );
+		self::assertSame( array( 'officer' ), $args['role'] );
+		self::assertSame( array( 4, 9 ), $args['include'] );
+	}
+
+	public function test_count_by_status_counts_only_the_members_with_the_role(): void {
+		$GLOBALS['mac_members_test_users'] = array(
+			new \WP_User( array( 'ID' => 1, 'roles' => array( 'mac_members_pending', 'officer' ) ) ),
+			new \WP_User( array( 'ID' => 2, 'roles' => array( 'mac_members_approved', 'officer' ) ) ),
+			new \WP_User( array( 'ID' => 3, 'roles' => array( 'mac_members_approved' ) ) ),
+			new \WP_User( array( 'ID' => 4, 'roles' => array( 'subscriber', 'officer' ) ) ),
+		);
+
+		self::assertSame(
+			array(
+				'pending'  => 1,
+				'approved' => 1,
+				'inactive' => 0,
+				'denied'   => 0,
+			),
+			( new MembersQuery( $this->create_settings_repository() ) )->count_by_status( 'officer' )
+		);
+	}
+
+	public function test_filter_roles_are_the_roles_members_hold_without_status_roles_or_exclusions(): void {
+		$GLOBALS['mac_members_test_roles'] += array(
+			'officer'      => array( 'name' => 'Officer', 'capabilities' => array( 'read' => true ) ),
+			'trustee'      => array( 'name' => 'Trustee', 'capabilities' => array( 'read' => true ) ),
+			'shop_steward' => array( 'name' => 'Shop Steward', 'capabilities' => array( 'read' => true ) ),
+			'editor'       => array( 'name' => 'Editor', 'capabilities' => array( 'read' => true ) ),
+			'site_manager' => array( 'name' => 'Site Manager', 'capabilities' => array( 'read' => true, 'manage_options' => true ) ),
+			'author'       => array( 'name' => 'Author', 'capabilities' => array( 'read' => true, 'manage_options' => false ) ),
+		);
+		$GLOBALS['mac_members_test_users'] = array(
+			new \WP_User( array( 'ID' => 1, 'roles' => array( 'mac_members_pending', 'trustee', 'administrator' ) ) ),
+			new \WP_User( array( 'ID' => 2, 'roles' => array( 'mac_members_approved', 'shop_steward', 'editor' ) ) ),
+			new \WP_User( array( 'ID' => 3, 'roles' => array( 'mac_members_denied', 'officer', 'site_manager', 'author' ) ) ),
+			new \WP_User( array( 'ID' => 4, 'roles' => array( 'subscriber' ) ) ),
+		);
+		$repository = $this->create_settings_repository();
+		$repository->save( array( 'role_filter_exclusions' => 'administrator, EDITOR, manage_options' ) );
+
+		// Left out: Administrator by slug, Editor by name, Site Manager by capability. Author does not grant
+		// manage_options, and only a non-member holds Subscriber.
+		self::assertSame(
+			array(
+				'author'       => 'Author',
+				'officer'      => 'Officer',
+				'shop_steward' => 'Shop Steward',
+				'trustee'      => 'Trustee',
+			),
+			( new MembersQuery( $repository ) )->get_filter_roles()
+		);
+	}
+
+	public function test_filter_roles_leave_out_administrator_by_default_and_show_translated_names(): void {
+		$GLOBALS['mac_members_test_roles']['officer']  = array( 'name' => 'Officer', 'capabilities' => array( 'read' => true ) );
+		$GLOBALS['mac_members_test_role_translations'] = array( 'Officer' => 'Responsabil' );
+		$GLOBALS['mac_members_test_users']             = array(
+			new \WP_User( array( 'ID' => 1, 'roles' => array( 'mac_members_approved', 'officer', 'administrator' ) ) ),
+		);
+
+		self::assertSame( array( 'officer' => 'Responsabil' ), ( new MembersQuery( $this->create_settings_repository() ) )->get_filter_roles() );
+	}
+
+	/**
+	 * @param array<int,int> $expected IDs of the members the search finds.
+	 */
+	#[DataProvider( 'provide_searches' )]
+	public function test_search_matches_every_word_in_the_names_email_username_or_id( string $search, string $role, array $expected ): void {
+		$this->store_named_members();
+
+		$members = ( new MembersQuery( $this->create_settings_repository() ) )->get_members( null, 1, $role, $search );
+
+		self::assertSame( $expected, array_map( static fn ( \WP_User $user ): int => $user->ID, $members['users'] ) );
+		self::assertSame( count( $expected ), $members['total'] );
+	}
+
+	/**
+	 * @return array<string,array{0:string,1:string,2:array<int,int>}>
+	 */
+	public static function provide_searches(): array {
+		return array(
+			'first name, any case'     => array( 'TEST', '', array( 1, 2 ) ),
+			'first and last name'      => array( 'test doi', '', array( 2 ) ),
+			'last name'                => array( 'pop', '', array( 3 ) ),
+			'email'                    => array( 'membru2@', '', array( 2 ) ),
+			'username'                 => array( 'membru-test-1', '', array( 1 ) ),
+			'user ID'                  => array( '3', '', array( 3 ) ),
+			'wildcards are plain text' => array( '*ana*', '', array( 3 ) ),
+			'with a role'              => array( 'test', 'officer', array( 1 ) ),
+			'no match'                 => array( 'nobody', '', array() ),
+			'not a member'             => array( 'outsider', '', array() ),
+		);
+	}
+
+	public function test_each_search_runs_once_for_the_counts_and_the_page(): void {
+		$this->store_named_members();
+		$query = new MembersQuery( $this->create_settings_repository() );
+
+		$query->count_by_status( '', 'test' );
+		$after_counts = count( $GLOBALS['mac_members_test_user_queries'] );
+		$query->get_members( null, 1, '', 'test' );
+
+		// Only the page query is new: the page reuses the matches the counts found.
+		self::assertSame( $after_counts + 1, count( $GLOBALS['mac_members_test_user_queries'] ) );
+	}
+
 	public function test_get_status_reads_the_status_from_the_configured_roles(): void {
 		$query = new MembersQuery( $this->create_settings_repository() );
 
@@ -110,6 +222,16 @@ final class MembersQueryTest extends TestCase {
 		// A user who holds two status roles shows the first status, in the order pending, approved, inactive, denied.
 		self::assertSame( MemberStatus::Pending, $query->get_status( new \WP_User( array( 'ID' => 3, 'roles' => array( 'mac_members_approved', 'mac_members_pending' ) ) ) ) );
 		self::assertNull( $query->get_status( new \WP_User( array( 'ID' => 4, 'roles' => array( 'subscriber' ) ) ) ) );
+	}
+
+	private function store_named_members(): void {
+		$GLOBALS['mac_members_test_roles']['officer'] = array( 'name' => 'Officer', 'capabilities' => array( 'read' => true ) );
+		$GLOBALS['mac_members_test_users']            = array(
+			new \WP_User( array( 'ID' => 1, 'user_login' => 'membru-test-1', 'user_email' => 'mihai+membru1@example.org', 'first_name' => 'Test', 'last_name' => 'Unu', 'roles' => array( 'mac_members_pending', 'officer' ) ) ),
+			new \WP_User( array( 'ID' => 2, 'user_login' => 'membru-test-2', 'user_email' => 'mihai+membru2@example.org', 'first_name' => 'Test', 'last_name' => 'Doi', 'roles' => array( 'mac_members_approved' ) ) ),
+			new \WP_User( array( 'ID' => 3, 'user_login' => 'ana', 'user_email' => 'ana@example.org', 'first_name' => 'Ana', 'last_name' => 'Pop', 'roles' => array( 'mac_members_denied' ) ) ),
+			new \WP_User( array( 'ID' => 4, 'user_login' => 'outsider', 'user_email' => 'outsider@example.org', 'first_name' => 'Outsider', 'roles' => array( 'subscriber' ) ) ),
+		);
 	}
 
 	private function create_settings_repository(): WordPressSettingsRepository {

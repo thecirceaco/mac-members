@@ -8,7 +8,7 @@ It provides a small admin settings page, a protected members table shortcode wit
 
 - WordPress 6.x
 - PHP 8.3+
-- Automatic.css 4 on the front end: the members table takes its colors, borders, radius, spacing and buttons from ACSS variables and button classes (`btn--primary`, `btn--outline`, `btn--s`), so it follows each site's design system
+- Automatic.css 4 on the front end, with the status colors (success, danger, warning and info) and the neutral color turned on: every color, border, radius, space and text size in the members table is an ACSS token, and its buttons are ACSS buttons (`btn--success`, `btn--danger`, `btn--primary`, `btn--outline`, `btn--s`), so it follows each site's ACSS settings
 
 ## Installation
 
@@ -40,6 +40,7 @@ The four roles must be different roles, and the approved, inactive and denied ro
 
 The settings page also includes:
 
+- roles left out of the role filter, `administrator` by default
 - admin notification email
 - from email
 - member and admin approval email toggles
@@ -66,7 +67,16 @@ The table has a filter for each status (Pending, Approved, Inactive, Denied) and
 
 Pending requests are listed oldest first, like a queue; the other views show the newest registrations first. The table shows 50 members per page, with Previous and Next links (`mac_members_page`). The columns are User ID, Email, First Name, Last Name, Username, Registered, Profile, Status and Actions; the Actions column has only the status changes the member's status allows.
 
+A form above the table narrows any view:
+
+- **Role** lists the other roles members hold, for example Officer or Trustee. It leaves out the four status roles, and the roles that "Roles left out of the role filter" names by slug or name, or that have a capability it names. It shows only when members hold such a role.
+- **Search** matches members whose first name, last name, email, username or display name contains every word. A number also matches the user ID.
+
+The role and the search are kept in the `mac_members_role` and `mac_members_search` query arguments. The status filters, their counts and the page links keep them, and Clear removes both.
+
 After a change, a row that no longer belongs in a filtered view disappears, and in the All view the row shows its new status and buttons. The filter counts follow the changes.
+
+The stylesheet and the script are versioned with the plugin version and the file's modification time, so a new build reaches browsers and CDNs that keep the old files for a year.
 
 Each time the table is rendered it gets a token that lists the users it shows and is signed for the current user and login session. Status change requests must send that token, and the server only acts on users the token lists, so buttons or requests that did not come from a rendered table are refused. A token is valid for 12 hours; after that the table has to be reloaded.
 

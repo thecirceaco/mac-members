@@ -204,6 +204,7 @@ final class WordPressSettingsRepository implements SettingsRepositoryInterface
 				SettingsSchema::TYPE_ROLE   => $this->sanitize_role( $value, $fallback[ $key ] ?? $field['default'] ),
 				SettingsSchema::TYPE_EMAIL  => $this->sanitize_email( $value ),
 				SettingsSchema::TYPE_TOGGLE => $this->sanitize_toggle( $value ),
+				SettingsSchema::TYPE_LIST   => $this->sanitize_list( $value, (string) $field['default'] ),
 				default                     => $field['default'],
 			};
 		}
@@ -262,6 +263,29 @@ final class WordPressSettingsRepository implements SettingsRepositoryInterface
 		$normalized = filter_var( $value, FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE );
 
 		return \is_bool( $normalized ) ? $normalized : false;
+	}
+
+	/**
+	 * A comma-separated list with each entry cleaned, cut to 100 characters and listed once, at most 50
+	 * entries. A value that is not text falls back to the default.
+	 */
+	private function sanitize_list( mixed $value, string $default ): string
+	{
+		if ( ! \is_scalar( $value ) ) {
+			return $default;
+		}
+
+		$entries = array();
+
+		foreach ( SettingsSchema::parse_list( (string) $value ) as $entry ) {
+			$entry = mb_substr( \sanitize_text_field( $entry ), 0, 100 );
+
+			if ( '' !== $entry && ! in_array( strtolower( $entry ), array_map( 'strtolower', $entries ), true ) ) {
+				$entries[] = $entry;
+			}
+		}
+
+		return implode( ', ', array_slice( $entries, 0, 50 ) );
 	}
 
 	private function get_site_admin_email(): string

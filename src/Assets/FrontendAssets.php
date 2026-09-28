@@ -38,16 +38,28 @@ final class FrontendAssets implements Service
 			self::STYLE_HANDLE,
 			MAC_MEMBERS_ASSETS_URL . 'members-table.css',
 			array(),
-			MAC_MEMBERS_VERSION
+			$this->get_asset_version( 'members-table.css' )
 		);
 
 		\wp_register_script(
 			self::SCRIPT_HANDLE,
 			MAC_MEMBERS_ASSETS_URL . 'members-table.js',
 			array(),
-			MAC_MEMBERS_VERSION,
+			$this->get_asset_version( 'members-table.js' ),
 			true
 		);
+	}
+
+	/**
+	 * The plugin version plus the file's modification time. Browsers and CDNs keep these files for a year, so
+	 * a new build with the same plugin version still needs a new address to reach them.
+	 */
+	public function get_asset_version( string $file ): string
+	{
+		$path     = MAC_MEMBERS_ASSETS_PATH . $file;
+		$modified = \is_file( $path ) ? filemtime( $path ) : false;
+
+		return false === $modified ? MAC_MEMBERS_VERSION : MAC_MEMBERS_VERSION . '.' . $modified;
 	}
 
 	public function enqueue_members_table(): void

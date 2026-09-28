@@ -193,8 +193,8 @@ final class MembersTableShortcodeTest extends TestCase {
 
 		$output = $this->create_shortcode()->render();
 
-		self::assertStringContainsString( 'class="mac-members-button mac-members-button--approve btn--primary btn--s"', $output );
-		self::assertStringContainsString( 'class="mac-members-button mac-members-button--deny btn--primary btn--outline btn--s"', $output );
+		self::assertStringContainsString( 'class="mac-members-button mac-members-button--approve btn--success btn--s"', $output );
+		self::assertStringContainsString( 'class="mac-members-button mac-members-button--deny btn--danger btn--s"', $output );
 		self::assertStringContainsString( 'class="mac-members-filter btn--primary btn--outline btn--s" href="/?mac_members_status=approved"', $output );
 	}
 
@@ -252,6 +252,150 @@ final class MembersTableShortcodeTest extends TestCase {
 		self::assertStringContainsString( 'href="/members/?mac_members_status=approved&amp;mac_members_page=1">Previous</a>', $second );
 		self::assertStringNotContainsString( '>Next</a>', $second );
 		self::assertSame( 1, substr_count( $second, '<tr class="mac-members-list__row"' ) );
+	}
+
+	public function test_role_filter_offers_the_roles_members_hold_and_narrows_the_view_and_counts(): void {
+		$this->add_union_roles();
+		$this->store_people(
+			array(
+				1 => array( 'roles' => array( 'mac_members_pending', 'officer' ) ),
+				2 => array( 'roles' => array( 'mac_members_approved', 'officer' ) ),
+				3 => array( 'roles' => array( 'mac_members_approved', 'trustee' ) ),
+				4 => array( 'roles' => array( 'mac_members_approved', 'administrator' ) ),
+				5 => array( 'roles' => array( 'subscriber', 'shop_steward' ) ),
+			)
+		);
+		$_SERVER['REQUEST_URI']     = '/members/?mac_members_status=approved&mac_members_role=officer';
+		$_GET['mac_members_status'] = 'approved';
+		$_GET['mac_members_role']   = 'officer';
+
+		$output = $this->create_shortcode()->render();
+
+		// Administrator is left out by default, and only a non-member holds Shop Steward.
+		self::assertSame( 3, preg_match_all( '/<option value="([^"]*)"[^>]*>([^<]*)<\/option>/', $output, $options ) );
+		self::assertSame( array( '', 'officer', 'trustee' ), $options[1] );
+		self::assertSame( array( 'All roles', 'Officer', 'Trustee' ), $options[2] );
+		self::assertStringContainsString( '<option value="officer" selected>Officer</option>', $output );
+		self::assertStringContainsString( 'data-mac-members-user-id="2" data-mac-members-status="approved"', $output );
+		self::assertStringNotContainsString( 'data-mac-members-user-id="3"', $output );
+		self::assertStringNotContainsString( 'data-mac-members-user-id="4"', $output );
+		self::assertStringContainsString( 'href="/members/?mac_members_status=pending&amp;mac_members_role=officer">Pending <span class="mac-members-count" data-mac-members-count-for="pending">1</span>', $output );
+		self::assertStringContainsString( 'data-mac-members-count-for="approved">1</span>', $output );
+		self::assertStringContainsString( 'data-mac-members-count-for="all">2</span>', $output );
+		self::assertStringContainsString( '<a class="mac-members-search__clear btn--primary btn--outline btn--s" href="/members/?mac_members_status=approved">Clear</a>', $output );
+	}
+
+	public function test_role_that_is_not_offered_is_ignored(): void {
+		$this->store_people(
+			array(
+				1 => array( 'roles' => array( 'mac_members_approved', 'administrator' ) ),
+				2 => array( 'roles' => array( 'mac_members_approved' ) ),
+			)
+		);
+		$_GET['mac_members_status'] = 'approved';
+		$_GET['mac_members_role']   = 'administrator';
+
+		$output = $this->create_shortcode()->render();
+
+		self::assertStringContainsString( 'data-mac-members-user-id="1"', $output );
+		self::assertStringContainsString( 'data-mac-members-user-id="2"', $output );
+		// No member holds a role the filter offers, so only the search shows.
+		self::assertStringNotContainsString( '<select', $output );
+		self::assertStringContainsString( '<input type="search" name="mac_members_search" value=""', $output );
+		self::assertStringNotContainsString( 'mac-members-search__clear', $output );
+	}
+
+	public function test_search_narrows_the_view_and_the_counts_and_stays_in_the_links(): void {
+		$this->store_people(
+			array(
+				1 => array(
+					'roles'      => array( 'mac_members_pending' ),
+					'first_name' => 'Test',
+					'last_name'  => 'Unu',
+				),
+				2 => array(
+					'roles'      => array( 'mac_members_approved' ),
+					'first_name' => 'Test',
+					'last_name'  => 'Doi',
+				),
+				3 => array( 'roles' => array( 'mac_members_denied' ) ),
+			)
+		);
+		$_GET['mac_members_status'] = 'all';
+		$_GET['mac_members_search'] = '  test doi ';
+
+		$output = $this->create_shortcode()->render();
+
+		self::assertStringContainsString( 'data-mac-members-user-id="2" data-mac-members-status="approved"', $output );
+		self::assertStringNotContainsString( 'data-mac-members-user-id="1"', $output );
+		self::assertStringNotContainsString( 'data-mac-members-user-id="3"', $output );
+		self::assertStringContainsString( 'data-mac-members-count-for="pending">0</span>', $output );
+		self::assertStringContainsString( 'data-mac-members-count-for="approved">1</span>', $output );
+		self::assertStringContainsString( 'data-mac-members-count-for="all">1</span>', $output );
+		self::assertStringContainsString( 'href="/?mac_members_status=pending&amp;mac_members_search=test+doi"', $output );
+		self::assertStringContainsString( '<input type="search" name="mac_members_search" value="test doi" maxlength="100" placeholder="Name, email or username">', $output );
+	}
+
+	public function test_links_encode_the_search(): void {
+		$_GET['mac_members_status'] = 'approved';
+		$_GET['mac_members_search'] = 'a&b #1';
+
+		$output = $this->create_shortcode()->render();
+
+		self::assertStringContainsString( 'href="/?mac_members_status=denied&amp;mac_members_search=a%26b+%231"', $output );
+		self::assertStringContainsString( 'name="mac_members_search" value="a&amp;b #1"', $output );
+	}
+
+	public function test_search_without_matches_says_no_members_match(): void {
+		$this->store_people( array( 1 => array( 'roles' => array( 'mac_members_pending' ) ) ) );
+		$_GET['mac_members_search'] = 'nobody';
+
+		$output = $this->create_shortcode()->render();
+
+		self::assertStringContainsString( '<p class="mac-members-empty">No members match these filters.</p>', $output );
+		self::assertStringContainsString( 'data-mac-members-count-for="all">0</span>', $output );
+		self::assertStringContainsString( '<a class="mac-members-search__clear btn--primary btn--outline btn--s" href="/?mac_members_status=pending">Clear</a>', $output );
+	}
+
+	public function test_form_sends_the_page_query_arguments_and_the_view(): void {
+		$_SERVER['REQUEST_URI']     = '/?page_id=5&mac_members_status=denied&mac_members_page=2&mac_members_search=x';
+		$_GET['mac_members_status'] = 'denied';
+
+		$output = $this->create_shortcode()->render();
+
+		self::assertStringContainsString( '<form class="mac-members-search" method="get" action="/" role="search" aria-label="Filter members"><input type="hidden" name="page_id" value="5"><input type="hidden" name="mac_members_status" value="denied"><label class="mac-members-search__field">', $output );
+		self::assertStringContainsString( '<button type="submit" class="mac-members-search__submit btn--primary btn--s">Filter</button></form>', $output );
+	}
+
+	public function test_fixed_view_form_has_no_status_field(): void {
+		$output = $this->create_shortcode()->render( array( 'status' => 'approved' ) );
+
+		self::assertStringContainsString( '<form class="mac-members-search"', $output );
+		self::assertStringNotContainsString( 'name="mac_members_status"', $output );
+	}
+
+	public function test_pagination_links_keep_the_role_and_the_search(): void {
+		$this->add_union_roles();
+		$members = array();
+
+		for ( $id = 1; $id <= 51; $id++ ) {
+			$members[ $id ] = array(
+				'roles'      => array( 'mac_members_approved', 'officer' ),
+				'first_name' => 'Ion',
+			);
+		}
+
+		$this->store_people( $members );
+		$_GET = array(
+			'mac_members_status' => 'approved',
+			'mac_members_role'   => 'officer',
+			'mac_members_search' => 'ion',
+		);
+
+		self::assertStringContainsString(
+			'href="/?mac_members_status=approved&amp;mac_members_role=officer&amp;mac_members_search=ion&amp;mac_members_page=2">Next</a>',
+			$this->create_shortcode()->render()
+		);
 	}
 
 	public function test_single_page_has_no_pagination(): void {
@@ -443,6 +587,32 @@ final class MembersTableShortcodeTest extends TestCase {
 					'user_login' => 'member' . $user_id,
 					'roles'      => array( $role ),
 				)
+			);
+		}
+	}
+
+	/**
+	 * @param array<int,array<string,mixed>> $people User data keyed by user ID; email and username default to member<ID>.
+	 */
+	private function store_people( array $people ): void {
+		$GLOBALS['mac_members_test_users'] = array();
+
+		foreach ( $people as $user_id => $data ) {
+			$GLOBALS['mac_members_test_users'][] = new \WP_User(
+				$data + array(
+					'ID'         => $user_id,
+					'user_email' => 'member' . $user_id . '@example.test',
+					'user_login' => 'member' . $user_id,
+				)
+			);
+		}
+	}
+
+	private function add_union_roles(): void {
+		foreach ( array( 'officer' => 'Officer', 'trustee' => 'Trustee', 'shop_steward' => 'Shop Steward' ) as $slug => $name ) {
+			$GLOBALS['mac_members_test_roles'][ $slug ] = array(
+				'name'         => $name,
+				'capabilities' => array( 'read' => true ),
 			);
 		}
 	}

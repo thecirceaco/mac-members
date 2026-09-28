@@ -20,9 +20,10 @@ final class SettingsSchema
 	public const TYPE_ROLE   = 'role';
 	public const TYPE_EMAIL  = 'email';
 	public const TYPE_TOGGLE = 'toggle';
+	public const TYPE_LIST   = 'list';
 
 	/**
-	 * @return array<string,array{label:string,type:string,default:mixed}>
+	 * @return array<string,array{label:string,type:string,default:mixed,description?:string}>
 	 */
 	public function get_fields(): array
 	{
@@ -46,6 +47,12 @@ final class SettingsSchema
 				'label'   => __( 'Denied role', 'mac-members' ),
 				'type'    => self::TYPE_ROLE,
 				'default' => Roles::DENIED,
+			),
+			'role_filter_exclusions' => array(
+				'label'       => __( 'Roles left out of the role filter', 'mac-members' ),
+				'type'        => self::TYPE_LIST,
+				'default'     => 'administrator',
+				'description' => __( 'Comma-separated role slugs, role names or capabilities, for example administrator, manage_options. The members table offers every role its members hold, except the status roles and the roles that match this list or have one of these capabilities.', 'mac-members' ),
 			),
 			'admin_notification_email' => array(
 				'label'   => __( 'Admin notification email', 'mac-members' ),
@@ -131,6 +138,16 @@ final class SettingsSchema
 	public function get_toggle_fields(): array
 	{
 		return $this->get_fields_by_type( self::TYPE_TOGGLE );
+	}
+
+	/**
+	 * Splits a comma-separated list into its trimmed, non-empty entries.
+	 *
+	 * @return array<int,string>
+	 */
+	public static function parse_list( string $value ): array
+	{
+		return array_values( array_filter( array_map( 'trim', explode( ',', $value ) ), static fn ( string $entry ): bool => '' !== $entry ) );
 	}
 
 	/**

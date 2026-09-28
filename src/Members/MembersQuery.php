@@ -10,6 +10,7 @@ declare(strict_types=1);
 namespace MacMembers\Members;
 
 use MacMembers\Settings\SettingsRepositoryInterface;
+use MacMembers\Settings\SettingsSchema;
 
 if ( ! defined( 'ABSPATH' ) ) {
 	exit; // Exit if accessed directly.
@@ -19,6 +20,29 @@ final class MembersQuery
 {
 	public const PER_PAGE = 50;
 
+	/**
+	 * Longest search the table accepts.
+	 */
+	public const SEARCH_MAX_LENGTH = 100;
+
+	/**
+	 * Most words of a search that are matched.
+	 */
+	private const SEARCH_MAX_WORDS = 5;
+
+	/**
+	 * User fields a search word is matched against, next to the first and last name. A word made of digits
+	 * is also compared with the user ID.
+	 */
+	private const SEARCH_COLUMNS = array( 'user_login', 'user_email', 'user_nicename', 'display_name' );
+
+	/**
+	 * IDs of the members that match a role and search, so each search runs once per request.
+	 *
+	 * @var array<string,array<int,int>>
+	 */
+	private array $search_matches = array();
+
 	public function __construct(
 		private readonly SettingsRepositoryInterface $settings
 	) {}
@@ -26,13 +50,15 @@ final class MembersQuery
 	/**
 	 * Pending requests are listed oldest first, like a queue; the other views newest first.
 	 *
-	 * @param MemberStatus|null $status Status to list, or null for every member.
+	 * @param MemberStatus|null $status  Status to list, or null for every member.
+	 * @param string            $role    A role the members must also hold, or '' for any role.
+	 * @param array<int,int>    $include Only these users, or no limit when empty.
 	 *
 	 * @return array<string,mixed>
 	 */
-	public function get_query_args( ?MemberStatus $status, int $page = 1 ): array
+	public function get_query_args( ?MemberStatus $status, int $page = 1, string $role = '', array $include = array() ): array
 	{
-		return array(
+		$args = array(
 			'role__in'    => null === $status ? array_values( $this->get_status_roles() ) : array( $this->get_role( $status ) ),
 			'number'      => self::PER_PAGE,
 			'paged'       => max( 1, $page ),
@@ -41,16 +67,38 @@ final class MembersQuery
 			'fields'      => 'all',
 			'count_total' => true,
 		);
+
+		if ( '' !== $role ) {
+			// WordPress lists only the users who hold every role in `role`, and one of the roles in `role__in`.
+			$args['role'] = array( $role );
+		}
+
+		if ( array() !== $include ) {
+			$args['include'] = $include;
+		}
+
+		return $args;
 	}
 
 	/**
 	 * @param MemberStatus|null $status Status to list, or null for every member.
+	 * @param string            $role   A role the members must also hold, or '' for any role.
+	 * @param string            $search Words every listed member matches, or '' for no search.
 	 *
 	 * @return array{users:array<int,object>,total:int} One page of members and the number of members in the view.
 	 */
-	public function get_members( ?MemberStatus $status, int $page = 1 ): array
+	public function get_members( ?MemberStatus $status, int $page = 1, string $role = '', string $search = '' ): array
 	{
-		$query = new \WP_User_Query( $this->get_query_args( $status, $page ) );
+		$include = $this->find_search_matches( $role, $search );
+
+		if ( array() === $include ) {
+			return array(
+				'users' => array(),
+				'total' => 0,
+			);
+		}
+
+		$query = new \WP_User_Query( $this->get_query_args( $status, $page, $role, $include ?? array() ) );
 		$users = $query->get_results();
 
 		return array(
@@ -60,26 +108,72 @@ final class MembersQuery
 	}
 
 	/**
+	 * @param string $role   A role the counted members must also hold, or '' for any role.
+	 * @param string $search Words every counted member matches, or '' for no search.
+	 *
 	 * @return array<string,int> Number of members with each status, keyed by status value.
 	 */
-	public function count_by_status(): array
+	public function count_by_status( string $role = '', string $search = '' ): array
 	{
-		$counts = array();
+		$include = $this->find_search_matches( $role, $search );
+		$counts  = array();
 
 		foreach ( MemberStatus::cases() as $status ) {
-			$query = new \WP_User_Query(
-				array(
-					'role'        => $this->get_role( $status ),
-					'number'      => 1,
-					'fields'      => 'ID',
-					'count_total' => true,
-				)
+			if ( array() === $include ) {
+				$counts[ $status->value ] = 0;
+				continue;
+			}
+
+			$args = array(
+				'role'        => '' === $role ? $this->get_role( $status ) : array( $this->get_role( $status ), $role ),
+				'number'      => 1,
+				'fields'      => 'ID',
+				'count_total' => true,
 			);
 
-			$counts[ $status->value ] = (int) $query->get_total();
+			if ( null !== $include ) {
+				$args['include'] = $include;
+			}
+
+			$counts[ $status->value ] = (int) ( new \WP_User_Query( $args ) )->get_total();
 		}
 
 		return $counts;
+	}
+
+	/**
+	 * Roles the role filter offers: every role at least one member holds, except the status roles and the
+	 * roles that the role filter exclusions setting names by slug or name, or that have a capability it names.
+	 *
+	 * @return array<string,string> Role names keyed by slug, sorted by name.
+	 */
+	public function get_filter_roles(): array
+	{
+		$status_roles = array_values( array_filter( $this->get_status_roles() ) );
+		$exclusions   = array_map( 'strtolower', SettingsSchema::parse_list( (string) $this->settings->get( 'role_filter_exclusions', '' ) ) );
+		$roles        = array();
+
+		if ( array() === $status_roles ) {
+			return array();
+		}
+
+		foreach ( $this->get_site_roles() as $slug => $role ) {
+			$name = isset( $role['name'] ) ? (string) $role['name'] : $slug;
+
+			if (
+				in_array( $slug, $status_roles, true )
+				|| $this->is_excluded( $slug, $name, $role['capabilities'] ?? array(), $exclusions )
+				|| ! $this->is_held_by_a_member( $slug, $status_roles )
+			) {
+				continue;
+			}
+
+			$roles[ $slug ] = \translate_user_role( $name );
+		}
+
+		asort( $roles, SORT_NATURAL | SORT_FLAG_CASE );
+
+		return $roles;
 	}
 
 	/**
@@ -97,6 +191,149 @@ final class MembersQuery
 		}
 
 		return null;
+	}
+
+	/**
+	 * IDs of the members, with any status and with the role when one is set, that match every word of the
+	 * search in their user ID, username, email, nicename, display name, first name or last name. WordPress
+	 * searches user fields and user meta separately, so each word runs one query for each and joins them.
+	 *
+	 * @return array<int,int>|null The matching IDs, or null when there is no search.
+	 */
+	private function find_search_matches( string $role, string $search ): ?array
+	{
+		$words = $this->get_search_words( $search );
+
+		if ( array() === $words ) {
+			return null;
+		}
+
+		$key = $role . '|' . implode( ' ', $words );
+
+		if ( isset( $this->search_matches[ $key ] ) ) {
+			return $this->search_matches[ $key ];
+		}
+
+		$base = array(
+			'role__in'    => array_values( $this->get_status_roles() ),
+			'number'      => -1,
+			'fields'      => 'ID',
+			'count_total' => false,
+		);
+
+		if ( '' !== $role ) {
+			$base['role'] = array( $role );
+		}
+
+		$matches = null;
+
+		foreach ( $words as $word ) {
+			$in_fields = ( new \WP_User_Query(
+				$base + array(
+					'search'         => '*' . $word . '*',
+					'search_columns' => ctype_digit( $word ) ? array_merge( array( 'ID' ), self::SEARCH_COLUMNS ) : self::SEARCH_COLUMNS,
+				)
+			) )->get_results();
+
+			$in_names = ( new \WP_User_Query(
+				$base + array(
+					// phpcs:ignore WordPress.DB.SlowDBQuery.slow_db_query_meta_query -- Names are user meta; this runs only for reviewers who search.
+					'meta_query' => array(
+						'relation' => 'OR',
+						array(
+							'key'     => 'first_name',
+							'value'   => $word,
+							'compare' => 'LIKE',
+						),
+						array(
+							'key'     => 'last_name',
+							'value'   => $word,
+							'compare' => 'LIKE',
+						),
+					),
+				)
+			) )->get_results();
+
+			$word_matches = array_unique( array_map( 'intval', array_merge( (array) $in_fields, (array) $in_names ) ) );
+			$matches      = null === $matches ? $word_matches : array_intersect( $matches, $word_matches );
+
+			if ( array() === $matches ) {
+				break;
+			}
+		}
+
+		$this->search_matches[ $key ] = array_values( $matches ?? array() );
+
+		return $this->search_matches[ $key ];
+	}
+
+	/**
+	 * @return array<int,string> The search's distinct words, without the * that WordPress reads as a wildcard.
+	 */
+	private function get_search_words( string $search ): array
+	{
+		$words = preg_split( '/\s+/u', trim( $search ), -1, PREG_SPLIT_NO_EMPTY );
+		$words = array_map( static fn ( string $word ): string => trim( $word, '*' ), \is_array( $words ) ? $words : array() );
+		$words = array_values( array_unique( array_filter( $words, static fn ( string $word ): bool => '' !== $word ) ) );
+
+		return array_slice( $words, 0, self::SEARCH_MAX_WORDS );
+	}
+
+	/**
+	 * @param mixed             $capabilities The role's capabilities.
+	 * @param array<int,string> $exclusions   Lowercase entries of the role filter exclusions setting.
+	 */
+	private function is_excluded( string $slug, string $name, mixed $capabilities, array $exclusions ): bool
+	{
+		$names = array( strtolower( $slug ), strtolower( $name ), strtolower( \translate_user_role( $name ) ) );
+
+		if ( array() !== array_intersect( $names, $exclusions ) ) {
+			return true;
+		}
+
+		foreach ( \is_array( $capabilities ) ? $capabilities : array() as $capability => $granted ) {
+			if ( $granted && in_array( strtolower( (string) $capability ), $exclusions, true ) ) {
+				return true;
+			}
+		}
+
+		return false;
+	}
+
+	/**
+	 * @param array<int,string> $status_roles The configured status roles.
+	 */
+	private function is_held_by_a_member( string $role, array $status_roles ): bool
+	{
+		$query = new \WP_User_Query(
+			array(
+				'role'        => array( $role ),
+				'role__in'    => $status_roles,
+				'number'      => 1,
+				'fields'      => 'ID',
+				'count_total' => false,
+			)
+		);
+
+		return array() !== (array) $query->get_results();
+	}
+
+	/**
+	 * @return array<string,array<string,mixed>> The site's roles, keyed by slug.
+	 */
+	private function get_site_roles(): array
+	{
+		$wp_roles = \wp_roles();
+		$roles    = \is_object( $wp_roles ) && isset( $wp_roles->roles ) && \is_array( $wp_roles->roles ) ? $wp_roles->roles : array();
+		$site     = array();
+
+		foreach ( $roles as $slug => $role ) {
+			if ( \is_array( $role ) && '' !== (string) $slug ) {
+				$site[ (string) $slug ] = $role;
+			}
+		}
+
+		return $site;
 	}
 
 	/**

@@ -371,33 +371,20 @@ if ( ! class_exists( 'WP_User_Query' ) ) {
 		public function __construct( array $args ) {
 			$this->args                                  = $args;
 			$GLOBALS['mac_members_test_last_user_query'] = $args;
+			$GLOBALS['mac_members_test_user_queries'][]  = $args;
 		}
 
 		private int $total = 0;
 
 		/**
-		 * The users in $GLOBALS['mac_members_test_users'] that match the role arguments, paged like WordPress.
+		 * The users in $GLOBALS['mac_members_test_users'] that match the arguments, paged like WordPress: every
+		 * role in `role`, one role in `role__in`, an ID in `include`, `search` in one of `search_columns` (with
+		 * * as the wildcard) and the `meta_query` clauses, compared with LIKE or =.
 		 *
 		 * @return array<int,WP_User|int>
 		 */
 		public function get_results(): array {
-			$users = $GLOBALS['mac_members_test_users'] ?? array();
-			$roles = array();
-
-			if ( isset( $this->args['role'] ) && '' !== $this->args['role'] ) {
-				$roles = array( (string) $this->args['role'] );
-			} elseif ( ! empty( $this->args['role__in'] ) ) {
-				$roles = array_map( 'strval', (array) $this->args['role__in'] );
-			}
-
-			if ( array() !== $roles ) {
-				$users = array_values(
-					array_filter(
-						$users,
-						static fn ( WP_User $user ): bool => array() !== array_intersect( $roles, $user->roles )
-					)
-				);
-			}
+			$users = array_values( array_filter( $GLOBALS['mac_members_test_users'] ?? array(), array( $this, 'matches' ) ) );
 
 			$this->total = count( $users );
 			$number      = (int) ( $this->args['number'] ?? -1 );
@@ -418,6 +405,83 @@ if ( ! class_exists( 'WP_User_Query' ) ) {
 			$this->get_results();
 
 			return $this->total;
+		}
+
+		private function matches( WP_User $user ): bool {
+			$all = array_filter( array_map( 'strval', (array) ( $this->args['role'] ?? array() ) ) );
+			$any = array_filter( array_map( 'strval', (array) ( $this->args['role__in'] ?? array() ) ) );
+
+			if ( array() !== array_diff( $all, $user->roles ) ) {
+				return false;
+			}
+
+			if ( array() !== $any && array() === array_intersect( $any, $user->roles ) ) {
+				return false;
+			}
+
+			if ( ! empty( $this->args['include'] ) && ! in_array( $user->ID, array_map( 'intval', (array) $this->args['include'] ), true ) ) {
+				return false;
+			}
+
+			if ( isset( $this->args['search'] ) && '' !== $this->args['search'] && ! $this->matches_search( $user ) ) {
+				return false;
+			}
+
+			return ! isset( $this->args['meta_query'] ) || $this->matches_meta_query( $user, (array) $this->args['meta_query'] );
+		}
+
+		private function matches_search( WP_User $user ): bool {
+			$search  = (string) $this->args['search'];
+			$leading = str_starts_with( $search, '*' );
+			$ending  = str_ends_with( $search, '*' );
+			$term    = strtolower( trim( $search, '*' ) );
+
+			foreach ( (array) ( $this->args['search_columns'] ?? array( 'user_login', 'user_email', 'display_name' ) ) as $column ) {
+				$value = strtolower( 'ID' === $column ? (string) $user->ID : (string) ( $user->{$column} ?? $user->get( (string) $column ) ?? '' ) );
+
+				if ( 'ID' === $column ) {
+					if ( $value === $term ) {
+						return true;
+					}
+
+					continue;
+				}
+
+				$found = match ( true ) {
+					$leading && $ending => str_contains( $value, $term ),
+					$leading            => str_ends_with( $value, $term ),
+					$ending             => str_starts_with( $value, $term ),
+					default             => $value === $term,
+				};
+
+				if ( $found ) {
+					return true;
+				}
+			}
+
+			return false;
+		}
+
+		/**
+		 * @param array<int|string,mixed> $meta_query Meta query clauses and their relation.
+		 */
+		private function matches_meta_query( WP_User $user, array $meta_query ): bool {
+			$relation = strtoupper( (string) ( $meta_query['relation'] ?? 'AND' ) );
+			$results  = array();
+
+			foreach ( $meta_query as $key => $clause ) {
+				if ( 'relation' === $key || ! is_array( $clause ) ) {
+					continue;
+				}
+
+				$value     = strtolower( (string) ( $user->get( (string) $clause['key'] ) ?? '' ) );
+				$expected  = strtolower( (string) ( $clause['value'] ?? '' ) );
+				$results[] = 'LIKE' === strtoupper( (string) ( $clause['compare'] ?? '=' ) )
+					? str_contains( $value, $expected )
+					: $value === $expected;
+			}
+
+			return 'OR' === $relation ? in_array( true, $results, true ) : ! in_array( false, $results, true );
 		}
 
 		/**
@@ -499,6 +563,8 @@ function mac_members_tests_reset_wp_state(): void {
 	$GLOBALS['mac_members_test_user_roles']        = array();
 	$GLOBALS['mac_members_test_cleaned_user_cache'] = array();
 	$GLOBALS['mac_members_test_last_user_query']   = null;
+	$GLOBALS['mac_members_test_user_queries']      = array();
+	$GLOBALS['mac_members_test_role_translations'] = array();
 	$GLOBALS['mac_members_test_registered_styles'] = array();
 	$GLOBALS['mac_members_test_registered_scripts'] = array();
 	$GLOBALS['mac_members_test_enqueued_styles']    = array();
@@ -572,12 +638,18 @@ function shortcode_atts( array $pairs, array|string $atts, string $shortcode = '
  *
  * @param array<string,mixed> $args Query arguments.
  */
+/**
+ * Like WordPress: the URL's own arguments are encoded again, and new values are added as they are, so callers
+ * encode them.
+ */
 function add_query_arg( array $args, ?string $url = null ): string {
 	$url   = $url ?? (string) ( $_SERVER['REQUEST_URI'] ?? '/' );
 	$parts = explode( '?', $url, 2 );
 	$query = array();
 
 	parse_str( $parts[1] ?? '', $query );
+
+	$query = array_map( static fn ( mixed $value ): mixed => is_string( $value ) ? urlencode( $value ) : $value, $query );
 
 	foreach ( $args as $key => $value ) {
 		if ( false === $value ) {
@@ -587,7 +659,13 @@ function add_query_arg( array $args, ?string $url = null ): string {
 		}
 	}
 
-	return $parts[0] . ( array() === $query ? '' : '?' . http_build_query( $query ) );
+	$pairs = array();
+
+	foreach ( $query as $key => $value ) {
+		$pairs[] = $key . '=' . ( is_array( $value ) ? http_build_query( $value ) : (string) $value );
+	}
+
+	return $parts[0] . ( array() === $pairs ? '' : '?' . implode( '&', $pairs ) );
 }
 
 /**
@@ -644,6 +722,12 @@ function get_bloginfo( string $show = '' ): string {
 
 function wp_roles(): WP_Roles {
 	return new WP_Roles( $GLOBALS['mac_members_test_roles'] ?? array() );
+}
+
+function translate_user_role( string $name, string $domain = 'default' ): string {
+	unset( $domain );
+
+	return $GLOBALS['mac_members_test_role_translations'][ $name ] ?? $name;
 }
 
 function get_role( string $role ): ?WP_Role {

@@ -23,10 +23,12 @@ final class MembersTableShortcode implements Service
 	public const SHORTCODE = 'mac_members_table';
 
 	/**
-	 * Query arguments that choose the view and the page.
+	 * Query arguments that choose the view, the page, the role and the search.
 	 */
 	public const STATUS_QUERY_ARG = 'mac_members_status';
 	public const PAGE_QUERY_ARG   = 'mac_members_page';
+	public const ROLE_QUERY_ARG   = 'mac_members_role';
+	public const SEARCH_QUERY_ARG = 'mac_members_search';
 
 	/**
 	 * View that lists every member.
@@ -58,7 +60,7 @@ final class MembersTableShortcode implements Service
 
 	/**
 	 * Renders the table. With a `status` attribute (pending, approved, inactive, denied or all) the table
-	 * shows only that view, without the status filters.
+	 * shows only that view, without the status filters. The role filter and the search narrow any view.
 	 *
 	 * @param array<string,mixed>|string $attributes Shortcode attributes.
 	 */
@@ -79,16 +81,21 @@ final class MembersTableShortcode implements Service
 		$view       = $fixed_view ?? $this->parse_view( $this->get_query_string( self::STATUS_QUERY_ARG ) ) ?? MemberStatus::Pending->value;
 		$status     = self::VIEW_ALL === $view ? null : MemberStatus::from( $view );
 		$page       = max( 1, \absint( $this->get_query_string( self::PAGE_QUERY_ARG ) ) );
-		$members    = $this->query->get_members( $status, $page );
-		$base_url   = \remove_query_arg( array( self::STATUS_QUERY_ARG, self::PAGE_QUERY_ARG ) );
+		$roles      = $this->query->get_filter_roles();
+		$role       = $this->parse_role( $this->get_query_string( self::ROLE_QUERY_ARG ), $roles );
+		$search     = $this->parse_search( $this->get_query_string( self::SEARCH_QUERY_ARG ) );
+		$members    = $this->query->get_members( $status, $page, $role, $search );
+		$base_url   = \remove_query_arg( array( self::STATUS_QUERY_ARG, self::PAGE_QUERY_ARG, self::ROLE_QUERY_ARG, self::SEARCH_QUERY_ARG ) );
+		$narrowing  = $this->get_narrowing_args( $role, $search );
 
 		return $this->renderer->render(
 			$this->get_rows( $members['users'] ),
 			$view,
-			null === $fixed_view ? $this->get_filters( $view, $base_url ) : array(),
-			$this->get_pagination( $view, $page, $members['total'], $base_url ),
+			null === $fixed_view ? $this->get_filters( $view, $base_url, $role, $search ) : array(),
+			$this->get_pagination( $view, $page, $members['total'], $base_url, $narrowing ),
 			$this->settings->get_missing_role_slugs(),
-			$this->render_token->issue( $this->get_user_ids( $members['users'] ) )
+			$this->render_token->issue( $this->get_user_ids( $members['users'] ) ),
+			$this->get_search_form( null === $fixed_view ? $view : null, $base_url, $roles, $role, $search )
 		);
 	}
 
@@ -114,6 +121,40 @@ final class MembersTableShortcode implements Service
 		}
 
 		return null;
+	}
+
+	/**
+	 * @param array<string,string> $roles Roles the role filter offers, keyed by slug.
+	 *
+	 * @return string An offered role, or '' for any role.
+	 */
+	private function parse_role( string $value, array $roles ): string
+	{
+		return array_key_exists( $value, $roles ) ? $value : '';
+	}
+
+	private function parse_search( string $value ): string
+	{
+		return trim( mb_substr( trim( $value ), 0, MembersQuery::SEARCH_MAX_LENGTH ) );
+	}
+
+	/**
+	 * The role and search query arguments that are set, for links that keep them. They are encoded here
+	 * because add_query_arg() adds new values as they are.
+	 *
+	 * @return array<string,string>
+	 */
+	private function get_narrowing_args( string $role, string $search ): array
+	{
+		$args = array_filter(
+			array(
+				self::ROLE_QUERY_ARG   => $role,
+				self::SEARCH_QUERY_ARG => $search,
+			),
+			static fn ( string $value ): bool => '' !== $value
+		);
+
+		return array_map( 'urlencode', $args );
 	}
 
 	private function get_query_string( string $key ): string
@@ -147,19 +188,22 @@ final class MembersTableShortcode implements Service
 	}
 
 	/**
+	 * Status filters whose counts and links follow the role and the search.
+	 *
 	 * @return array<int,array{view:string,label:string,count:int,url:string,current:bool}>
 	 */
-	private function get_filters( string $view, string $base_url ): array
+	private function get_filters( string $view, string $base_url, string $role, string $search ): array
 	{
-		$counts  = $this->query->count_by_status();
-		$filters = array();
+		$counts    = $this->query->count_by_status( $role, $search );
+		$narrowing = $this->get_narrowing_args( $role, $search );
+		$filters   = array();
 
 		foreach ( MemberStatus::cases() as $status ) {
 			$filters[] = array(
 				'view'    => $status->value,
 				'label'   => $status->label(),
 				'count'   => $counts[ $status->value ] ?? 0,
-				'url'     => \add_query_arg( array( self::STATUS_QUERY_ARG => $status->value ), $base_url ),
+				'url'     => \add_query_arg( array( self::STATUS_QUERY_ARG => $status->value ) + $narrowing, $base_url ),
 				'current' => $status->value === $view,
 			);
 		}
@@ -168,7 +212,7 @@ final class MembersTableShortcode implements Service
 			'view'    => self::VIEW_ALL,
 			'label'   => __( 'All', 'mac-members' ),
 			'count'   => array_sum( $counts ),
-			'url'     => \add_query_arg( array( self::STATUS_QUERY_ARG => self::VIEW_ALL ), $base_url ),
+			'url'     => \add_query_arg( array( self::STATUS_QUERY_ARG => self::VIEW_ALL ) + $narrowing, $base_url ),
 			'current' => self::VIEW_ALL === $view,
 		);
 
@@ -176,27 +220,66 @@ final class MembersTableShortcode implements Service
 	}
 
 	/**
+	 * The role and search form. It sends the page's other query arguments and the current view as hidden
+	 * fields, because a GET form replaces the query string of its action.
+	 *
+	 * @param string|null          $view  The current view, or null when the shortcode fixes it.
+	 * @param array<string,string> $roles Roles the role filter offers, keyed by slug.
+	 *
+	 * @return array{action:string,hidden:array<string,string>,roles:array<string,string>,role:string,search:string,clear_url:string}
+	 */
+	private function get_search_form( ?string $view, string $base_url, array $roles, string $role, string $search ): array
+	{
+		$parts  = explode( '?', $base_url, 2 );
+		$query  = array();
+		$hidden = array();
+
+		parse_str( $parts[1] ?? '', $query );
+
+		foreach ( $query as $name => $value ) {
+			if ( \is_string( $value ) ) {
+				$hidden[ (string) $name ] = $value;
+			}
+		}
+
+		if ( null !== $view ) {
+			$hidden[ self::STATUS_QUERY_ARG ] = $view;
+		}
+
+		return array(
+			'action'    => $parts[0],
+			'hidden'    => $hidden,
+			'roles'     => $roles,
+			'role'      => $role,
+			'search'    => $search,
+			'clear_url' => null === $view ? $base_url : \add_query_arg( array( self::STATUS_QUERY_ARG => $view ), $base_url ),
+		);
+	}
+
+	/**
+	 * @param array<string,string> $narrowing The role and search query arguments that are set.
+	 *
 	 * @return array{page:int,pages:int,previous_url:string,next_url:string}
 	 */
-	private function get_pagination( string $view, int $page, int $total, string $base_url ): array
+	private function get_pagination( string $view, int $page, int $total, string $base_url, array $narrowing ): array
 	{
 		$pages = max( 1, (int) ceil( $total / MembersQuery::PER_PAGE ) );
 
 		return array(
 			'page'         => $page,
 			'pages'        => $pages,
-			'previous_url' => 1 < $page ? $this->get_page_url( $view, $page - 1, $base_url ) : '',
-			'next_url'     => $page < $pages ? $this->get_page_url( $view, $page + 1, $base_url ) : '',
+			'previous_url' => 1 < $page ? $this->get_page_url( $view, $page - 1, $base_url, $narrowing ) : '',
+			'next_url'     => $page < $pages ? $this->get_page_url( $view, $page + 1, $base_url, $narrowing ) : '',
 		);
 	}
 
-	private function get_page_url( string $view, int $page, string $base_url ): string
+	/**
+	 * @param array<string,string> $narrowing The role and search query arguments that are set.
+	 */
+	private function get_page_url( string $view, int $page, string $base_url, array $narrowing ): string
 	{
 		return \add_query_arg(
-			array(
-				self::STATUS_QUERY_ARG => $view,
-				self::PAGE_QUERY_ARG   => $page,
-			),
+			array( self::STATUS_QUERY_ARG => $view ) + $narrowing + array( self::PAGE_QUERY_ARG => $page ),
 			$base_url
 		);
 	}

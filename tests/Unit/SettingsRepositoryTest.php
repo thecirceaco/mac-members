@@ -51,6 +51,21 @@ final class SettingsRepositoryTest extends TestCase {
 		self::assertSame( 'Example Site', $repository->get_from_name() );
 	}
 
+	public function test_role_filter_exclusions_default_to_administrator(): void {
+		self::assertSame( 'administrator', $this->create_repository()->all()['role_filter_exclusions'] );
+	}
+
+	public function test_role_filter_exclusions_are_saved_as_a_clean_comma_separated_list(): void {
+		$repository = $this->create_repository();
+
+		self::assertSame(
+			'administrator, manage_options, Shop Steward',
+			$repository->save( array( 'role_filter_exclusions' => ' administrator,, manage_options , <b>Shop Steward</b>, ADMINISTRATOR ' ) )['role_filter_exclusions']
+		);
+		self::assertSame( '', $repository->save( array( 'role_filter_exclusions' => '' ) )['role_filter_exclusions'] );
+		self::assertSame( 'administrator', $repository->save( array( 'role_filter_exclusions' => array( 'editor' ) ) )['role_filter_exclusions'] );
+	}
+
 	public function test_save_accepts_existing_role_slugs_only(): void {
 		$repository = $this->create_repository();
 
