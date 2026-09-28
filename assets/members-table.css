@@ -91,6 +91,23 @@
 	color: var(--text-dark-muted);
 }
 
+/* The browser's clear button in the search, drawn as an X mask so it takes the ACSS danger color. */
+.mac-members-search__input::-webkit-search-cancel-button {
+	-webkit-appearance: none;
+	appearance: none;
+	inline-size: 0.875em;
+	block-size: 0.875em;
+	margin-inline-start: 0.5em;
+	background-color: var(--danger);
+	-webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M5 5l14 14M19 5 5 19' stroke='%23000' stroke-width='3' stroke-linecap='round'/%3E%3C/svg%3E") center / contain no-repeat;
+	mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M5 5l14 14M19 5 5 19' stroke='%23000' stroke-width='3' stroke-linecap='round'/%3E%3C/svg%3E") center / contain no-repeat;
+	cursor: pointer;
+}
+
+.mac-members-search__input::-webkit-search-cancel-button:hover {
+	background-color: var(--danger-hover);
+}
+
 /* The wrapper draws the outer border and rounds the corners, and the cells only draw the lines between them. */
 .mac-members-table-wrap {
 	overflow-x: auto;
@@ -128,10 +145,12 @@
 	white-space: nowrap;
 }
 
-/* Striped rows: every second row is --bg-ultra-light. Only the header is --bg-light. */
+/*
+ * Striped rows: every second row is --bg-ultra-light. Only the header is --bg-light. Every row keeps the page's
+ * text color, so both stripes read the same.
+ */
 .mac-members-list tbody tr:nth-child(even) {
 	background-color: var(--bg-ultra-light);
-	color: var(--bg-ultra-light-text);
 }
 
 .mac-members-status__label {
@@ -262,4 +281,20 @@
 
 .mac-members-range {
 	margin: 0;
+}
+
+/*
+ * The browser draws a select's arrow against the border, and padding does not move it. The selects draw
+ * their own arrow instead, in the text color, with room between it and the border.
+ */
+.mac-members-search__role,
+.mac-members-per-page__select {
+	-webkit-appearance: none;
+	appearance: none;
+	padding-inline-end: 2.25em;
+	background-image: linear-gradient(45deg, transparent 50%, currentColor 50%), linear-gradient(135deg, currentColor 50%, transparent 50%);
+	background-position: calc(100% - 1.2em) 50%, calc(100% - 0.85em) 50%;
+	background-size: 0.35em 0.35em;
+	background-repeat: no-repeat;
+	cursor: pointer;
 }
