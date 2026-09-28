@@ -137,8 +137,8 @@
 			if (!result.ok) {
 				showNotice(root, 'error', getMessage(result.data, config.genericError || 'Something went wrong. Please try again.'));
 
-				// The user was approved or denied elsewhere, so this row is out of date.
-				if (getErrorCode(result.data) === 'not_pending') {
+				// The member's status changed elsewhere, so this row is out of date.
+				if (getErrorCode(result.data) === 'status_changed') {
 					row.classList.add('is-success');
 					window.setTimeout(() => {
 						row.remove();

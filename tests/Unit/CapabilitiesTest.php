@@ -42,14 +42,14 @@ final class CapabilitiesTest extends TestCase {
 	}
 
 	public function test_sensitive_capabilities_of_role_lists_only_granted_sensitive_capabilities(): void {
-		$GLOBALS['mac_members_test_roles']['member']['capabilities']['delete_users'] = false;
-		$GLOBALS['mac_members_test_roles']['member']['capabilities']['edit_plugins'] = true;
+		$GLOBALS['mac_members_test_roles']['mac_members_approved']['capabilities']['delete_users'] = false;
+		$GLOBALS['mac_members_test_roles']['mac_members_approved']['capabilities']['edit_plugins'] = true;
 
 		self::assertSame(
 			array( 'manage_options', 'edit_users', 'promote_users', 'unfiltered_html' ),
 			Capabilities::sensitive_capabilities_of_role( 'administrator' )
 		);
-		self::assertSame( array( 'edit_plugins' ), Capabilities::sensitive_capabilities_of_role( 'member' ) );
+		self::assertSame( array( 'edit_plugins' ), Capabilities::sensitive_capabilities_of_role( 'mac_members_approved' ) );
 		self::assertSame( array(), Capabilities::sensitive_capabilities_of_role( 'subscriber' ) );
 		self::assertSame( array(), Capabilities::sensitive_capabilities_of_role( 'not-a-role' ) );
 	}

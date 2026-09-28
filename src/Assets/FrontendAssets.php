@@ -19,9 +19,11 @@ final class FrontendAssets implements Service
 {
 	public const STYLE_HANDLE  = 'mac-members-pending-members';
 	public const SCRIPT_HANDLE = 'mac-members-pending-members';
-	public const NONCE_ACTION  = 'mac_members_pending_member_action';
-	public const APPROVE_ACTION = 'mac_members_approve_user';
-	public const DENY_ACTION    = 'mac_members_deny_user';
+	public const NONCE_ACTION  = 'mac_members_member_action';
+	public const APPROVE_ACTION    = 'mac_members_approve_user';
+	public const DENY_ACTION       = 'mac_members_deny_user';
+	public const DEACTIVATE_ACTION = 'mac_members_deactivate_user';
+	public const REACTIVATE_ACTION = 'mac_members_reactivate_user';
 
 	public function register(): void
 	{

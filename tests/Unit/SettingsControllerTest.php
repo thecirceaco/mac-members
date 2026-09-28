@@ -68,8 +68,8 @@ final class SettingsControllerTest extends TestCase {
 			'mac_members_settings_nonce' => $nonce,
 			'mac_members_settings'       => array(
 				'pending_role'                => 'subscriber',
-				'approved_role'               => 'member',
-				'denied_role'                 => 'member-invalid',
+				'approved_role'               => 'mac_members_approved',
+				'denied_role'                 => 'mac_members_denied',
 				'admin_notification_email'    => 'notifications@example.test',
 				'from_email'                  => 'from@example.test',
 				'send_member_approval_email' => '1',
@@ -103,9 +103,9 @@ final class SettingsControllerTest extends TestCase {
 			'mac_members_settings_nonce' => wp_create_nonce( SettingsController::NONCE_ACTION ),
 			'mac_members_settings'       => array_merge(
 				array(
-					'pending_role'  => 'member-pending',
-					'approved_role' => 'member',
-					'denied_role'   => 'member-invalid',
+					'pending_role'  => 'mac_members_pending',
+					'approved_role' => 'mac_members_approved',
+					'denied_role'   => 'mac_members_denied',
 					'from_email'    => 'from@example.test',
 				),
 				$roles
@@ -134,9 +134,9 @@ final class SettingsControllerTest extends TestCase {
 	public static function provide_role_submissions_that_are_not_allowed(): array {
 		return array(
 			'same role twice'         => array(
-				array( 'denied_role' => 'member' ),
+				array( 'denied_role' => 'mac_members_approved' ),
 				'roles_not_distinct',
-				'The pending, approved and denied roles must be three different roles. The settings were not saved.',
+				'The pending, approved, inactive and denied roles must be four different roles. The settings were not saved.',
 			),
 			'sensitive approved role' => array(
 				array( 'approved_role' => 'administrator' ),
@@ -173,7 +173,7 @@ final class SettingsControllerTest extends TestCase {
 	public function test_render_missing_roles_warning_outputs_expected_notice_on_settings_page(): void {
 		$GLOBALS['mac_members_test_roles'] = array(
 			'administrator' => array( 'name' => 'Administrator' ),
-			'member'        => array( 'name' => 'Member' ),
+			'mac_members_approved'        => array( 'name' => 'Member' ),
 		);
 
 		$_GET['page'] = MAC_MEMBERS_ADMIN_SLUG;

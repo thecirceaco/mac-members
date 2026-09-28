@@ -58,6 +58,7 @@ final class PendingMembersQueryTest extends TestCase {
 					'user_email'      => 'member@example.test',
 					'user_login'      => 'member12',
 					'user_registered' => '2026-05-01 12:00:00',
+					'roles'           => array( 'mac_members_pending' ),
 				)
 			),
 		);

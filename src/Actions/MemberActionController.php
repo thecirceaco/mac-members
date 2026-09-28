@@ -1,6 +1,6 @@
 <?php
 /**
- * Authenticated member approval actions.
+ * Authenticated member status actions: approve, deny, deactivate and reactivate.
  *
  * @package mac-members
  */
@@ -13,6 +13,8 @@ use MacMembers\Assets\FrontendAssets;
 use MacMembers\Contracts\Service;
 use MacMembers\Email\MemberNotificationService;
 use MacMembers\Email\NotificationResult;
+use MacMembers\Members\MemberStatus;
+use MacMembers\Members\MemberTransition;
 use MacMembers\PendingMembers\RenderToken;
 use MacMembers\Security\Capabilities;
 use MacMembers\Settings\SettingsRepositoryInterface;
@@ -26,14 +28,12 @@ final class MemberActionController implements Service
 	private const ERROR_INVALID_REQUEST = 'invalid_request';
 	private const ERROR_INVALID_USER = 'invalid_user';
 	private const ERROR_PERMISSION = 'permission_denied';
-	private const ERROR_NOT_PENDING = 'not_pending';
+	private const ERROR_STATUS_CHANGED = 'status_changed';
 	private const ERROR_UPDATE_FAILED = 'role_update_failed';
 	private const ERROR_MISSING_ROLE = 'missing_role';
 	private const ERROR_ROLE_SETTINGS = 'invalid_role_settings';
 	private const ERROR_STALE_TABLE = 'stale_table';
 	private const ERROR_BUSY = 'busy';
-	private const SUCCESS_APPROVED = 'approved';
-	private const SUCCESS_DENIED = 'denied';
 
 	/**
 	 * @param \Closure|null $end_request Runs before the request exits, after a response was sent. Tests pass a
@@ -50,27 +50,38 @@ final class MemberActionController implements Service
 
 	public function register(): void
 	{
-		\add_action( 'wp_ajax_' . FrontendAssets::APPROVE_ACTION, array( $this, 'approve' ) );
-		\add_action( 'wp_ajax_' . FrontendAssets::DENY_ACTION, array( $this, 'deny' ) );
+		foreach ( MemberTransition::cases() as $transition ) {
+			\add_action( 'wp_ajax_' . $transition->ajax_action(), array( $this, $transition->value ) );
+		}
 	}
 
 	public function approve(): void
 	{
-		$this->handle( FrontendAssets::APPROVE_ACTION, 'approved_role', 'denied_role', self::SUCCESS_APPROVED );
+		$this->handle( MemberTransition::Approve );
 	}
 
 	public function deny(): void
 	{
-		$this->handle( FrontendAssets::DENY_ACTION, 'denied_role', 'approved_role', self::SUCCESS_DENIED );
+		$this->handle( MemberTransition::Deny );
+	}
+
+	public function deactivate(): void
+	{
+		$this->handle( MemberTransition::Deactivate );
+	}
+
+	public function reactivate(): void
+	{
+		$this->handle( MemberTransition::Reactivate );
 	}
 
 	/**
 	 * Every failed check sends an error and returns. send_error() also ends the request itself, so a
 	 * response function that does not exit can never let a failed check reach the role change.
 	 */
-	private function handle( string $expected_action, string $target_role_setting, string $other_role_setting, string $success_code ): void
+	private function handle( MemberTransition $transition ): void
 	{
-		if ( ! $this->is_valid_request( $expected_action ) ) {
+		if ( ! $this->is_valid_request( $transition->ajax_action() ) ) {
 			$this->send_error( self::ERROR_INVALID_REQUEST, 400 );
 			return;
 		}
@@ -105,33 +116,32 @@ final class MemberActionController implements Service
 			return;
 		}
 
-		$pending_role = (string) $this->settings->get( 'pending_role', 'member-pending' );
-		$target_role  = (string) $this->settings->get( $target_role_setting, '' );
-		// Approve and deny exclude each other: a user who went back to pending must not keep an earlier outcome.
-		$other_role = (string) $this->settings->get( $other_role_setting, '' );
+		$status_roles = $this->get_status_roles();
+		$target_role  = $status_roles[ $transition->to_status()->value ];
+		$from_roles   = $this->get_from_roles( $transition, $status_roles );
 
 		// Check the roles before any write, so a missing role cannot leave the user half-changed.
-		if ( ! $this->settings->role_exists( $pending_role ) || ! $this->settings->role_exists( $target_role ) ) {
+		if ( ! $this->settings->role_exists( $target_role ) || ! $this->any_role_exists( $from_roles ) ) {
 			$this->send_error( self::ERROR_MISSING_ROLE, 500 );
 			return;
 		}
 
-		if ( ! $this->roles_are_allowed( $pending_role, $target_role, $other_role ) ) {
+		if ( ! $this->roles_are_allowed( $status_roles, $target_role ) ) {
 			$this->send_error( self::ERROR_ROLE_SETTINGS, 500 );
 			return;
 		}
 
-		if ( ! $this->user_has_role( $user, $pending_role ) ) {
-			$this->send_error( self::ERROR_NOT_PENDING, 409 );
+		if ( ! $this->user_has_any_role( $user, $from_roles ) ) {
+			$this->send_error( self::ERROR_STATUS_CHANGED, 409 );
 			return;
 		}
 
-		if ( ! $this->can_assign_roles( $user, $pending_role, $target_role, $other_role ) ) {
+		if ( ! $this->can_assign_roles( $user, $status_roles, $target_role ) ) {
 			$this->send_error( self::ERROR_PERMISSION, 403 );
 			return;
 		}
 
-		// Only one approve or deny can change this user at a time.
+		// Only one status change can change this user at a time.
 		if ( ! $this->lock->acquire( $user_id ) ) {
 			$this->send_error( self::ERROR_BUSY, 409 );
 			return;
@@ -140,14 +150,14 @@ final class MemberActionController implements Service
 		try {
 			// Read the user again under the lock: another request may have changed the roles since the checks above.
 			$user    = $this->read_user( $user_id );
-			$pending = $user instanceof \WP_User && $this->user_has_role( $user, $pending_role );
-			$changed = $pending && $this->change_roles( $user, $pending_role, $target_role, $other_role );
+			$allowed = $user instanceof \WP_User && $this->user_has_any_role( $user, $from_roles );
+			$changed = $allowed && $this->change_roles( $user, $status_roles, $target_role );
 		} finally {
 			$this->lock->release( $user_id );
 		}
 
-		if ( ! $pending ) {
-			$this->send_error( self::ERROR_NOT_PENDING, 409 );
+		if ( ! $allowed ) {
+			$this->send_error( self::ERROR_STATUS_CHANGED, 409 );
 			return;
 		}
 
@@ -157,8 +167,8 @@ final class MemberActionController implements Service
 		}
 
 		$this->send_success(
-			$success_code,
-			$this->send_notifications( $success_code, $user )
+			$transition,
+			$this->send_notifications( $transition, $user )
 		);
 	}
 
@@ -185,6 +195,47 @@ final class MemberActionController implements Service
 	}
 
 	/**
+	 * @return array<string,string> The configured role of each status, keyed by status value.
+	 */
+	private function get_status_roles(): array
+	{
+		$roles = array();
+
+		foreach ( MemberStatus::cases() as $status ) {
+			$roles[ $status->value ] = (string) $this->settings->get( $status->role_setting(), '' );
+		}
+
+		return $roles;
+	}
+
+	/**
+	 * @param array<string,string> $status_roles Configured role of each status.
+	 *
+	 * @return array<int,string> Roles of the statuses a member must have for this change.
+	 */
+	private function get_from_roles( MemberTransition $transition, array $status_roles ): array
+	{
+		return array_map(
+			static fn ( MemberStatus $status ): string => $status_roles[ $status->value ],
+			$transition->from_statuses()
+		);
+	}
+
+	/**
+	 * @param array<int,string> $roles Roles.
+	 */
+	private function any_role_exists( array $roles ): bool
+	{
+		foreach ( $roles as $role ) {
+			if ( $this->settings->role_exists( $role ) ) {
+				return true;
+			}
+		}
+
+		return false;
+	}
+
+	/**
 	 * The acting user may not change their own roles or those of a user who holds a sensitive capability,
 	 * and must be allowed to promote this user.
 	 */
@@ -196,30 +247,29 @@ final class MemberActionController implements Service
 	}
 
 	/**
-	 * The three roles must differ, and the role being added must not grant sensitive capabilities. This is
-	 * checked here as well as on save, because a role's capabilities can change after the settings are saved.
+	 * The four status roles must differ, and the role being added must not grant sensitive capabilities. This
+	 * is checked here as well as on save, because a role's capabilities can change after the settings are saved.
+	 *
+	 * @param array<string,string> $status_roles Configured role of each status.
 	 */
-	private function roles_are_allowed( string $pending_role, string $target_role, string $other_role ): bool
+	private function roles_are_allowed( array $status_roles, string $target_role ): bool
 	{
-		return 3 === count( array_unique( array( $pending_role, $target_role, $other_role ) ) )
+		return count( $status_roles ) === count( array_unique( $status_roles ) )
 			&& array() === Capabilities::sensitive_capabilities_of_role( $target_role );
 	}
 
 	/**
-	 * The acting user must be allowed to assign every role this action adds or removes, as in wp-admin.
+	 * The acting user must be allowed to assign every role this change adds or removes, as in wp-admin.
+	 *
+	 * @param array<string,string> $status_roles Configured role of each status.
 	 */
-	private function can_assign_roles( \WP_User $user, string $pending_role, string $target_role, string $other_role ): bool
+	private function can_assign_roles( \WP_User $user, array $status_roles, string $target_role ): bool
 	{
 		if ( ! \function_exists( 'get_editable_roles' ) ) {
 			require_once ABSPATH . 'wp-admin/includes/user.php';
 		}
 
-		$roles = array( $pending_role, $target_role );
-
-		if ( $this->user_has_role( $user, $other_role ) ) {
-			$roles[] = $other_role;
-		}
-
+		$roles          = array_merge( array( $target_role ), $this->get_roles_to_remove( $user, $status_roles, $target_role ) );
 		$editable_roles = \get_editable_roles();
 
 		foreach ( $roles as $role ) {
@@ -231,23 +281,58 @@ final class MemberActionController implements Service
 		return true;
 	}
 
+	/**
+	 * The statuses exclude each other, so every other status role the user holds is removed. A user who went
+	 * back to pending must not keep the outcome of an earlier review.
+	 *
+	 * @param array<string,string> $status_roles Configured role of each status.
+	 *
+	 * @return array<int,string>
+	 */
+	private function get_roles_to_remove( \WP_User $user, array $status_roles, string $target_role ): array
+	{
+		$roles = array();
+
+		foreach ( $status_roles as $role ) {
+			if ( $role !== $target_role && $this->user_has_role( $user, $role ) ) {
+				$roles[] = $role;
+			}
+		}
+
+		return $roles;
+	}
+
+	/**
+	 * @param array<int,string> $roles Roles.
+	 */
+	private function user_has_any_role( \WP_User $user, array $roles ): bool
+	{
+		foreach ( $roles as $role ) {
+			if ( $this->user_has_role( $user, $role ) ) {
+				return true;
+			}
+		}
+
+		return false;
+	}
+
 	private function user_has_role( \WP_User $user, string $role ): bool
 	{
 		return '' !== $role && in_array( $role, (array) $user->roles, true );
 	}
 
 	/**
-	 * Moves the user from the pending role to the target role. When the stored roles do not match the
-	 * expected result, the roles the user had before are restored and false is returned.
+	 * Gives the user the target role and removes every other status role. When the stored roles do not match
+	 * the expected result, the roles the user had before are restored and false is returned.
+	 *
+	 * @param array<string,string> $status_roles Configured role of each status.
 	 */
-	private function change_roles( \WP_User $user, string $pending_role, string $target_role, string $other_role ): bool
+	private function change_roles( \WP_User $user, array $status_roles, string $target_role ): bool
 	{
 		$original_roles = $this->get_roles( $user );
 
-		$user->remove_role( $pending_role );
-
-		if ( '' !== $other_role ) {
-			$user->remove_role( $other_role );
+		foreach ( $this->get_roles_to_remove( $user, $status_roles, $target_role ) as $role ) {
+			$user->remove_role( $role );
 		}
 
 		$user->add_role( $target_role );
@@ -259,11 +344,7 @@ final class MemberActionController implements Service
 			return false;
 		}
 
-		if (
-			$this->user_has_role( $stored, $target_role )
-			&& ! $this->user_has_role( $stored, $pending_role )
-			&& ! $this->user_has_role( $stored, $other_role )
-		) {
+		if ( $this->user_has_role( $stored, $target_role ) && array() === $this->get_roles_to_remove( $stored, $status_roles, $target_role ) ) {
 			return true;
 		}
 
@@ -309,25 +390,32 @@ final class MemberActionController implements Service
 		return array_values( array_map( 'strval', (array) $user->roles ) );
 	}
 
-	private function send_notifications( string $success_code, \WP_User $user ): ?NotificationResult
+	private function send_notifications( MemberTransition $transition, \WP_User $user ): ?NotificationResult
 	{
 		if ( ! $this->notifications instanceof MemberNotificationService ) {
 			return null;
 		}
 
-		return self::SUCCESS_APPROVED === $success_code
-			? $this->notifications->send_approval_notifications( $user )
-			: $this->notifications->send_denial_notifications( $user );
+		return match ( $transition ) {
+			MemberTransition::Approve, MemberTransition::Reactivate => $this->notifications->send_approval_notifications( $user ),
+			MemberTransition::Deny       => $this->notifications->send_denial_notifications( $user ),
+			MemberTransition::Deactivate => $this->notifications->send_deactivation_notifications( $user ),
+		};
 	}
 
-	private function send_success( string $message, ?NotificationResult $notification_result = null ): never
+	private function send_success( MemberTransition $transition, ?NotificationResult $notification_result = null ): never
 	{
-		$response_message = self::SUCCESS_APPROVED === $message
-			? __( 'Member approved successfully.', 'mac-members' )
-			: __( 'Member denied successfully.', 'mac-members' );
+		$response_message = match ( $transition ) {
+			MemberTransition::Approve    => __( 'Member approved successfully.', 'mac-members' ),
+			MemberTransition::Deny       => __( 'Member denied successfully.', 'mac-members' ),
+			MemberTransition::Deactivate => __( 'Member deactivated successfully.', 'mac-members' ),
+			MemberTransition::Reactivate => __( 'Member reactivated successfully.', 'mac-members' ),
+		};
 
 		$response = array(
-			'message' => $response_message,
+			'message'      => $response_message,
+			'status'       => $transition->to_status()->value,
+			'status_label' => $transition->to_status()->label(),
 		);
 
 		if ( $notification_result instanceof NotificationResult && $notification_result->has_failures() ) {
@@ -374,10 +462,10 @@ final class MemberActionController implements Service
 		return match ( $code ) {
 			self::ERROR_INVALID_USER => __( 'Invalid user.', 'mac-members' ),
 			self::ERROR_PERMISSION => __( 'You do not have permission to perform this action.', 'mac-members' ),
-			self::ERROR_NOT_PENDING => __( 'This user is no longer pending.', 'mac-members' ),
+			self::ERROR_STATUS_CHANGED => __( 'This member\'s status has changed. Please reload the page.', 'mac-members' ),
 			self::ERROR_UPDATE_FAILED => __( 'Unable to update user role.', 'mac-members' ),
 			self::ERROR_MISSING_ROLE => __( 'A role needed for this action does not exist. Please review Settings > MAC Members.', 'mac-members' ),
-			self::ERROR_ROLE_SETTINGS => __( 'The role settings are not allowed: the three roles must differ, and the role being added must not grant administrative capabilities. Please review Settings > MAC Members.', 'mac-members' ),
+			self::ERROR_ROLE_SETTINGS => __( 'The role settings are not allowed: the four roles must differ, and the role being added must not grant administrative capabilities. Please review Settings > MAC Members.', 'mac-members' ),
 			self::ERROR_STALE_TABLE => __( 'This table is out of date. Please reload the page and try again.', 'mac-members' ),
 			self::ERROR_BUSY => __( 'This member is being updated in another request. Please wait a moment and reload the page.', 'mac-members' ),
 			default => __( 'Invalid request.', 'mac-members' ),

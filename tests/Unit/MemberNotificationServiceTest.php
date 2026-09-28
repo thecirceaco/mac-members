@@ -133,7 +133,7 @@ final class MemberNotificationServiceTest extends TestCase {
 
 		self::assertSame( 'admin@example.test', $mail['to'] );
 		self::assertSame( 'Member account approved', $mail['subject'] );
-		self::assertStringContainsString( 'A pending member account has been approved on Example Site.', $mail['message'] );
+		self::assertStringContainsString( 'A member account has been approved on Example Site.', $mail['message'] );
 		self::assertStringContainsString( 'First Name: Mia', $mail['message'] );
 		self::assertStringContainsString( 'Last Name: Member', $mail['message'] );
 		self::assertStringContainsString( 'Username: miamember', $mail['message'] );
@@ -199,6 +199,39 @@ final class MemberNotificationServiceTest extends TestCase {
 		$service->send_denial_notifications( $user );
 		self::assertCount( 1, $GLOBALS['mac_members_test_mail'] );
 		self::assertSame( 'Your account request was not approved', $GLOBALS['mac_members_test_mail'][0]['subject'] );
+	}
+
+	public function test_deactivation_emails_go_to_the_member_and_the_admin(): void {
+		$this->create_service()->send_deactivation_notifications( $this->create_user() );
+
+		self::assertCount( 2, $GLOBALS['mac_members_test_mail'] );
+
+		$member = $GLOBALS['mac_members_test_mail'][0];
+		$admin  = $GLOBALS['mac_members_test_mail'][1];
+
+		self::assertSame( 'pending@example.test', $member['to'] );
+		self::assertSame( 'Your membership is no longer active', $member['subject'] );
+		self::assertStringContainsString( 'Hi Mia,', $member['message'] );
+		self::assertStringContainsString( 'Your membership on Example Site is no longer active.', $member['message'] );
+		self::assertSame( 'admin@example.test', $admin['to'] );
+		self::assertSame( 'Member account deactivated', $admin['subject'] );
+		self::assertStringContainsString( 'A member account has been deactivated on Example Site.', $admin['message'] );
+		self::assertStringContainsString( 'user-edit.php?user_id=12', $admin['message'] );
+		self::assertContains( 'Reply-To: pending@example.test', $admin['headers'] );
+	}
+
+	public function test_toggle_settings_control_the_deactivation_notifications(): void {
+		$repository = $this->create_repository();
+		$repository->save(
+			array(
+				'send_member_deactivation_email' => '0',
+				'send_admin_deactivation_email'  => '1',
+			)
+		);
+
+		( new MemberNotificationService( $repository ) )->send_deactivation_notifications( $this->create_user() );
+
+		self::assertSame( array( 'Member account deactivated' ), array_column( $GLOBALS['mac_members_test_mail'], 'subject' ) );
 	}
 
 	public function test_invalid_admin_and_from_settings_fall_back_to_site_admin_email(): void {

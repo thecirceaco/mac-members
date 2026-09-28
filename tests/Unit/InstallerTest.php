@@ -11,6 +11,7 @@ namespace MacMembers\Tests\Unit;
 
 use MacMembers\Installer;
 use MacMembers\Security\Capabilities;
+use MacMembers\Security\Roles;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\TestCase;
 
@@ -18,6 +19,7 @@ use function get_role;
 use function mac_members_tests_reset_wp_state;
 
 #[CoversClass( Installer::class )]
+#[CoversClass( Roles::class )]
 final class InstallerTest extends TestCase {
 	protected function setUp(): void {
 		parent::setUp();
@@ -41,11 +43,11 @@ final class InstallerTest extends TestCase {
 
 		self::assertTrue( $GLOBALS['mac_members_test_roles']['administrator']['capabilities'][ Capabilities::REVIEW ] );
 
-		foreach ( array( 'member-pending', 'member', 'member-invalid', 'subscriber' ) as $role ) {
+		foreach ( array( 'mac_members_pending', 'mac_members_approved', 'mac_members_inactive', 'mac_members_denied', 'subscriber' ) as $role ) {
 			self::assertArrayNotHasKey( Capabilities::REVIEW, $GLOBALS['mac_members_test_roles'][ $role ]['capabilities'], $role );
 		}
 
-		self::assertSame( 1, $GLOBALS['mac_members_test_options'][ Installer::VERSION_OPTION ] );
+		self::assertSame( 2, $GLOBALS['mac_members_test_options'][ Installer::VERSION_OPTION ] );
 	}
 
 	public function test_install_registers_a_static_uninstall_callback(): void {
@@ -63,7 +65,7 @@ final class InstallerTest extends TestCase {
 
 		( new Installer() )->install();
 
-		self::assertSame( 1, $GLOBALS['mac_members_test_options'][ Installer::VERSION_OPTION ] );
+		self::assertSame( 2, $GLOBALS['mac_members_test_options'][ Installer::VERSION_OPTION ] );
 	}
 
 	public function test_maybe_install_runs_once_on_a_site_that_updated_without_reactivating(): void {
@@ -82,7 +84,7 @@ final class InstallerTest extends TestCase {
 
 	public function test_uninstall_removes_the_review_capability_from_every_role(): void {
 		( new Installer() )->install();
-		get_role( 'member' )->add_cap( Capabilities::REVIEW );
+		get_role( 'mac_members_approved' )->add_cap( Capabilities::REVIEW );
 
 		Installer::uninstall();
 
@@ -93,11 +95,84 @@ final class InstallerTest extends TestCase {
 		self::assertArrayNotHasKey( Installer::VERSION_OPTION, $GLOBALS['mac_members_test_options'] );
 	}
 
+	public function test_install_creates_the_missing_member_roles_with_read_only(): void {
+		$this->remove_member_roles();
+
+		( new Installer() )->install();
+
+		self::assertSame(
+			array(
+				'mac_members_pending'  => array( 'name' => 'Member (Pending)', 'capabilities' => array( 'read' => true ) ),
+				'mac_members_approved' => array( 'name' => 'Member', 'capabilities' => array( 'read' => true ) ),
+				'mac_members_inactive' => array( 'name' => 'Member (Inactive)', 'capabilities' => array( 'read' => true ) ),
+				'mac_members_denied'   => array( 'name' => 'Member (Denied)', 'capabilities' => array( 'read' => true ) ),
+			),
+			array_intersect_key( $GLOBALS['mac_members_test_roles'], array_flip( array_keys( Roles::defaults() ) ) )
+		);
+	}
+
+	public function test_install_keeps_an_existing_member_role_as_it_is(): void {
+		$GLOBALS['mac_members_test_roles']['mac_members_approved'] = array(
+			'name'         => 'Union Member',
+			'capabilities' => array( 'read' => true, 'upload_files' => true ),
+		);
+
+		( new Installer() )->install();
+
+		self::assertSame( 'Union Member', $GLOBALS['mac_members_test_roles']['mac_members_approved']['name'] );
+		self::assertTrue( $GLOBALS['mac_members_test_roles']['mac_members_approved']['capabilities']['upload_files'] );
+	}
+
+	public function test_maybe_install_on_a_version_one_site_creates_the_roles_without_granting_the_capability_again(): void {
+		$this->remove_member_roles();
+		$GLOBALS['mac_members_test_options'][ Installer::VERSION_OPTION ] = 1;
+
+		( new Installer() )->maybe_install();
+
+		self::assertArrayNotHasKey( Capabilities::REVIEW, $GLOBALS['mac_members_test_roles']['administrator']['capabilities'] );
+
+		foreach ( array_keys( Roles::defaults() ) as $slug ) {
+			self::assertArrayHasKey( $slug, $GLOBALS['mac_members_test_roles'], $slug );
+		}
+
+		self::assertSame( 2, $GLOBALS['mac_members_test_options'][ Installer::VERSION_OPTION ] );
+	}
+
+	public function test_maybe_install_on_a_current_site_does_not_bring_back_a_deleted_role(): void {
+		$GLOBALS['mac_members_test_options'][ Installer::VERSION_OPTION ] = 2;
+		unset( $GLOBALS['mac_members_test_roles']['mac_members_inactive'] );
+
+		( new Installer() )->maybe_install();
+
+		self::assertArrayNotHasKey( 'mac_members_inactive', $GLOBALS['mac_members_test_roles'] );
+	}
+
+	public function test_uninstall_removes_only_the_member_roles_that_no_user_holds(): void {
+		$GLOBALS['mac_members_test_users'] = array(
+			new \WP_User( array( 'ID' => 12, 'roles' => array( 'mac_members_approved', 'subscriber' ) ) ),
+		);
+
+		Installer::uninstall();
+
+		self::assertArrayHasKey( 'mac_members_approved', $GLOBALS['mac_members_test_roles'] );
+		self::assertArrayNotHasKey( 'mac_members_pending', $GLOBALS['mac_members_test_roles'] );
+		self::assertArrayNotHasKey( 'mac_members_inactive', $GLOBALS['mac_members_test_roles'] );
+		self::assertArrayNotHasKey( 'mac_members_denied', $GLOBALS['mac_members_test_roles'] );
+		self::assertArrayHasKey( 'subscriber', $GLOBALS['mac_members_test_roles'] );
+		self::assertArrayHasKey( 'administrator', $GLOBALS['mac_members_test_roles'] );
+	}
+
 	public function test_uninstall_removes_lock_rows_left_by_requests_that_died(): void {
 		$GLOBALS['wpdb']->rows['mac_members_lock_12'] = '1:dead-request';
 
 		Installer::uninstall();
 
 		self::assertSame( array(), $GLOBALS['wpdb']->rows );
+	}
+
+	private function remove_member_roles(): void {
+		foreach ( array_keys( Roles::defaults() ) as $slug ) {
+			unset( $GLOBALS['mac_members_test_roles'][ $slug ] );
+		}
 	}
 }

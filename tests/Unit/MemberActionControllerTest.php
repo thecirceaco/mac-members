@@ -38,10 +38,14 @@ final class MemberActionControllerTest extends TestCase {
 
 		$controller->register();
 
-		self::assertArrayHasKey( 'wp_ajax_mac_members_approve_user', $GLOBALS['mac_members_test_actions'] );
-		self::assertArrayHasKey( 'wp_ajax_mac_members_deny_user', $GLOBALS['mac_members_test_actions'] );
-		self::assertArrayNotHasKey( 'wp_ajax_nopriv_mac_members_approve_user', $GLOBALS['mac_members_test_actions'] );
-		self::assertArrayNotHasKey( 'wp_ajax_nopriv_mac_members_deny_user', $GLOBALS['mac_members_test_actions'] );
+		foreach ( array( 'approve', 'deny', 'deactivate', 'reactivate' ) as $method ) {
+			self::assertSame(
+				array( $controller, $method ),
+				$GLOBALS['mac_members_test_actions'][ 'wp_ajax_mac_members_' . $method . '_user' ][0]['callback'],
+				$method
+			);
+			self::assertArrayNotHasKey( 'wp_ajax_nopriv_mac_members_' . $method . '_user', $GLOBALS['mac_members_test_actions'] );
+		}
 	}
 
 	/**
@@ -52,7 +56,7 @@ final class MemberActionControllerTest extends TestCase {
 	public function test_failed_gate_ends_the_request_before_any_role_change( string $gate, string $expected_code ): void {
 		$GLOBALS['mac_members_test_ajax_send_exits'] = false;
 
-		$this->store_user( 12, array( 'member-pending' ) );
+		$this->store_user( 12, array( 'mac_members_pending' ) );
 		$this->prepare_ajax_request( FrontendAssets::APPROVE_ACTION, 12 );
 		$this->arrange_failed_gate( $gate );
 
@@ -90,7 +94,7 @@ final class MemberActionControllerTest extends TestCase {
 			'self action'     => array( 'self action', 'permission_denied' ),
 			'elevated target' => array( 'elevated target', 'permission_denied' ),
 			'missing role'    => array( 'missing role', 'missing_role' ),
-			'not pending'     => array( 'not pending', 'not_pending' ),
+			'not pending'     => array( 'not pending', 'status_changed' ),
 			'no review cap'   => array( 'no review cap', 'permission_denied' ),
 			'cannot promote'  => array( 'cannot promote', 'permission_denied' ),
 			'unsafe roles'    => array( 'unsafe roles', 'invalid_role_settings' ),
@@ -103,7 +107,7 @@ final class MemberActionControllerTest extends TestCase {
 	public function test_success_response_ends_the_request_once(): void {
 		$GLOBALS['mac_members_test_ajax_send_exits'] = false;
 
-		$user = $this->store_user( 12, array( 'member-pending' ) );
+		$user = $this->store_user( 12, array( 'mac_members_pending' ) );
 		$this->prepare_ajax_request( FrontendAssets::APPROVE_ACTION, $user->ID );
 
 		try {
@@ -115,11 +119,11 @@ final class MemberActionControllerTest extends TestCase {
 
 		self::assertCount( 1, $GLOBALS['mac_members_test_ajax_responses'] );
 		self::assertTrue( $GLOBALS['mac_members_test_ajax_responses'][0]['success'] );
-		self::assertSame( array( 'member' ), $user->roles );
+		self::assertSame( array( 'mac_members_approved' ), $user->roles );
 	}
 
 	public function test_nonce_is_checked_with_check_ajax_referer(): void {
-		$user = $this->store_user( 12, array( 'member-pending' ) );
+		$user = $this->store_user( 12, array( 'mac_members_pending' ) );
 		$this->prepare_ajax_request( FrontendAssets::APPROVE_ACTION, $user->ID );
 
 		$this->capture_ajax_response(
@@ -140,7 +144,7 @@ final class MemberActionControllerTest extends TestCase {
 
 	#[DataProvider( 'provide_render_tokens_that_do_not_allow_the_action' )]
 	public function test_request_without_a_matching_render_token_is_refused( string $case ): void {
-		$user = $this->store_user( 12, array( 'member-pending' ) );
+		$user = $this->store_user( 12, array( 'mac_members_pending' ) );
 		$this->prepare_ajax_request( FrontendAssets::APPROVE_ACTION, $user->ID, $this->make_render_token( $case ) );
 
 		$response = $this->capture_ajax_response(
@@ -151,7 +155,7 @@ final class MemberActionControllerTest extends TestCase {
 		self::assertSame( 403, $response['status'] );
 		self::assertSame( 'stale_table', $response['data']['code'] );
 		self::assertSame( 'This table is out of date. Please reload the page and try again.', $response['data']['message'] );
-		self::assertSame( array( 'member-pending' ), $user->roles );
+		self::assertSame( array( 'mac_members_pending' ), $user->roles );
 		self::assertSame( array(), $GLOBALS['mac_members_test_role_changes'] );
 	}
 
@@ -174,7 +178,7 @@ final class MemberActionControllerTest extends TestCase {
 		$token = ( new RenderToken() )->issue( array( 11, 12, 13 ) );
 
 		foreach ( array( 11, 12, 13 ) as $user_id ) {
-			$user = $this->store_user( $user_id, array( 'member-pending' ) );
+			$user = $this->store_user( $user_id, array( 'mac_members_pending' ) );
 			$this->prepare_ajax_request( FrontendAssets::APPROVE_ACTION, $user_id, $token );
 
 			$response = $this->capture_ajax_response(
@@ -182,14 +186,14 @@ final class MemberActionControllerTest extends TestCase {
 			);
 
 			self::assertTrue( $response['success'], (string) $user_id );
-			self::assertSame( array( 'member' ), $user->roles );
+			self::assertSame( array( 'mac_members_approved' ), $user->roles );
 		}
 	}
 
 	public function test_member_locked_by_another_request_is_busy(): void {
 		$GLOBALS['wpdb']->rows['mac_members_lock_12'] = ( time() + 30 ) . ':other-request';
 
-		$user = $this->store_user( 12, array( 'member-pending' ) );
+		$user = $this->store_user( 12, array( 'mac_members_pending' ) );
 		$this->prepare_ajax_request( FrontendAssets::APPROVE_ACTION, $user->ID );
 
 		$response = $this->capture_ajax_response(
@@ -200,7 +204,7 @@ final class MemberActionControllerTest extends TestCase {
 		self::assertSame( 409, $response['status'] );
 		self::assertSame( 'busy', $response['data']['code'] );
 		self::assertSame( 'This member is being updated in another request. Please wait a moment and reload the page.', $response['data']['message'] );
-		self::assertSame( array( 'member-pending' ), $user->roles );
+		self::assertSame( array( 'mac_members_pending' ), $user->roles );
 		self::assertSame( array(), $GLOBALS['mac_members_test_role_changes'] );
 		self::assertSame( ( time() + 30 ) . ':other-request', $GLOBALS['wpdb']->rows['mac_members_lock_12'] );
 	}
@@ -208,7 +212,7 @@ final class MemberActionControllerTest extends TestCase {
 	public function test_expired_lock_does_not_block_the_action(): void {
 		$GLOBALS['wpdb']->rows['mac_members_lock_12'] = ( time() - 1 ) . ':dead-request';
 
-		$user = $this->store_user( 12, array( 'member-pending' ) );
+		$user = $this->store_user( 12, array( 'mac_members_pending' ) );
 		$this->prepare_ajax_request( FrontendAssets::APPROVE_ACTION, $user->ID );
 
 		$response = $this->capture_ajax_response(
@@ -220,13 +224,13 @@ final class MemberActionControllerTest extends TestCase {
 	}
 
 	public function test_lock_is_released_after_success_and_after_a_failed_write(): void {
-		$approved = $this->store_user( 12, array( 'member-pending' ) );
+		$approved = $this->store_user( 12, array( 'mac_members_pending' ) );
 		$this->prepare_ajax_request( FrontendAssets::APPROVE_ACTION, $approved->ID );
 
 		self::assertTrue( $this->capture_ajax_response( fn (): mixed => $this->create_controller()->approve() )['success'] );
 		self::assertSame( array(), $GLOBALS['wpdb']->rows );
 
-		$failed = $this->store_user( 13, array( 'member-pending' ), array(), true, array( 'blocked_roles' => array( 'member' ) ) );
+		$failed = $this->store_user( 13, array( 'mac_members_pending' ), array(), true, array( 'blocked_roles' => array( 'mac_members_approved' ) ) );
 		$this->prepare_ajax_request( FrontendAssets::APPROVE_ACTION, $failed->ID );
 
 		self::assertSame( 'role_update_failed', $this->capture_ajax_response( fn (): mixed => $this->create_controller()->approve() )['data']['code'] );
@@ -234,12 +238,12 @@ final class MemberActionControllerTest extends TestCase {
 	}
 
 	public function test_roles_are_read_again_after_the_lock_is_taken(): void {
-		$user = $this->store_user( 12, array( 'member-pending' ) );
+		$user = $this->store_user( 12, array( 'mac_members_pending' ) );
 		$this->prepare_ajax_request( FrontendAssets::APPROVE_ACTION, $user->ID );
 
-		// Another request denies the user after this one checked the roles and before it took the lock.
+		// Another request approves the user after this one checked the roles and before it took the lock.
 		$GLOBALS['mac_members_test_after_lock_insert'] = static function (): void {
-			$GLOBALS['mac_members_test_user_roles'][12] = array( 'member-invalid' );
+			$GLOBALS['mac_members_test_user_roles'][12] = array( 'mac_members_approved' );
 		};
 
 		$response = $this->capture_ajax_response(
@@ -248,14 +252,136 @@ final class MemberActionControllerTest extends TestCase {
 
 		self::assertFalse( $response['success'] );
 		self::assertSame( 409, $response['status'] );
-		self::assertSame( 'not_pending', $response['data']['code'] );
+		self::assertSame( 'status_changed', $response['data']['code'] );
 		self::assertSame( array(), $GLOBALS['mac_members_test_role_changes'] );
-		self::assertSame( array( 'member-invalid' ), $GLOBALS['mac_members_test_user_roles'][12] );
+		self::assertSame( array( 'mac_members_approved' ), $GLOBALS['mac_members_test_user_roles'][12] );
 		self::assertSame( array(), $GLOBALS['wpdb']->rows );
 	}
 
+	/**
+	 * @param array<int,string> $roles_before Roles before the change.
+	 * @param array<int,string> $roles_after Expected roles after the change.
+	 */
+	#[DataProvider( 'provide_status_changes' )]
+	public function test_status_change_moves_the_member_and_keeps_unrelated_roles( string $transition, array $roles_before, array $roles_after, string $message, string $status ): void {
+		$user = $this->store_user( 12, $roles_before );
+		$this->prepare_ajax_request( 'mac_members_' . $transition . '_user', $user->ID );
+
+		$response = $this->capture_ajax_response(
+			fn (): mixed => $this->create_controller()->{$transition}()
+		);
+
+		self::assertTrue( $response['success'] );
+		self::assertSame( 200, $response['status'] );
+		self::assertSame( $message, $response['data']['message'] );
+		self::assertSame( $status, $response['data']['status'] );
+		self::assertSame( $roles_after, $user->roles );
+	}
+
+	/**
+	 * @return array<string,array{0:string,1:array<int,string>,2:array<int,string>,3:string,4:string}>
+	 */
+	public static function provide_status_changes(): array {
+		return array(
+			'approve a pending request'     => array( 'approve', array( 'subscriber', 'mac_members_pending' ), array( 'subscriber', 'mac_members_approved' ), 'Member approved successfully.', 'approved' ),
+			'approve a denied request'      => array( 'approve', array( 'subscriber', 'mac_members_denied' ), array( 'subscriber', 'mac_members_approved' ), 'Member approved successfully.', 'approved' ),
+			'deny a pending request'        => array( 'deny', array( 'subscriber', 'mac_members_pending' ), array( 'subscriber', 'mac_members_denied' ), 'Member denied successfully.', 'denied' ),
+			'deactivate an approved member' => array( 'deactivate', array( 'subscriber', 'mac_members_approved' ), array( 'subscriber', 'mac_members_inactive' ), 'Member deactivated successfully.', 'inactive' ),
+			'reactivate an inactive member' => array( 'reactivate', array( 'subscriber', 'mac_members_inactive' ), array( 'subscriber', 'mac_members_approved' ), 'Member reactivated successfully.', 'approved' ),
+			'deactivate removes a stray pending role' => array( 'deactivate', array( 'mac_members_approved', 'mac_members_pending' ), array( 'mac_members_inactive' ), 'Member deactivated successfully.', 'inactive' ),
+		);
+	}
+
+	/**
+	 * @param array<int,string> $roles Roles the member has.
+	 */
+	#[DataProvider( 'provide_status_changes_that_do_not_apply' )]
+	public function test_status_change_that_does_not_apply_to_the_current_status_is_refused( string $transition, array $roles ): void {
+		$user = $this->store_user( 12, $roles );
+		$this->prepare_ajax_request( 'mac_members_' . $transition . '_user', $user->ID );
+
+		$response = $this->capture_ajax_response(
+			fn (): mixed => $this->create_controller()->{$transition}()
+		);
+
+		self::assertFalse( $response['success'] );
+		self::assertSame( 409, $response['status'] );
+		self::assertSame( 'status_changed', $response['data']['code'] );
+		self::assertSame( 'This member\'s status has changed. Please reload the page.', $response['data']['message'] );
+		self::assertSame( $roles, $user->roles );
+		self::assertSame( array(), $GLOBALS['mac_members_test_role_changes'] );
+	}
+
+	/**
+	 * @return array<string,array{0:string,1:array<int,string>}>
+	 */
+	public static function provide_status_changes_that_do_not_apply(): array {
+		return array(
+			'approve an approved member'   => array( 'approve', array( 'mac_members_approved' ) ),
+			'approve an inactive member'   => array( 'approve', array( 'mac_members_inactive' ) ),
+			'deny an approved member'      => array( 'deny', array( 'mac_members_approved' ) ),
+			'deny a denied request'        => array( 'deny', array( 'mac_members_denied' ) ),
+			'deny an inactive member'      => array( 'deny', array( 'mac_members_inactive' ) ),
+			'deactivate a pending request' => array( 'deactivate', array( 'mac_members_pending' ) ),
+			'deactivate an inactive one'   => array( 'deactivate', array( 'mac_members_inactive' ) ),
+			'reactivate an approved one'   => array( 'reactivate', array( 'mac_members_approved' ) ),
+			'reactivate a denied request'  => array( 'reactivate', array( 'mac_members_denied' ) ),
+			'any change on a non-member'   => array( 'deactivate', array( 'subscriber' ) ),
+		);
+	}
+
+	public function test_deactivate_refuses_an_inactive_role_with_sensitive_capabilities(): void {
+		$GLOBALS['mac_members_test_roles']['mac_members_inactive']['capabilities']['edit_users'] = true;
+
+		$user = $this->store_user( 12, array( 'mac_members_approved' ) );
+		$this->prepare_ajax_request( FrontendAssets::DEACTIVATE_ACTION, $user->ID );
+
+		$response = $this->capture_ajax_response(
+			fn (): mixed => $this->create_controller()->deactivate()
+		);
+
+		self::assertSame( 'invalid_role_settings', $response['data']['code'] );
+		self::assertSame( array( 'mac_members_approved' ), $user->roles );
+	}
+
+	public function test_missing_inactive_role_blocks_deactivate_before_any_write(): void {
+		unset( $GLOBALS['mac_members_test_roles']['mac_members_inactive'] );
+
+		$user = $this->store_user( 12, array( 'mac_members_approved' ) );
+		$this->prepare_ajax_request( FrontendAssets::DEACTIVATE_ACTION, $user->ID );
+
+		$response = $this->capture_ajax_response(
+			fn (): mixed => $this->create_controller()->deactivate()
+		);
+
+		self::assertSame( 'missing_role', $response['data']['code'] );
+		self::assertSame( array( 'mac_members_approved' ), $user->roles );
+		self::assertSame( array(), $GLOBALS['mac_members_test_role_changes'] );
+	}
+
+	public function test_deactivate_and_reactivate_send_their_notifications(): void {
+		$user = $this->store_user( 12, array( 'mac_members_approved' ) );
+		$this->prepare_ajax_request( FrontendAssets::DEACTIVATE_ACTION, $user->ID );
+
+		self::assertTrue( $this->capture_ajax_response( fn (): mixed => $this->create_controller( $this->create_notification_service() )->deactivate() )['success'] );
+		self::assertSame(
+			array( 'Your membership is no longer active', 'Member account deactivated' ),
+			array_column( $GLOBALS['mac_members_test_mail'], 'subject' )
+		);
+
+		$GLOBALS['mac_members_test_mail'] = array();
+		$this->prepare_ajax_request( FrontendAssets::REACTIVATE_ACTION, $user->ID );
+
+		self::assertTrue( $this->capture_ajax_response( fn (): mixed => $this->create_controller( $this->create_notification_service() )->reactivate() )['success'] );
+		self::assertSame(
+			array( 'Your account has been approved', 'Member account approved' ),
+			array_column( $GLOBALS['mac_members_test_mail'], 'subject' )
+		);
+		self::assertSame( array( 'mac_members_approved' ), $user->roles );
+	}
+
 	public function test_second_action_on_the_same_member_finds_it_no_longer_pending(): void {
-		$user  = $this->store_user( 12, array( 'member-pending' ) );
+		$user  = $this->store_user( 12, array( 'mac_members_pending' ) );
 		$token = ( new RenderToken() )->issue( array( 12 ) );
 
 		$this->prepare_ajax_request( FrontendAssets::APPROVE_ACTION, $user->ID, $token );
@@ -264,12 +390,12 @@ final class MemberActionControllerTest extends TestCase {
 		$this->prepare_ajax_request( FrontendAssets::DENY_ACTION, $user->ID, $token );
 		$response = $this->capture_ajax_response( fn (): mixed => $this->create_controller()->deny() );
 
-		self::assertSame( 'not_pending', $response['data']['code'] );
-		self::assertSame( array( 'member' ), $user->roles );
+		self::assertSame( 'status_changed', $response['data']['code'] );
+		self::assertSame( array( 'mac_members_approved' ), $user->roles );
 	}
 
 	public function test_capability_denial_returns_permission_error(): void {
-		$user = $this->store_user( 12, array( 'member-pending' ) );
+		$user = $this->store_user( 12, array( 'mac_members_pending' ) );
 		$GLOBALS['mac_members_test_current_user_caps']['promote_users'] = false;
 
 		$this->prepare_ajax_request( FrontendAssets::APPROVE_ACTION, $user->ID );
@@ -281,11 +407,11 @@ final class MemberActionControllerTest extends TestCase {
 		self::assertFalse( $response['success'] );
 		self::assertSame( 403, $response['status'] );
 		self::assertSame( 'You do not have permission to perform this action.', $response['data']['message'] );
-		self::assertSame( array( 'member-pending' ), $user->roles );
+		self::assertSame( array( 'mac_members_pending' ), $user->roles );
 	}
 
 	public function test_invalid_nonce_returns_invalid_request(): void {
-		$user = $this->store_user( 12, array( 'member-pending' ) );
+		$user = $this->store_user( 12, array( 'mac_members_pending' ) );
 
 		$_POST    = array(
 			'action'  => FrontendAssets::APPROVE_ACTION,
@@ -301,7 +427,7 @@ final class MemberActionControllerTest extends TestCase {
 		self::assertFalse( $response['success'] );
 		self::assertSame( 400, $response['status'] );
 		self::assertSame( 'Invalid request.', $response['data']['message'] );
-		self::assertSame( array( 'member-pending' ), $user->roles );
+		self::assertSame( array( 'mac_members_pending' ), $user->roles );
 	}
 
 	public function test_invalid_user_returns_invalid_user_error(): void {
@@ -326,12 +452,12 @@ final class MemberActionControllerTest extends TestCase {
 
 		self::assertFalse( $response['success'] );
 		self::assertSame( 409, $response['status'] );
-		self::assertSame( 'This user is no longer pending.', $response['data']['message'] );
-		self::assertSame( 'not_pending', $response['data']['code'] );
+		self::assertSame( 'This member\'s status has changed. Please reload the page.', $response['data']['message'] );
+		self::assertSame( 'status_changed', $response['data']['code'] );
 	}
 
 	public function test_self_action_is_blocked(): void {
-		$user = $this->store_user( 12, array( 'member-pending' ) );
+		$user = $this->store_user( 12, array( 'mac_members_pending' ) );
 		$GLOBALS['mac_members_test_current_user_id'] = 12;
 		$this->prepare_ajax_request( FrontendAssets::APPROVE_ACTION, $user->ID );
 
@@ -342,13 +468,13 @@ final class MemberActionControllerTest extends TestCase {
 		self::assertFalse( $response['success'] );
 		self::assertSame( 403, $response['status'] );
 		self::assertSame( 'You do not have permission to perform this action.', $response['data']['message'] );
-		self::assertSame( array( 'member-pending' ), $user->roles );
+		self::assertSame( array( 'mac_members_pending' ), $user->roles );
 	}
 
 	public function test_elevated_target_is_blocked(): void {
 		$user = $this->store_user(
 			12,
-			array( 'member-pending' ),
+			array( 'mac_members_pending' ),
 			array(
 				'manage_options' => true,
 			)
@@ -362,11 +488,11 @@ final class MemberActionControllerTest extends TestCase {
 		self::assertFalse( $response['success'] );
 		self::assertSame( 403, $response['status'] );
 		self::assertSame( 'You do not have permission to perform this action.', $response['data']['message'] );
-		self::assertSame( array( 'member-pending' ), $user->roles );
+		self::assertSame( array( 'mac_members_pending' ), $user->roles );
 	}
 
 	public function test_approve_preserves_extra_roles_while_removing_pending_and_adding_approved(): void {
-		$user = $this->store_user( 12, array( 'member-pending', 'subscriber' ) );
+		$user = $this->store_user( 12, array( 'mac_members_pending', 'subscriber' ) );
 		$this->prepare_ajax_request( FrontendAssets::APPROVE_ACTION, $user->ID );
 
 		$response = $this->capture_ajax_response(
@@ -376,11 +502,11 @@ final class MemberActionControllerTest extends TestCase {
 		self::assertTrue( $response['success'] );
 		self::assertSame( 200, $response['status'] );
 		self::assertSame( 'Member approved successfully.', $response['data']['message'] );
-		self::assertSame( array( 'subscriber', 'member' ), $user->roles );
+		self::assertSame( array( 'subscriber', 'mac_members_approved' ), $user->roles );
 	}
 
 	public function test_deny_preserves_extra_roles_while_removing_pending_and_adding_denied(): void {
-		$user = $this->store_user( 12, array( 'member-pending', 'subscriber' ) );
+		$user = $this->store_user( 12, array( 'mac_members_pending', 'subscriber' ) );
 		$this->prepare_ajax_request( FrontendAssets::DENY_ACTION, $user->ID );
 
 		$response = $this->capture_ajax_response(
@@ -390,7 +516,7 @@ final class MemberActionControllerTest extends TestCase {
 		self::assertTrue( $response['success'] );
 		self::assertSame( 200, $response['status'] );
 		self::assertSame( 'Member denied successfully.', $response['data']['message'] );
-		self::assertSame( array( 'subscriber', 'member-invalid' ), $user->roles );
+		self::assertSame( array( 'subscriber', 'mac_members_denied' ), $user->roles );
 	}
 
 	/**
@@ -416,12 +542,12 @@ final class MemberActionControllerTest extends TestCase {
 	 */
 	public static function provide_users_with_outcome_roles(): array {
 		return array(
-			'approve a user denied earlier'           => array( 'approve', array( 'member-pending', 'member-invalid', 'subscriber' ), array( 'subscriber', 'member' ) ),
-			'approve a user holding both outcomes'    => array( 'approve', array( 'member-pending', 'member', 'member-invalid' ), array( 'member' ) ),
-			'approve a user already holding approved' => array( 'approve', array( 'member-pending', 'member' ), array( 'member' ) ),
-			'deny a user approved earlier'            => array( 'deny', array( 'member-pending', 'member', 'subscriber' ), array( 'subscriber', 'member-invalid' ) ),
-			'deny a user holding both outcomes'       => array( 'deny', array( 'member-pending', 'member', 'member-invalid' ), array( 'member-invalid' ) ),
-			'deny a user already holding denied'      => array( 'deny', array( 'member-pending', 'member-invalid' ), array( 'member-invalid' ) ),
+			'approve a user denied earlier'           => array( 'approve', array( 'mac_members_pending', 'mac_members_denied', 'subscriber' ), array( 'subscriber', 'mac_members_approved' ) ),
+			'approve a user holding both outcomes'    => array( 'approve', array( 'mac_members_pending', 'mac_members_approved', 'mac_members_denied' ), array( 'mac_members_approved' ) ),
+			'approve a user already holding approved' => array( 'approve', array( 'mac_members_pending', 'mac_members_approved' ), array( 'mac_members_approved' ) ),
+			'deny a user approved earlier'            => array( 'deny', array( 'mac_members_pending', 'mac_members_approved', 'subscriber' ), array( 'subscriber', 'mac_members_denied' ) ),
+			'deny a user holding both outcomes'       => array( 'deny', array( 'mac_members_pending', 'mac_members_approved', 'mac_members_denied' ), array( 'mac_members_denied' ) ),
+			'deny a user already holding denied'      => array( 'deny', array( 'mac_members_pending', 'mac_members_denied' ), array( 'mac_members_denied' ) ),
 		);
 	}
 
@@ -432,7 +558,7 @@ final class MemberActionControllerTest extends TestCase {
 	public function test_role_settings_that_are_not_allowed_are_refused_before_any_write( array $stored_settings, string $action ): void {
 		$GLOBALS['mac_members_test_options'][ MAC_MEMBERS_SETTINGS_OPTION ] = $stored_settings;
 
-		$user = $this->store_user( 12, array( 'member-pending' ) );
+		$user = $this->store_user( 12, array( 'mac_members_pending' ) );
 		$this->prepare_ajax_request( 'approve' === $action ? FrontendAssets::APPROVE_ACTION : FrontendAssets::DENY_ACTION, $user->ID );
 
 		$response = $this->capture_ajax_response(
@@ -442,7 +568,7 @@ final class MemberActionControllerTest extends TestCase {
 		self::assertFalse( $response['success'] );
 		self::assertSame( 500, $response['status'] );
 		self::assertSame( 'invalid_role_settings', $response['data']['code'] );
-		self::assertSame( array( 'member-pending' ), $user->roles );
+		self::assertSame( array( 'mac_members_pending' ), $user->roles );
 		self::assertSame( array(), $GLOBALS['mac_members_test_role_changes'] );
 	}
 
@@ -453,15 +579,15 @@ final class MemberActionControllerTest extends TestCase {
 		return array(
 			'approved and denied are the same role' => array(
 				array(
-					'approved_role' => 'member',
-					'denied_role'   => 'member',
+					'approved_role' => 'mac_members_approved',
+					'denied_role'   => 'mac_members_approved',
 				),
 				'deny',
 			),
 			'pending and approved are the same role' => array(
 				array(
-					'pending_role'  => 'member-pending',
-					'approved_role' => 'member-pending',
+					'pending_role'  => 'mac_members_pending',
+					'approved_role' => 'mac_members_pending',
 				),
 				'approve',
 			),
@@ -477,9 +603,9 @@ final class MemberActionControllerTest extends TestCase {
 	}
 
 	public function test_target_role_that_gained_a_sensitive_capability_after_saving_is_refused(): void {
-		$GLOBALS['mac_members_test_roles']['member']['capabilities']['edit_users'] = true;
+		$GLOBALS['mac_members_test_roles']['mac_members_approved']['capabilities']['edit_users'] = true;
 
-		$user = $this->store_user( 12, array( 'member-pending' ) );
+		$user = $this->store_user( 12, array( 'mac_members_pending' ) );
 		$this->prepare_ajax_request( FrontendAssets::APPROVE_ACTION, $user->ID );
 
 		$response = $this->capture_ajax_response(
@@ -487,13 +613,13 @@ final class MemberActionControllerTest extends TestCase {
 		);
 
 		self::assertSame( 'invalid_role_settings', $response['data']['code'] );
-		self::assertSame( array( 'member-pending' ), $user->roles );
+		self::assertSame( array( 'mac_members_pending' ), $user->roles );
 	}
 
 	public function test_review_capability_is_required_in_addition_to_promote_users(): void {
 		$GLOBALS['mac_members_test_current_user_caps']['mac_members_review'] = false;
 
-		$user = $this->store_user( 12, array( 'member-pending' ) );
+		$user = $this->store_user( 12, array( 'mac_members_pending' ) );
 		$this->prepare_ajax_request( FrontendAssets::APPROVE_ACTION, $user->ID );
 
 		$response = $this->capture_ajax_response(
@@ -502,14 +628,14 @@ final class MemberActionControllerTest extends TestCase {
 
 		self::assertSame( 403, $response['status'] );
 		self::assertSame( 'permission_denied', $response['data']['code'] );
-		self::assertSame( array( 'member-pending' ), $user->roles );
+		self::assertSame( array( 'mac_members_pending' ), $user->roles );
 	}
 
 	public function test_promote_user_is_checked_for_the_target_user(): void {
 		$GLOBALS['mac_members_test_current_user_object_caps']['promote_user'][12] = false;
 
-		$user = $this->store_user( 12, array( 'member-pending' ) );
-		$this->store_user( 13, array( 'member-pending' ) );
+		$user = $this->store_user( 12, array( 'mac_members_pending' ) );
+		$this->store_user( 13, array( 'mac_members_pending' ) );
 		$this->prepare_ajax_request( FrontendAssets::APPROVE_ACTION, $user->ID );
 
 		$response = $this->capture_ajax_response(
@@ -517,7 +643,7 @@ final class MemberActionControllerTest extends TestCase {
 		);
 
 		self::assertSame( 403, $response['status'] );
-		self::assertSame( array( 'member-pending' ), $user->roles );
+		self::assertSame( array( 'mac_members_pending' ), $user->roles );
 
 		$this->prepare_ajax_request( FrontendAssets::APPROVE_ACTION, 13 );
 
@@ -529,7 +655,7 @@ final class MemberActionControllerTest extends TestCase {
 	}
 
 	public function test_target_holding_any_sensitive_capability_is_blocked(): void {
-		$user = $this->store_user( 12, array( 'member-pending' ), array( 'edit_users' => true ) );
+		$user = $this->store_user( 12, array( 'mac_members_pending' ), array( 'edit_users' => true ) );
 		$this->prepare_ajax_request( FrontendAssets::DENY_ACTION, $user->ID );
 
 		$response = $this->capture_ajax_response(
@@ -537,14 +663,14 @@ final class MemberActionControllerTest extends TestCase {
 		);
 
 		self::assertSame( 403, $response['status'] );
-		self::assertSame( array( 'member-pending' ), $user->roles );
+		self::assertSame( array( 'mac_members_pending' ), $user->roles );
 	}
 
 	#[DataProvider( 'provide_roles_that_are_not_editable' )]
 	public function test_roles_the_acting_user_cannot_assign_are_refused( string $role ): void {
 		$this->remove_editable_role( $role );
 
-		$user = $this->store_user( 12, array( 'member-pending', 'member-invalid' ) );
+		$user = $this->store_user( 12, array( 'mac_members_pending', 'mac_members_denied' ) );
 		$this->prepare_ajax_request( FrontendAssets::APPROVE_ACTION, $user->ID );
 
 		$response = $this->capture_ajax_response(
@@ -553,7 +679,7 @@ final class MemberActionControllerTest extends TestCase {
 
 		self::assertSame( 403, $response['status'] );
 		self::assertSame( 'permission_denied', $response['data']['code'] );
-		self::assertSame( array( 'member-pending', 'member-invalid' ), $user->roles );
+		self::assertSame( array( 'mac_members_pending', 'mac_members_denied' ), $user->roles );
 		self::assertSame( array(), $GLOBALS['mac_members_test_role_changes'] );
 	}
 
@@ -562,16 +688,16 @@ final class MemberActionControllerTest extends TestCase {
 	 */
 	public static function provide_roles_that_are_not_editable(): array {
 		return array(
-			'pending role'                => array( 'member-pending' ),
-			'approved role'               => array( 'member' ),
-			'held denied role to remove' => array( 'member-invalid' ),
+			'pending role'                => array( 'mac_members_pending' ),
+			'approved role'               => array( 'mac_members_approved' ),
+			'held denied role to remove' => array( 'mac_members_denied' ),
 		);
 	}
 
 	public function test_other_outcome_role_need_not_be_editable_when_the_user_does_not_hold_it(): void {
-		$this->remove_editable_role( 'member-invalid' );
+		$this->remove_editable_role( 'mac_members_denied' );
 
-		$user = $this->store_user( 12, array( 'member-pending' ) );
+		$user = $this->store_user( 12, array( 'mac_members_pending' ) );
 		$this->prepare_ajax_request( FrontendAssets::APPROVE_ACTION, $user->ID );
 
 		$response = $this->capture_ajax_response(
@@ -579,13 +705,13 @@ final class MemberActionControllerTest extends TestCase {
 		);
 
 		self::assertTrue( $response['success'] );
-		self::assertSame( array( 'member' ), $user->roles );
+		self::assertSame( array( 'mac_members_approved' ), $user->roles );
 	}
 
 	public function test_missing_target_role_returns_error_before_any_write(): void {
-		unset( $GLOBALS['mac_members_test_roles']['member'] );
+		unset( $GLOBALS['mac_members_test_roles']['mac_members_approved'] );
 
-		$user = $this->store_user( 12, array( 'member-pending', 'subscriber' ) );
+		$user = $this->store_user( 12, array( 'mac_members_pending', 'subscriber' ) );
 		$this->prepare_ajax_request( FrontendAssets::APPROVE_ACTION, $user->ID );
 
 		$response = $this->capture_ajax_response(
@@ -596,14 +722,14 @@ final class MemberActionControllerTest extends TestCase {
 		self::assertSame( 500, $response['status'] );
 		self::assertSame( 'missing_role', $response['data']['code'] );
 		self::assertSame( 'A role needed for this action does not exist. Please review Settings > MAC Members.', $response['data']['message'] );
-		self::assertSame( array( 'member-pending', 'subscriber' ), $user->roles );
+		self::assertSame( array( 'mac_members_pending', 'subscriber' ), $user->roles );
 		self::assertSame( array(), $GLOBALS['mac_members_test_cleaned_user_cache'] );
 	}
 
 	public function test_missing_pending_role_returns_error_before_any_write(): void {
-		unset( $GLOBALS['mac_members_test_roles']['member-pending'] );
+		unset( $GLOBALS['mac_members_test_roles']['mac_members_pending'] );
 
-		$user = $this->store_user( 12, array( 'member-pending' ) );
+		$user = $this->store_user( 12, array( 'mac_members_pending' ) );
 		$this->prepare_ajax_request( FrontendAssets::DENY_ACTION, $user->ID );
 
 		$response = $this->capture_ajax_response(
@@ -613,13 +739,13 @@ final class MemberActionControllerTest extends TestCase {
 		self::assertFalse( $response['success'] );
 		self::assertSame( 500, $response['status'] );
 		self::assertSame( 'missing_role', $response['data']['code'] );
-		self::assertSame( array( 'member-pending' ), $user->roles );
+		self::assertSame( array( 'mac_members_pending' ), $user->roles );
 	}
 
 	public function test_missing_other_outcome_role_does_not_block_the_action(): void {
-		unset( $GLOBALS['mac_members_test_roles']['member-invalid'] );
+		unset( $GLOBALS['mac_members_test_roles']['mac_members_denied'] );
 
-		$user = $this->store_user( 12, array( 'member-pending' ) );
+		$user = $this->store_user( 12, array( 'mac_members_pending' ) );
 		$this->prepare_ajax_request( FrontendAssets::APPROVE_ACTION, $user->ID );
 
 		$response = $this->capture_ajax_response(
@@ -627,16 +753,16 @@ final class MemberActionControllerTest extends TestCase {
 		);
 
 		self::assertTrue( $response['success'] );
-		self::assertSame( array( 'member' ), $user->roles );
+		self::assertSame( array( 'mac_members_approved' ), $user->roles );
 	}
 
 	public function test_failed_approval_write_restores_the_original_roles(): void {
 		$user = $this->store_user(
 			12,
-			array( 'member-pending', 'subscriber' ),
+			array( 'mac_members_pending', 'subscriber' ),
 			array(),
 			true,
-			array( 'blocked_roles' => array( 'member' ) )
+			array( 'blocked_roles' => array( 'mac_members_approved' ) )
 		);
 		$this->prepare_ajax_request( FrontendAssets::APPROVE_ACTION, $user->ID );
 
@@ -647,17 +773,17 @@ final class MemberActionControllerTest extends TestCase {
 		self::assertFalse( $response['success'] );
 		self::assertSame( 500, $response['status'] );
 		self::assertSame( 'role_update_failed', $response['data']['code'] );
-		self::assertEqualsCanonicalizing( array( 'member-pending', 'subscriber' ), $user->roles );
-		self::assertEqualsCanonicalizing( array( 'member-pending', 'subscriber' ), $GLOBALS['mac_members_test_user_roles'][12] );
+		self::assertEqualsCanonicalizing( array( 'mac_members_pending', 'subscriber' ), $user->roles );
+		self::assertEqualsCanonicalizing( array( 'mac_members_pending', 'subscriber' ), $GLOBALS['mac_members_test_user_roles'][12] );
 	}
 
 	public function test_failed_denial_write_restores_the_removed_outcome_role_too(): void {
 		$user = $this->store_user(
 			12,
-			array( 'member-pending', 'member' ),
+			array( 'mac_members_pending', 'mac_members_approved' ),
 			array(),
 			true,
-			array( 'blocked_roles' => array( 'member-invalid' ) )
+			array( 'blocked_roles' => array( 'mac_members_denied' ) )
 		);
 		$this->prepare_ajax_request( FrontendAssets::DENY_ACTION, $user->ID );
 
@@ -667,13 +793,13 @@ final class MemberActionControllerTest extends TestCase {
 
 		self::assertFalse( $response['success'] );
 		self::assertSame( 'role_update_failed', $response['data']['code'] );
-		self::assertEqualsCanonicalizing( array( 'member-pending', 'member' ), $GLOBALS['mac_members_test_user_roles'][12] );
+		self::assertEqualsCanonicalizing( array( 'mac_members_pending', 'mac_members_approved' ), $GLOBALS['mac_members_test_user_roles'][12] );
 	}
 
 	public function test_role_change_is_checked_against_the_stored_roles(): void {
 		$user = $this->store_user(
 			12,
-			array( 'member-pending' ),
+			array( 'mac_members_pending' ),
 			array(),
 			true,
 			array( 'persist_roles' => false )
@@ -686,12 +812,12 @@ final class MemberActionControllerTest extends TestCase {
 
 		self::assertFalse( $response['success'] );
 		self::assertSame( 'role_update_failed', $response['data']['code'] );
-		self::assertSame( array( 'member-pending' ), $GLOBALS['mac_members_test_user_roles'][12] );
+		self::assertSame( array( 'mac_members_pending' ), $GLOBALS['mac_members_test_user_roles'][12] );
 		self::assertContains( 12, $GLOBALS['mac_members_test_cleaned_user_cache'] );
 	}
 
 	public function test_role_update_failure_returns_error(): void {
-		$user = $this->store_user( 12, array( 'member-pending' ), array(), false );
+		$user = $this->store_user( 12, array( 'mac_members_pending' ), array(), false );
 		$this->prepare_ajax_request( FrontendAssets::APPROVE_ACTION, $user->ID );
 
 		$response = $this->capture_ajax_response(
@@ -701,11 +827,11 @@ final class MemberActionControllerTest extends TestCase {
 		self::assertFalse( $response['success'] );
 		self::assertSame( 500, $response['status'] );
 		self::assertSame( 'Unable to update user role.', $response['data']['message'] );
-		self::assertSame( array( 'member-pending' ), $user->roles );
+		self::assertSame( array( 'mac_members_pending' ), $user->roles );
 	}
 
 	public function test_approve_sends_enabled_notifications_after_role_update(): void {
-		$user = $this->store_user( 12, array( 'member-pending', 'subscriber' ) );
+		$user = $this->store_user( 12, array( 'mac_members_pending', 'subscriber' ) );
 		$this->prepare_ajax_request( FrontendAssets::APPROVE_ACTION, $user->ID );
 
 		$response = $this->capture_ajax_response(
@@ -713,7 +839,7 @@ final class MemberActionControllerTest extends TestCase {
 		);
 
 		self::assertTrue( $response['success'] );
-		self::assertSame( array( 'subscriber', 'member' ), $user->roles );
+		self::assertSame( array( 'subscriber', 'mac_members_approved' ), $user->roles );
 		self::assertSame(
 			array( 'Your account has been approved', 'Member account approved' ),
 			array_column( $GLOBALS['mac_members_test_mail'], 'subject' )
@@ -721,7 +847,7 @@ final class MemberActionControllerTest extends TestCase {
 	}
 
 	public function test_email_failure_returns_warning_without_rolling_back_role_update(): void {
-		$user = $this->store_user( 12, array( 'member-pending', 'subscriber' ) );
+		$user = $this->store_user( 12, array( 'mac_members_pending', 'subscriber' ) );
 		$GLOBALS['mac_members_test_mail_fail_next'] = 1;
 		$this->prepare_ajax_request( FrontendAssets::APPROVE_ACTION, $user->ID );
 
@@ -731,7 +857,7 @@ final class MemberActionControllerTest extends TestCase {
 
 		self::assertTrue( $response['success'] );
 		self::assertSame( 200, $response['status'] );
-		self::assertSame( array( 'subscriber', 'member' ), $user->roles );
+		self::assertSame( array( 'subscriber', 'mac_members_approved' ), $user->roles );
 		self::assertTrue( $response['data']['warning'] );
 		self::assertSame(
 			'Member approved successfully. One or more notification emails could not be sent.',
@@ -795,10 +921,10 @@ final class MemberActionControllerTest extends TestCase {
 				$GLOBALS['wpdb']->rows['mac_members_lock_12'] = ( time() + 30 ) . ':other-request';
 				break;
 			case 'elevated target':
-				$this->store_user( 12, array( 'member-pending' ), array( 'manage_options' => true ) );
+				$this->store_user( 12, array( 'mac_members_pending' ), array( 'manage_options' => true ) );
 				break;
 			case 'missing role':
-				unset( $GLOBALS['mac_members_test_roles']['member'] );
+				unset( $GLOBALS['mac_members_test_roles']['mac_members_approved'] );
 				break;
 			case 'not pending':
 				$this->store_user( 12, array( 'subscriber' ) );
@@ -813,7 +939,7 @@ final class MemberActionControllerTest extends TestCase {
 				$GLOBALS['mac_members_test_options'][ MAC_MEMBERS_SETTINGS_OPTION ] = array( 'approved_role' => 'administrator' );
 				break;
 			case 'not editable':
-				$this->remove_editable_role( 'member' );
+				$this->remove_editable_role( 'mac_members_approved' );
 				break;
 			default:
 				self::fail( 'Unknown gate: ' . $gate );

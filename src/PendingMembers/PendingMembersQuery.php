@@ -27,7 +27,7 @@ final class PendingMembersQuery
 	public function get_query_args(): array
 	{
 		return array(
-			'role'        => (string) $this->settings->get( 'pending_role', 'member-pending' ),
+			'role'        => (string) $this->settings->get( 'pending_role', \MacMembers\Security\Roles::PENDING ),
 			'number'      => 50,
 			'orderby'     => 'registered',
 			'order'       => 'ASC',

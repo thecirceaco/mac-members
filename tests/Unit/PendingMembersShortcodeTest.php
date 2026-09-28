@@ -61,8 +61,8 @@ final class PendingMembersShortcodeTest extends TestCase {
 
 	public function test_render_adds_a_render_token_that_allows_only_the_rendered_users(): void {
 		$GLOBALS['mac_members_test_users'] = array(
-			new \WP_User( array( 'ID' => 123 ) ),
-			new \WP_User( array( 'ID' => 124 ) ),
+			new \WP_User( array( 'ID' => 123, 'roles' => array( 'mac_members_pending' ) ) ),
+			new \WP_User( array( 'ID' => 124, 'roles' => array( 'mac_members_pending' ) ) ),
 		);
 
 		$token  = $this->get_render_token( $this->create_shortcode()->render() );
@@ -196,6 +196,7 @@ final class PendingMembersShortcodeTest extends TestCase {
 					'user_registered' => '2026-05-01 12:00:00',
 					'first_name'      => 'Mia <Admin>',
 					'last_name'       => 'O\'Connor',
+					'roles'           => array( 'mac_members_pending' ),
 				)
 			),
 		);
@@ -226,13 +227,13 @@ final class PendingMembersShortcodeTest extends TestCase {
 	}
 
 	public function test_render_warns_about_missing_roles_in_the_table(): void {
-		unset( $GLOBALS['mac_members_test_roles']['member-pending'], $GLOBALS['mac_members_test_roles']['member-invalid'] );
+		unset( $GLOBALS['mac_members_test_roles']['mac_members_pending'], $GLOBALS['mac_members_test_roles']['mac_members_denied'] );
 
 		$output = $this->create_shortcode()->render();
 
 		self::assertStringContainsString( 'mac-members-notice--warning', $output );
 		self::assertStringContainsString(
-			'MAC Members: One or more configured roles do not exist (member-pending, member-invalid). Approve and deny are blocked for any action that needs a missing role. Please review Settings &gt; MAC Members.',
+			'MAC Members: One or more configured roles do not exist (mac_members_pending, mac_members_denied). Approve and deny are blocked for any action that needs a missing role. Please review Settings &gt; MAC Members.',
 			$output
 		);
 	}

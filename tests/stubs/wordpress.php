@@ -373,11 +373,51 @@ if ( ! class_exists( 'WP_User_Query' ) ) {
 			$GLOBALS['mac_members_test_last_user_query'] = $args;
 		}
 
+		private int $total = 0;
+
 		/**
-		 * @return array<int,WP_User>
+		 * The users in $GLOBALS['mac_members_test_users'] that match the role arguments, paged like WordPress.
+		 *
+		 * @return array<int,WP_User|int>
 		 */
 		public function get_results(): array {
-			return $GLOBALS['mac_members_test_users'] ?? array();
+			$users = $GLOBALS['mac_members_test_users'] ?? array();
+			$roles = array();
+
+			if ( isset( $this->args['role'] ) && '' !== $this->args['role'] ) {
+				$roles = array( (string) $this->args['role'] );
+			} elseif ( ! empty( $this->args['role__in'] ) ) {
+				$roles = array_map( 'strval', (array) $this->args['role__in'] );
+			}
+
+			if ( array() !== $roles ) {
+				$users = array_values(
+					array_filter(
+						$users,
+						static fn ( WP_User $user ): bool => array() !== array_intersect( $roles, $user->roles )
+					)
+				);
+			}
+
+			$this->total = count( $users );
+			$number      = (int) ( $this->args['number'] ?? -1 );
+
+			if ( 0 < $number ) {
+				$page  = max( 1, (int) ( $this->args['paged'] ?? 1 ) );
+				$users = array_slice( $users, ( $page - 1 ) * $number, $number );
+			}
+
+			if ( 'ID' === ( $this->args['fields'] ?? 'all' ) ) {
+				return array_map( static fn ( WP_User $user ): int => $user->ID, $users );
+			}
+
+			return $users;
+		}
+
+		public function get_total(): int {
+			$this->get_results();
+
+			return $this->total;
 		}
 
 		/**
@@ -410,16 +450,20 @@ function mac_members_tests_reset_wp_state(): void {
 				'unfiltered_html' => true,
 			),
 		),
-		'member-pending' => array(
-			'name'         => 'Member Pending',
+		'mac_members_pending'  => array(
+			'name'         => 'Member (Pending)',
 			'capabilities' => array( 'read' => true ),
 		),
-		'member'         => array(
+		'mac_members_approved' => array(
 			'name'         => 'Member',
 			'capabilities' => array( 'read' => true ),
 		),
-		'member-invalid' => array(
-			'name'         => 'Member Invalid',
+		'mac_members_inactive' => array(
+			'name'         => 'Member (Inactive)',
+			'capabilities' => array( 'read' => true ),
+		),
+		'mac_members_denied'   => array(
+			'name'         => 'Member (Denied)',
 			'capabilities' => array( 'read' => true ),
 		),
 		'subscriber'     => array(
@@ -552,6 +596,23 @@ function wp_roles(): WP_Roles {
 
 function get_role( string $role ): ?WP_Role {
 	return wp_roles()->get_role( $role );
+}
+
+function add_role( string $role, string $display_name, array $capabilities = array() ): ?WP_Role {
+	if ( isset( $GLOBALS['mac_members_test_roles'][ $role ] ) ) {
+		return null;
+	}
+
+	$GLOBALS['mac_members_test_roles'][ $role ] = array(
+		'name'         => $display_name,
+		'capabilities' => $capabilities,
+	);
+
+	return new WP_Role( $role, $capabilities );
+}
+
+function remove_role( string $role ): void {
+	unset( $GLOBALS['mac_members_test_roles'][ $role ] );
 }
 
 /**

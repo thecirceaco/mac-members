@@ -9,6 +9,8 @@ declare(strict_types=1);
 
 namespace MacMembers\Settings;
 
+use MacMembers\Security\Roles;
+
 if ( ! defined( 'ABSPATH' ) ) {
 	exit; // Exit if accessed directly.
 }
@@ -28,17 +30,22 @@ final class SettingsSchema
 			'pending_role' => array(
 				'label'   => __( 'Pending role', 'mac-members' ),
 				'type'    => self::TYPE_ROLE,
-				'default' => 'member-pending',
+				'default' => Roles::PENDING,
 			),
 			'approved_role' => array(
 				'label'   => __( 'Approved role', 'mac-members' ),
 				'type'    => self::TYPE_ROLE,
-				'default' => 'member',
+				'default' => Roles::APPROVED,
+			),
+			'inactive_role' => array(
+				'label'   => __( 'Inactive role', 'mac-members' ),
+				'type'    => self::TYPE_ROLE,
+				'default' => Roles::INACTIVE,
 			),
 			'denied_role' => array(
 				'label'   => __( 'Denied role', 'mac-members' ),
 				'type'    => self::TYPE_ROLE,
-				'default' => 'member-invalid',
+				'default' => Roles::DENIED,
 			),
 			'admin_notification_email' => array(
 				'label'   => __( 'Admin notification email', 'mac-members' ),
@@ -67,6 +74,16 @@ final class SettingsSchema
 			),
 			'send_admin_denial_email' => array(
 				'label'   => __( 'Send admin denial email', 'mac-members' ),
+				'type'    => self::TYPE_TOGGLE,
+				'default' => true,
+			),
+			'send_member_deactivation_email' => array(
+				'label'   => __( 'Send member deactivation email', 'mac-members' ),
+				'type'    => self::TYPE_TOGGLE,
+				'default' => true,
+			),
+			'send_admin_deactivation_email' => array(
+				'label'   => __( 'Send admin deactivation email', 'mac-members' ),
 				'type'    => self::TYPE_TOGGLE,
 				'default' => true,
 			),

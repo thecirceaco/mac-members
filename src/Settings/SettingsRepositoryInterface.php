@@ -30,8 +30,9 @@ interface SettingsRepositoryInterface
 	public function save( array $settings ): array;
 
 	/**
-	 * Checks the roles that saving these settings would store: the pending, approved and denied roles must
-	 * be three different roles, and the approved and denied roles must not grant sensitive capabilities.
+	 * Checks the roles that saving these settings would store: the pending, approved, inactive and denied
+	 * roles must be four different roles, and the approved, inactive and denied roles must not grant
+	 * sensitive capabilities.
 	 *
 	 * @param array<string,mixed> $settings Submitted settings.
 	 *

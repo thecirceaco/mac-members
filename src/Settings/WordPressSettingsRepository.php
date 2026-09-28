@@ -157,12 +157,15 @@ final class WordPressSettingsRepository implements SettingsRepositoryInterface
 		}
 
 		if ( count( array_unique( $roles ) ) !== count( $roles ) ) {
-			$errors['roles_not_distinct'] = __( 'The pending, approved and denied roles must be three different roles. The settings were not saved.', 'mac-members' );
+			$errors['roles_not_distinct'] = __( 'The pending, approved, inactive and denied roles must be four different roles. The settings were not saved.', 'mac-members' );
 		}
 
+		// The roles that approve, reactivate, deactivate and deny add to a member.
 		$messages = array(
 			/* translators: 1: role name, 2: comma-separated capability names. */
 			'approved_role' => __( 'The approved role "%1$s" grants administrative capabilities (%2$s). Choose a role without them. The settings were not saved.', 'mac-members' ),
+			/* translators: 1: role name, 2: comma-separated capability names. */
+			'inactive_role' => __( 'The inactive role "%1$s" grants administrative capabilities (%2$s). Choose a role without them. The settings were not saved.', 'mac-members' ),
 			/* translators: 1: role name, 2: comma-separated capability names. */
 			'denied_role'   => __( 'The denied role "%1$s" grants administrative capabilities (%2$s). Choose a role without them. The settings were not saved.', 'mac-members' ),
 		);
