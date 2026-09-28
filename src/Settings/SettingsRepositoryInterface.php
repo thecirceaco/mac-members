@@ -26,6 +26,16 @@ interface SettingsRepositoryInterface
 	public function save( array $settings ): array;
 
 	/**
+	 * Checks the roles that saving these settings would store: the pending, approved and denied roles must
+	 * be three different roles, and the approved and denied roles must not grant sensitive capabilities.
+	 *
+	 * @param array<string,mixed> $settings Submitted settings.
+	 *
+	 * @return array<string,string> Error messages keyed by error code, empty when the roles are allowed.
+	 */
+	public function validate_roles( array $settings ): array;
+
+	/**
 	 * @return array<string,mixed>
 	 */
 	public function ensure_defaults(): array;

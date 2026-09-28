@@ -55,6 +55,7 @@ final class Kernel
 		$pending_members_query = new PendingMembersQuery( $settings_repository );
 		$notifications        = new MemberNotificationService( $settings_repository );
 		$services             = [
+			new Installer(),
 			new SettingsController( $settings_repository, $settings_schema ),
 			new MemberActionController( $settings_repository, $notifications ),
 			$frontend_assets,

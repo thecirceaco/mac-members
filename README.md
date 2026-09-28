@@ -27,6 +27,8 @@ The role defaults are:
 | Approved role | `member` |
 | Denied role | `member-invalid` |
 
+The pending, approved and denied roles must be three different roles, and the approved and denied roles must not grant administrative capabilities such as `manage_options`, `edit_users`, `promote_users`, `delete_users`, `unfiltered_html`, `edit_plugins`, `edit_themes`, `install_plugins` or `activate_plugins` (the full list is in `src/Security/Capabilities.php`). Settings that break these rules are not saved, and the settings page shows why. Approve and deny check the same rules again before they change a user, because a role can gain capabilities after the settings are saved.
+
 The settings page also includes:
 
 - admin notification email
@@ -77,11 +79,15 @@ Each notification type can be toggled from the settings page. Email delivery fai
 
 ## Security
 
-MAC Members uses authenticated WordPress AJAX actions for approval and denial. It checks the nonce with `check_ajax_referer()`, requires the acting user to have `promote_users`, verifies that the target user is still pending, blocks self-actions, and blocks actions against elevated target users.
+MAC Members uses authenticated WordPress AJAX actions for approval and denial. It checks the nonce with `check_ajax_referer()` and requires the acting user to have the `mac_members_review` capability and `promote_users`. For each target user it checks `current_user_can( 'promote_user', $user_id )` and that every role the action adds or removes is in `get_editable_roles()`. It verifies that the target user is still pending, blocks self-actions, and blocks actions against target users who hold any of the sensitive capabilities listed under Settings.
 
 Every check that fails sends an error and ends the request, and so does the success response, so a failed check can never reach the role change, even when a `wp_die` handler does not exit.
 
 The plugin does not expose public unauthenticated approval endpoints and does not provide a REST API in v0.2.0.
+
+### Review capability
+
+Activating the plugin gives the `administrator` role the `mac_members_review` capability. A site that updates the plugin without reactivating it gets the same step once, on the next request. To let another role review members, give it `mac_members_review` and `promote_users` with a role editor. Deleting the plugin from the Plugins screen removes `mac_members_review` from every role.
 
 ## Development
 

@@ -11,26 +11,72 @@ if ( ! defined( 'ABSPATH' ) ) {
 	define( 'ABSPATH', dirname( __DIR__, 2 ) . '/' );
 }
 
+if ( ! class_exists( 'WP_Role' ) ) {
+	final class WP_Role {
+		public string $name;
+
+		/**
+		 * @var array<string,bool>
+		 */
+		public array $capabilities;
+
+		/**
+		 * @param array<string,bool> $capabilities Capabilities.
+		 */
+		public function __construct( string $role, array $capabilities ) {
+			$this->name         = $role;
+			$this->capabilities = $capabilities;
+		}
+
+		public function add_cap( string $cap, bool $grant = true ): void {
+			$this->capabilities[ $cap ] = $grant;
+
+			$GLOBALS['mac_members_test_roles'][ $this->name ]['capabilities'][ $cap ] = $grant;
+		}
+
+		public function remove_cap( string $cap ): void {
+			unset( $this->capabilities[ $cap ], $GLOBALS['mac_members_test_roles'][ $this->name ]['capabilities'][ $cap ] );
+		}
+
+		public function has_cap( string $cap ): bool {
+			return ! empty( $this->capabilities[ $cap ] );
+		}
+	}
+}
+
 if ( ! class_exists( 'WP_Roles' ) ) {
 	final class WP_Roles {
 		/**
 		 * Registered roles.
 		 *
-		 * @var array<string,array<string,string>>
+		 * @var array<string,array<string,mixed>>
 		 */
 		public array $roles = array();
 
 		/**
+		 * @var array<string,WP_Role>
+		 */
+		public array $role_objects = array();
+
+		/**
 		 * Create the roles object.
 		 *
-		 * @param array<string,array<string,string>> $roles Roles.
+		 * @param array<string,array<string,mixed>> $roles Roles.
 		 */
 		public function __construct( array $roles ) {
 			$this->roles = $roles;
+
+			foreach ( $roles as $slug => $role ) {
+				$this->role_objects[ $slug ] = new WP_Role( (string) $slug, (array) ( $role['capabilities'] ?? array() ) );
+			}
 		}
 
 		public function is_role( string $role ): bool {
 			return isset( $this->roles[ $role ] );
+		}
+
+		public function get_role( string $role ): ?WP_Role {
+			return $this->role_objects[ $role ] ?? null;
 		}
 	}
 }
@@ -201,16 +247,42 @@ function mac_members_tests_reset_wp_state(): void {
 		'name' => 'Example Site',
 	);
 	$GLOBALS['mac_members_test_roles']            = array(
-		'administrator'  => array( 'name' => 'Administrator' ),
-		'member-pending' => array( 'name' => 'Member Pending' ),
-		'member'         => array( 'name' => 'Member' ),
-		'member-invalid' => array( 'name' => 'Member Invalid' ),
-		'subscriber'     => array( 'name' => 'Subscriber' ),
+		'administrator'  => array(
+			'name'         => 'Administrator',
+			'capabilities' => array(
+				'read'            => true,
+				'manage_options'  => true,
+				'edit_users'      => true,
+				'promote_users'   => true,
+				'unfiltered_html' => true,
+			),
+		),
+		'member-pending' => array(
+			'name'         => 'Member Pending',
+			'capabilities' => array( 'read' => true ),
+		),
+		'member'         => array(
+			'name'         => 'Member',
+			'capabilities' => array( 'read' => true ),
+		),
+		'member-invalid' => array(
+			'name'         => 'Member Invalid',
+			'capabilities' => array( 'read' => true ),
+		),
+		'subscriber'     => array(
+			'name'         => 'Subscriber',
+			'capabilities' => array( 'read' => true ),
+		),
 	);
 	$GLOBALS['mac_members_test_current_user_caps'] = array(
-		'manage_options' => true,
-		'promote_users'  => true,
+		'manage_options'     => true,
+		'promote_users'      => true,
+		'mac_members_review' => true,
 	);
+	// Capabilities checked for one object, such as current_user_can( 'promote_user', 12 ), keyed by capability and ID.
+	$GLOBALS['mac_members_test_current_user_object_caps'] = array();
+	$GLOBALS['mac_members_test_uninstall_hooks']          = array();
+	$GLOBALS['mac_members_test_doing_it_wrong']           = array();
 	$GLOBALS['mac_members_test_options_pages']     = array();
 	$GLOBALS['mac_members_test_settings_errors']   = array();
 	$GLOBALS['mac_members_test_nonces']            = array();
@@ -279,7 +351,18 @@ function apply_filters( string $hook_name, mixed $value, mixed ...$args ): mixed
 }
 
 function register_activation_hook( string $file, callable $callback ): void {
-	$GLOBALS['mac_members_test_activation_hooks'][ $file ] = $callback;
+	$GLOBALS['mac_members_test_activation_hooks'][ $file ][] = $callback;
+}
+
+function register_uninstall_hook( string $file, callable $callback ): void {
+	// Like WordPress, which stores the callback in an option: object methods are refused.
+	if ( is_array( $callback ) && is_object( $callback[0] ) ) {
+		$GLOBALS['mac_members_test_doing_it_wrong'][] = 'register_uninstall_hook';
+
+		return;
+	}
+
+	$GLOBALS['mac_members_test_uninstall_hooks'][ $file ] = $callback;
 }
 
 function get_option( string $option, mixed $default_value = false ): mixed {
@@ -306,6 +389,17 @@ function get_bloginfo( string $show = '' ): string {
 
 function wp_roles(): WP_Roles {
 	return new WP_Roles( $GLOBALS['mac_members_test_roles'] ?? array() );
+}
+
+function get_role( string $role ): ?WP_Role {
+	return wp_roles()->get_role( $role );
+}
+
+/**
+ * @return array<string,array<string,mixed>>
+ */
+function get_editable_roles(): array {
+	return apply_filters( 'editable_roles', $GLOBALS['mac_members_test_roles'] ?? array() );
 }
 
 function sanitize_key( string $key ): string {
@@ -362,7 +456,16 @@ function esc_attr__( string $text, string $domain = 'default' ): string {
 	return esc_attr( __( $text, $domain ) );
 }
 
-function current_user_can( string $capability ): bool {
+function current_user_can( string $capability, mixed ...$args ): bool {
+	if ( isset( $args[0] ) && isset( $GLOBALS['mac_members_test_current_user_object_caps'][ $capability ][ (int) $args[0] ] ) ) {
+		return (bool) $GLOBALS['mac_members_test_current_user_object_caps'][ $capability ][ (int) $args[0] ];
+	}
+
+	// map_meta_cap() maps promote_user to promote_users.
+	if ( 'promote_user' === $capability ) {
+		$capability = 'promote_users';
+	}
+
 	return (bool) ( $GLOBALS['mac_members_test_current_user_caps'][ $capability ] ?? false );
 }
 

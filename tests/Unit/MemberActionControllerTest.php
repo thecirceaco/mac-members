@@ -18,6 +18,7 @@ use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 
+use function add_filter;
 use function mac_members_tests_reset_wp_state;
 use function wp_create_nonce;
 
@@ -84,6 +85,10 @@ final class MemberActionControllerTest extends TestCase {
 			'elevated target' => array( 'elevated target', 'permission_denied' ),
 			'missing role'    => array( 'missing role', 'missing_role' ),
 			'not pending'     => array( 'not pending', 'not_pending' ),
+			'no review cap'   => array( 'no review cap', 'permission_denied' ),
+			'cannot promote'  => array( 'cannot promote', 'permission_denied' ),
+			'unsafe roles'    => array( 'unsafe roles', 'invalid_role_settings' ),
+			'not editable'    => array( 'not editable', 'permission_denied' ),
 		);
 	}
 
@@ -282,17 +287,157 @@ final class MemberActionControllerTest extends TestCase {
 		);
 	}
 
-	public function test_same_approved_and_denied_role_is_not_removed_while_adding_it(): void {
-		$GLOBALS['mac_members_test_options'][ MAC_MEMBERS_SETTINGS_OPTION ] = array(
-			'approved_role' => 'member',
-			'denied_role'   => 'member',
-		);
+	/**
+	 * @param array<string,string> $stored_settings Stored role settings.
+	 */
+	#[DataProvider( 'provide_role_settings_that_are_not_allowed' )]
+	public function test_role_settings_that_are_not_allowed_are_refused_before_any_write( array $stored_settings, string $action ): void {
+		$GLOBALS['mac_members_test_options'][ MAC_MEMBERS_SETTINGS_OPTION ] = $stored_settings;
 
 		$user = $this->store_user( 12, array( 'member-pending' ) );
+		$this->prepare_ajax_request( 'approve' === $action ? FrontendAssets::APPROVE_ACTION : FrontendAssets::DENY_ACTION, $user->ID );
+
+		$response = $this->capture_ajax_response(
+			fn (): mixed => 'approve' === $action ? $this->create_controller()->approve() : $this->create_controller()->deny()
+		);
+
+		self::assertFalse( $response['success'] );
+		self::assertSame( 500, $response['status'] );
+		self::assertSame( 'invalid_role_settings', $response['data']['code'] );
+		self::assertSame( array( 'member-pending' ), $user->roles );
+		self::assertSame( array(), $GLOBALS['mac_members_test_role_changes'] );
+	}
+
+	/**
+	 * @return array<string,array{0:array<string,string>,1:string}>
+	 */
+	public static function provide_role_settings_that_are_not_allowed(): array {
+		return array(
+			'approved and denied are the same role' => array(
+				array(
+					'approved_role' => 'member',
+					'denied_role'   => 'member',
+				),
+				'deny',
+			),
+			'pending and approved are the same role' => array(
+				array(
+					'pending_role'  => 'member-pending',
+					'approved_role' => 'member-pending',
+				),
+				'approve',
+			),
+			'approved role is an administrator role' => array(
+				array( 'approved_role' => 'administrator' ),
+				'approve',
+			),
+			'denied role is an administrator role' => array(
+				array( 'denied_role' => 'administrator' ),
+				'deny',
+			),
+		);
+	}
+
+	public function test_target_role_that_gained_a_sensitive_capability_after_saving_is_refused(): void {
+		$GLOBALS['mac_members_test_roles']['member']['capabilities']['edit_users'] = true;
+
+		$user = $this->store_user( 12, array( 'member-pending' ) );
+		$this->prepare_ajax_request( FrontendAssets::APPROVE_ACTION, $user->ID );
+
+		$response = $this->capture_ajax_response(
+			fn (): mixed => $this->create_controller()->approve()
+		);
+
+		self::assertSame( 'invalid_role_settings', $response['data']['code'] );
+		self::assertSame( array( 'member-pending' ), $user->roles );
+	}
+
+	public function test_review_capability_is_required_in_addition_to_promote_users(): void {
+		$GLOBALS['mac_members_test_current_user_caps']['mac_members_review'] = false;
+
+		$user = $this->store_user( 12, array( 'member-pending' ) );
+		$this->prepare_ajax_request( FrontendAssets::APPROVE_ACTION, $user->ID );
+
+		$response = $this->capture_ajax_response(
+			fn (): mixed => $this->create_controller()->approve()
+		);
+
+		self::assertSame( 403, $response['status'] );
+		self::assertSame( 'permission_denied', $response['data']['code'] );
+		self::assertSame( array( 'member-pending' ), $user->roles );
+	}
+
+	public function test_promote_user_is_checked_for_the_target_user(): void {
+		$GLOBALS['mac_members_test_current_user_object_caps']['promote_user'][12] = false;
+
+		$user = $this->store_user( 12, array( 'member-pending' ) );
+		$this->store_user( 13, array( 'member-pending' ) );
+		$this->prepare_ajax_request( FrontendAssets::APPROVE_ACTION, $user->ID );
+
+		$response = $this->capture_ajax_response(
+			fn (): mixed => $this->create_controller()->approve()
+		);
+
+		self::assertSame( 403, $response['status'] );
+		self::assertSame( array( 'member-pending' ), $user->roles );
+
+		$this->prepare_ajax_request( FrontendAssets::APPROVE_ACTION, 13 );
+
+		$response = $this->capture_ajax_response(
+			fn (): mixed => $this->create_controller()->approve()
+		);
+
+		self::assertTrue( $response['success'] );
+	}
+
+	public function test_target_holding_any_sensitive_capability_is_blocked(): void {
+		$user = $this->store_user( 12, array( 'member-pending' ), array( 'edit_users' => true ) );
 		$this->prepare_ajax_request( FrontendAssets::DENY_ACTION, $user->ID );
 
 		$response = $this->capture_ajax_response(
 			fn (): mixed => $this->create_controller()->deny()
+		);
+
+		self::assertSame( 403, $response['status'] );
+		self::assertSame( array( 'member-pending' ), $user->roles );
+	}
+
+	#[DataProvider( 'provide_roles_that_are_not_editable' )]
+	public function test_roles_the_acting_user_cannot_assign_are_refused( string $role ): void {
+		$this->remove_editable_role( $role );
+
+		$user = $this->store_user( 12, array( 'member-pending', 'member-invalid' ) );
+		$this->prepare_ajax_request( FrontendAssets::APPROVE_ACTION, $user->ID );
+
+		$response = $this->capture_ajax_response(
+			fn (): mixed => $this->create_controller()->approve()
+		);
+
+		self::assertSame( 403, $response['status'] );
+		self::assertSame( 'permission_denied', $response['data']['code'] );
+		self::assertSame( array( 'member-pending', 'member-invalid' ), $user->roles );
+		self::assertSame( array(), $GLOBALS['mac_members_test_role_changes'] );
+	}
+
+	/**
+	 * @return array<string,array{0:string}>
+	 */
+	public static function provide_roles_that_are_not_editable(): array {
+		return array(
+			'pending role'                => array( 'member-pending' ),
+			'approved role'               => array( 'member' ),
+			'held denied role to remove' => array( 'member-invalid' ),
+		);
+	}
+
+	public function test_other_outcome_role_need_not_be_editable_when_the_user_does_not_hold_it(): void {
+		$this->remove_editable_role( 'member-invalid' );
+
+		$user = $this->store_user( 12, array( 'member-pending' ) );
+		$this->prepare_ajax_request( FrontendAssets::APPROVE_ACTION, $user->ID );
+
+		$response = $this->capture_ajax_response(
+			fn (): mixed => $this->create_controller()->approve()
 		);
 
 		self::assertTrue( $response['success'] );
@@ -511,11 +656,34 @@ final class MemberActionControllerTest extends TestCase {
 			case 'not pending':
 				$this->store_user( 12, array( 'subscriber' ) );
 				break;
+			case 'no review cap':
+				$GLOBALS['mac_members_test_current_user_caps']['mac_members_review'] = false;
+				break;
+			case 'cannot promote':
+				$GLOBALS['mac_members_test_current_user_object_caps']['promote_user'][12] = false;
+				break;
+			case 'unsafe roles':
+				$GLOBALS['mac_members_test_options'][ MAC_MEMBERS_SETTINGS_OPTION ] = array( 'approved_role' => 'administrator' );
+				break;
+			case 'not editable':
+				$this->remove_editable_role( 'member' );
+				break;
 			default:
 				self::fail( 'Unknown gate: ' . $gate );
 		}
 
 		$_REQUEST = $_POST;
+	}
+
+	private function remove_editable_role( string $role ): void {
+		add_filter(
+			'editable_roles',
+			static function ( array $roles ) use ( $role ): array {
+				unset( $roles[ $role ] );
+
+				return $roles;
+			}
+		);
 	}
 
 	private function prepare_ajax_request( string $action, int $user_id ): void {

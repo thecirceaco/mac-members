@@ -9,6 +9,8 @@ declare(strict_types=1);
 
 namespace MacMembers\Settings;
 
+use MacMembers\Security\Capabilities;
+
 final class WordPressSettingsRepository implements SettingsRepositoryInterface
 {
 	private ?array $settings = null;
@@ -45,11 +47,23 @@ final class WordPressSettingsRepository implements SettingsRepositoryInterface
 	{
 		$normalized = $this->normalize( $settings, $this->all(), true );
 
+		if ( array() !== $this->get_role_errors( $normalized ) ) {
+			// Roles that break the role rules are never stored; the saved roles stay.
+			foreach ( $this->schema->get_role_fields() as $key ) {
+				$normalized[ $key ] = $this->all()[ $key ];
+			}
+		}
+
 		\update_option( MAC_MEMBERS_SETTINGS_OPTION, $normalized );
 
 		$this->settings = $normalized;
 
 		return $normalized;
+	}
+
+	public function validate_roles( array $settings ): array
+	{
+		return $this->get_role_errors( $this->normalize( $settings, $this->all(), true ) );
 	}
 
 	public function ensure_defaults(): array
@@ -122,6 +136,47 @@ final class WordPressSettingsRepository implements SettingsRepositoryInterface
 	public function has_missing_roles(): bool
 	{
 		return array() !== $this->get_missing_role_slugs();
+	}
+
+	/**
+	 * @param array<string,mixed> $settings Normalized settings.
+	 *
+	 * @return array<string,string> Error messages keyed by error code.
+	 */
+	private function get_role_errors( array $settings ): array
+	{
+		$roles  = array();
+		$errors = array();
+
+		foreach ( $this->schema->get_role_fields() as $key ) {
+			$roles[ $key ] = (string) ( $settings[ $key ] ?? '' );
+		}
+
+		if ( count( array_unique( $roles ) ) !== count( $roles ) ) {
+			$errors['roles_not_distinct'] = __( 'The pending, approved and denied roles must be three different roles. The settings were not saved.', 'mac-members' );
+		}
+
+		$messages = array(
+			/* translators: 1: role name, 2: comma-separated capability names. */
+			'approved_role' => __( 'The approved role "%1$s" grants administrative capabilities (%2$s). Choose a role without them. The settings were not saved.', 'mac-members' ),
+			/* translators: 1: role name, 2: comma-separated capability names. */
+			'denied_role'   => __( 'The denied role "%1$s" grants administrative capabilities (%2$s). Choose a role without them. The settings were not saved.', 'mac-members' ),
+		);
+		$role_names = $this->get_available_roles();
+
+		foreach ( $messages as $key => $message ) {
+			$capabilities = Capabilities::sensitive_capabilities_of_role( $roles[ $key ] ?? '' );
+
+			if ( array() !== $capabilities ) {
+				$errors[ $key . '_sensitive' ] = sprintf(
+					$message,
+					$role_names[ $roles[ $key ] ] ?? $roles[ $key ],
+					implode( ', ', $capabilities )
+				);
+			}
+		}
+
+		return $errors;
 	}
 
 	/**

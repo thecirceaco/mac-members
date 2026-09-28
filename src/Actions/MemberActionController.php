@@ -13,6 +13,7 @@ use MacMembers\Assets\FrontendAssets;
 use MacMembers\Contracts\Service;
 use MacMembers\Email\MemberNotificationService;
 use MacMembers\Email\NotificationResult;
+use MacMembers\Security\Capabilities;
 use MacMembers\Settings\SettingsRepositoryInterface;
 
 final class MemberActionController implements Service
@@ -23,6 +24,7 @@ final class MemberActionController implements Service
 	private const ERROR_NOT_PENDING = 'not_pending';
 	private const ERROR_UPDATE_FAILED = 'role_update_failed';
 	private const ERROR_MISSING_ROLE = 'missing_role';
+	private const ERROR_ROLE_SETTINGS = 'invalid_role_settings';
 	private const SUCCESS_APPROVED = 'approved';
 	private const SUCCESS_DENIED = 'denied';
 
@@ -64,7 +66,7 @@ final class MemberActionController implements Service
 			return;
 		}
 
-		if ( ! \current_user_can( 'promote_users' ) ) {
+		if ( ! Capabilities::current_user_can_review() ) {
 			$this->send_error( self::ERROR_PERMISSION, 403 );
 			return;
 		}
@@ -83,7 +85,7 @@ final class MemberActionController implements Service
 			return;
 		}
 
-		if ( $user_id === \get_current_user_id() || $this->is_elevated_target( $user ) ) {
+		if ( ! $this->can_act_on( $user ) ) {
 			$this->send_error( self::ERROR_PERMISSION, 403 );
 			return;
 		}
@@ -93,19 +95,24 @@ final class MemberActionController implements Service
 		// Approve and deny exclude each other: a user who went back to pending must not keep an earlier outcome.
 		$other_role = (string) $this->settings->get( $other_role_setting, '' );
 
-		if ( $other_role === $target_role ) {
-			// Never remove the role that is being added.
-			$other_role = '';
-		}
-
 		// Check the roles before any write, so a missing role cannot leave the user half-changed.
 		if ( ! $this->settings->role_exists( $pending_role ) || ! $this->settings->role_exists( $target_role ) ) {
 			$this->send_error( self::ERROR_MISSING_ROLE, 500 );
 			return;
 		}
 
+		if ( ! $this->roles_are_allowed( $pending_role, $target_role, $other_role ) ) {
+			$this->send_error( self::ERROR_ROLE_SETTINGS, 500 );
+			return;
+		}
+
 		if ( ! $this->user_has_role( $user, $pending_role ) ) {
 			$this->send_error( self::ERROR_NOT_PENDING, 409 );
+			return;
+		}
+
+		if ( ! $this->can_assign_roles( $user, $pending_role, $target_role, $other_role ) ) {
+			$this->send_error( self::ERROR_PERMISSION, 403 );
 			return;
 		}
 
@@ -142,9 +149,51 @@ final class MemberActionController implements Service
 		return \sanitize_text_field( \wp_unslash( $_POST[ $key ] ) );
 	}
 
-	private function is_elevated_target( \WP_User $user ): bool
+	/**
+	 * The acting user may not change their own roles or those of a user who holds a sensitive capability,
+	 * and must be allowed to promote this user.
+	 */
+	private function can_act_on( \WP_User $user ): bool
 	{
-		return \user_can( $user, 'promote_users' ) || \user_can( $user, 'manage_options' );
+		return $user->ID !== \get_current_user_id()
+			&& ! Capabilities::user_has_sensitive_capability( $user )
+			&& \current_user_can( 'promote_user', $user->ID );
+	}
+
+	/**
+	 * The three roles must differ, and the role being added must not grant sensitive capabilities. This is
+	 * checked here as well as on save, because a role's capabilities can change after the settings are saved.
+	 */
+	private function roles_are_allowed( string $pending_role, string $target_role, string $other_role ): bool
+	{
+		return 3 === count( array_unique( array( $pending_role, $target_role, $other_role ) ) )
+			&& array() === Capabilities::sensitive_capabilities_of_role( $target_role );
+	}
+
+	/**
+	 * The acting user must be allowed to assign every role this action adds or removes, as in wp-admin.
+	 */
+	private function can_assign_roles( \WP_User $user, string $pending_role, string $target_role, string $other_role ): bool
+	{
+		if ( ! \function_exists( 'get_editable_roles' ) ) {
+			require_once ABSPATH . 'wp-admin/includes/user.php';
+		}
+
+		$roles = array( $pending_role, $target_role );
+
+		if ( $this->user_has_role( $user, $other_role ) ) {
+			$roles[] = $other_role;
+		}
+
+		$editable_roles = \get_editable_roles();
+
+		foreach ( $roles as $role ) {
+			if ( ! isset( $editable_roles[ $role ] ) ) {
+				return false;
+			}
+		}
+
+		return true;
 	}
 
 	private function user_has_role( \WP_User $user, string $role ): bool
@@ -293,6 +342,7 @@ final class MemberActionController implements Service
 			self::ERROR_NOT_PENDING => __( 'This user is no longer pending.', 'mac-members' ),
 			self::ERROR_UPDATE_FAILED => __( 'Unable to update user role.', 'mac-members' ),
 			self::ERROR_MISSING_ROLE => __( 'A role needed for this action does not exist. Please review Settings > MAC Members.', 'mac-members' ),
+			self::ERROR_ROLE_SETTINGS => __( 'The role settings are not allowed: the three roles must differ, and the role being added must not grant administrative capabilities. Please review Settings > MAC Members.', 'mac-members' ),
 			default => __( 'Invalid request.', 'mac-members' ),
 		};
 	}
