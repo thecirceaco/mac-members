@@ -11,6 +11,7 @@ namespace MacMembers\Assets;
 
 use MacMembers\Contracts\Service;
 use MacMembers\Members\MembersTableRenderer;
+use MacMembers\Members\MembersTableShortcode;
 use MacMembers\Members\MemberStatus;
 use MacMembers\Members\MemberTransition;
 
@@ -122,6 +123,7 @@ final class FrontendAssets implements Service
 			'genericError'   => __( 'Something went wrong. Please try again.', 'mac-members' ),
 			'genericSuccess' => __( 'Member updated.', 'mac-members' ),
 			'rangeText'      => MembersTableRenderer::get_range_template(),
+			'columnsCookie'  => MembersTableShortcode::COLUMNS_COOKIE,
 		);
 	}
 }

@@ -16,13 +16,19 @@ if ( ! defined( 'ABSPATH' ) ) {
 final class MembersTableRenderer
 {
 	/**
-	 * @param array<int,array{user:object,status:?MemberStatus}> $rows Members on this page and their status.
+	 * The table's columns, in order. The column checkboxes can hide any of them.
+	 */
+	public const COLUMN_KEYS = array( 'user_id', 'email', 'first_name', 'last_name', 'username', 'registered', 'profile', 'status', 'roles', 'actions' );
+
+	/**
+	 * @param array<int,array{user:object,status:?MemberStatus,roles?:array<string,string>}> $rows Members on this page, their status and their other roles.
 	 * @param string                                                 $view Shown view: a status value or "all".
 	 * @param array<int,array{view:string,label:string,count:int,url:string,current:bool}> $filters Status filters; empty hides them.
 	 * @param array{page?:int,pages?:int,per_page?:int,total?:int,first?:int,last?:int,links?:array<int,array{page:int,url:string,current:bool}|null>,previous_url?:string,next_url?:string} $pagination Pagination.
 	 * @param array<int,string>                                      $missing_roles Configured role slugs that do not exist.
 	 * @param string                                                 $render_token Token that status changes from this table must send.
 	 * @param array{action?:string,hidden?:array<string,string>,roles?:array<string,string>,role?:string,search?:string} $search_form Role and search form; empty hides it.
+	 * @param array<int,string>                                      $hidden_columns Keys of the columns the viewer hid.
 	 */
 	public function render(
 		array $rows,
@@ -31,7 +37,8 @@ final class MembersTableRenderer
 		array $pagination = array(),
 		array $missing_roles = array(),
 		string $render_token = '',
-		array $search_form = array()
+		array $search_form = array(),
+		array $hidden_columns = array()
 	): string {
 		$body     = $this->render_rows( $rows );
 		$narrowed = '' !== ( $search_form['role'] ?? '' ) || '' !== ( $search_form['search'] ?? '' );
@@ -41,6 +48,7 @@ final class MembersTableRenderer
 		$output  = '<div class="mac-members-table" data-mac-members-table data-mac-members-view="' . esc_attr( $view ) . '" data-mac-members-render-token="' . esc_attr( $render_token ) . '">';
 		$output .= $this->render_missing_roles_warning( $missing_roles );
 		$output .= $this->render_filters( $filters );
+		$output .= '' === $body ? '' : $this->render_column_toggles( $hidden_columns );
 		$output .= $this->render_search_form( $search_form, $form_id );
 		$output .= '<div class="mac-members-notices" aria-live="polite" aria-atomic="true"></div>';
 		$output .= '<p class="mac-members-empty"' . ( '' === $body ? '' : ' hidden' ) . '>' . esc_html( $this->get_empty_text( $view, $narrowed ) ) . '</p>';
@@ -49,15 +57,11 @@ final class MembersTableRenderer
 			$output .= '<div class="mac-members-table-wrap">';
 			$output .= '<table class="mac-members-list">';
 			$output .= '<thead><tr>';
-			$output .= '<th scope="col">' . esc_html__( 'User ID', 'mac-members' ) . '</th>';
-			$output .= '<th scope="col">' . esc_html__( 'Email', 'mac-members' ) . '</th>';
-			$output .= '<th scope="col">' . esc_html__( 'First Name', 'mac-members' ) . '</th>';
-			$output .= '<th scope="col">' . esc_html__( 'Last Name', 'mac-members' ) . '</th>';
-			$output .= '<th scope="col">' . esc_html__( 'Username', 'mac-members' ) . '</th>';
-			$output .= '<th scope="col">' . esc_html__( 'Registered', 'mac-members' ) . '</th>';
-			$output .= '<th scope="col">' . esc_html__( 'Profile', 'mac-members' ) . '</th>';
-			$output .= '<th scope="col">' . esc_html__( 'Status', 'mac-members' ) . '</th>';
-			$output .= '<th scope="col">' . esc_html__( 'Actions', 'mac-members' ) . '</th>';
+
+			foreach ( $this->get_columns() as $key => $label ) {
+				$output .= '<th scope="col" data-mac-members-column="' . esc_attr( $key ) . '">' . esc_html( $label ) . '</th>';
+			}
+
 			$output .= '</tr></thead>';
 			$output .= '<tbody>' . $body . '</tbody>';
 			$output .= '</table>';
@@ -81,6 +85,28 @@ final class MembersTableRenderer
 	}
 
 	/**
+	 * @return array<string,string> Column labels keyed by column key, in order.
+	 */
+	public function get_columns(): array
+	{
+		return array_combine(
+			self::COLUMN_KEYS,
+			array(
+				__( 'User ID', 'mac-members' ),
+				__( 'Email', 'mac-members' ),
+				__( 'First Name', 'mac-members' ),
+				__( 'Last Name', 'mac-members' ),
+				__( 'Username', 'mac-members' ),
+				__( 'Registered', 'mac-members' ),
+				__( 'Profile', 'mac-members' ),
+				__( 'Status', 'mac-members' ),
+				__( 'Roles', 'mac-members' ),
+				__( 'Actions', 'mac-members' ),
+			)
+		);
+	}
+
+	/**
 	 * Text shown when the view has no members. The script shows it too, after the last row goes.
 	 *
 	 * @param bool $narrowed Whether a role or a search narrows the view.
@@ -101,7 +127,7 @@ final class MembersTableRenderer
 	}
 
 	/**
-	 * @param array<int,array{user:object,status:?MemberStatus}> $rows Members and their status.
+	 * @param array<int,array{user:object,status:?MemberStatus,roles?:array<string,string>}> $rows Members, their status and their other roles.
 	 */
 	private function render_rows( array $rows ): string
 	{
@@ -116,24 +142,61 @@ final class MembersTableRenderer
 				continue;
 			}
 
-			$output .= '<tr class="mac-members-list__row" data-mac-members-user-id="' . esc_attr( (string) $id ) . '" data-mac-members-status="' . esc_attr( $status->value ) . '">';
-			$output .= '<td>' . esc_html( (string) $id ) . '</td>';
-			$output .= '<td>' . esc_html( $this->get_user_value( $user, 'user_email' ) ) . '</td>';
-			$output .= '<td>' . esc_html( $this->get_user_value( $user, 'first_name' ) ) . '</td>';
-			$output .= '<td>' . esc_html( $this->get_user_value( $user, 'last_name' ) ) . '</td>';
-			$output .= '<td>' . esc_html( $this->get_user_value( $user, 'user_login' ) ) . '</td>';
-			$output .= '<td>' . esc_html( $this->format_registered_date( $this->get_user_value( $user, 'user_registered' ) ) ) . '</td>';
-			$output .= '<td><a class="mac-members-profile-link" href="' . esc_url( $this->get_profile_url( $id ) ) . '" target="_blank" rel="noopener noreferrer">' . esc_html__( 'View profile', 'mac-members' ) . '</a></td>';
-			$output .= '<td class="mac-members-status"><span class="mac-members-status__label mac-members-status__label--' . esc_attr( $status->value ) . '">' . esc_html( $status->label() ) . '</span></td>';
-			$output .= '<td class="mac-members-actions">';
+			$actions = '';
 
 			foreach ( MemberTransition::available_for( $status ) as $transition ) {
-				$output .= $this->render_action_button( $transition, $id );
+				$actions .= $this->render_action_button( $transition, $id );
 			}
 
-			$output .= '</td>';
+			// Each cell's HTML, escaped, keyed by column.
+			$cells = array(
+				'user_id'    => esc_html( (string) $id ),
+				'email'      => esc_html( $this->get_user_value( $user, 'user_email' ) ),
+				'first_name' => esc_html( $this->get_user_value( $user, 'first_name' ) ),
+				'last_name'  => esc_html( $this->get_user_value( $user, 'last_name' ) ),
+				'username'   => esc_html( $this->get_user_value( $user, 'user_login' ) ),
+				'registered' => esc_html( $this->format_registered_date( $this->get_user_value( $user, 'user_registered' ) ) ),
+				'profile'    => '<a class="mac-members-profile-link" href="' . esc_url( $this->get_profile_url( $id ) ) . '" target="_blank" rel="noopener noreferrer">' . esc_html__( 'View profile', 'mac-members' ) . '</a>',
+				'status'     => '<span class="mac-members-status__label mac-members-status__label--' . esc_attr( $status->value ) . '">' . esc_html( $status->label() ) . '</span>',
+				'roles'      => esc_html( implode( ', ', $row['roles'] ?? array() ) ),
+				'actions'    => $actions,
+			);
+			$classes = array(
+				'status'  => 'mac-members-status',
+				'roles'   => 'mac-members-roles',
+				'actions' => 'mac-members-actions',
+			);
+
+			$output .= '<tr class="mac-members-list__row" data-mac-members-user-id="' . esc_attr( (string) $id ) . '" data-mac-members-status="' . esc_attr( $status->value ) . '">';
+
+			foreach ( self::COLUMN_KEYS as $key ) {
+				$class   = isset( $classes[ $key ] ) ? ' class="' . esc_attr( $classes[ $key ] ) . '"' : '';
+				$output .= '<td' . $class . ' data-mac-members-column="' . esc_attr( $key ) . '">' . $cells[ $key ] . '</td>';
+			}
+
 			$output .= '</tr>';
 		}
+
+		return $output;
+	}
+
+	/**
+	 * A checkbox for each column, checked unless the viewer hid the column. The stylesheet hides a column while
+	 * its checkbox is unchecked, and the script keeps the hidden columns in a cookie for the next page.
+	 *
+	 * @param array<int,string> $hidden_columns Keys of the columns the viewer hid.
+	 */
+	private function render_column_toggles( array $hidden_columns ): string
+	{
+		$output  = '<div class="mac-members-columns" role="group" aria-label="' . esc_attr__( 'Columns', 'mac-members' ) . '">';
+		$output .= '<span class="mac-members-columns__label">' . esc_html__( 'Columns', 'mac-members' ) . '</span>';
+
+		foreach ( $this->get_columns() as $key => $label ) {
+			$checked = in_array( $key, $hidden_columns, true ) ? '' : ' checked';
+			$output .= '<label class="mac-members-columns__option"><input type="checkbox" value="' . esc_attr( $key ) . '" data-mac-members-column-toggle' . $checked . '>' . esc_html( $label ) . '</label>';
+		}
+
+		$output .= '</div>';
 
 		return $output;
 	}

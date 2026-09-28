@@ -217,6 +217,22 @@ final class MembersQueryTest extends TestCase {
 		self::assertSame( $after_counts + 1, count( $GLOBALS['mac_members_test_user_queries'] ) );
 	}
 
+	public function test_other_roles_are_the_role_names_besides_the_status_roles(): void {
+		$GLOBALS['mac_members_test_roles']['officer']  = array( 'name' => 'Officer', 'capabilities' => array( 'read' => true ) );
+		$GLOBALS['mac_members_test_role_translations'] = array( 'Subscriber' => 'Abonat' );
+		$query                                         = new MembersQuery( $this->create_settings_repository() );
+
+		self::assertSame(
+			array(
+				'officer'    => 'Officer',
+				'subscriber' => 'Abonat',
+				'gone_role'  => 'gone_role',
+			),
+			$query->get_other_roles( new \WP_User( array( 'ID' => 1, 'roles' => array( 'officer', 'mac_members_approved', 'subscriber', 'gone_role' ) ) ) )
+		);
+		self::assertSame( array(), $query->get_other_roles( new \WP_User( array( 'ID' => 2, 'roles' => array( 'mac_members_pending' ) ) ) ) );
+	}
+
 	public function test_get_status_reads_the_status_from_the_configured_roles(): void {
 		$query = new MembersQuery( $this->create_settings_repository() );
 

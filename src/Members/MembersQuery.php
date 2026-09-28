@@ -47,6 +47,13 @@ final class MembersQuery
 	 */
 	private array $search_matches = array();
 
+	/**
+	 * The site's roles, read once per request.
+	 *
+	 * @var array<string,array<string,mixed>>|null
+	 */
+	private ?array $site_roles = null;
+
 	public function __construct(
 		private readonly SettingsRepositoryInterface $settings
 	) {}
@@ -178,6 +185,29 @@ final class MembersQuery
 		}
 
 		asort( $roles, SORT_NATURAL | SORT_FLAG_CASE );
+
+		return $roles;
+	}
+
+	/**
+	 * The member's roles other than the status roles, for the Roles column.
+	 *
+	 * @return array<string,string> Role names keyed by slug, in the order the user holds them.
+	 */
+	public function get_other_roles( object $user ): array
+	{
+		$status_roles = array_values( $this->get_status_roles() );
+		$site_roles   = $this->get_site_roles();
+		$roles        = array();
+
+		foreach ( isset( $user->roles ) ? array_map( 'strval', (array) $user->roles ) : array() as $slug ) {
+			if ( in_array( $slug, $status_roles, true ) ) {
+				continue;
+			}
+
+			$name           = isset( $site_roles[ $slug ]['name'] ) ? (string) $site_roles[ $slug ]['name'] : $slug;
+			$roles[ $slug ] = \translate_user_role( $name );
+		}
 
 		return $roles;
 	}
@@ -329,6 +359,10 @@ final class MembersQuery
 	 */
 	private function get_site_roles(): array
 	{
+		if ( null !== $this->site_roles ) {
+			return $this->site_roles;
+		}
+
 		$wp_roles = \wp_roles();
 		$roles    = \is_object( $wp_roles ) && isset( $wp_roles->roles ) && \is_array( $wp_roles->roles ) ? $wp_roles->roles : array();
 		$site     = array();
@@ -338,6 +372,8 @@ final class MembersQuery
 				$site[ (string) $slug ] = $role;
 			}
 		}
+
+		$this->site_roles = $site;
 
 		return $site;
 	}

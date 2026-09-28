@@ -7,6 +7,7 @@
 	const genericError = config.genericError || 'Something went wrong. Please try again.';
 	const genericSuccess = config.genericSuccess || 'Member updated.';
 	const rangeText = config.rangeText || '%1$s-%2$s of %3$s';
+	const columnsCookie = config.columnsCookie || 'mac_members_hidden_columns';
 	const rootSelector = '[data-mac-members-table]';
 	const rowSelector = 'tr[data-mac-members-user-id]';
 	const actionSelector = '[data-mac-members-action][data-mac-members-user-id]';
@@ -280,6 +281,29 @@
 			showNotice(root, 'error', genericError);
 			setRowProcessing(row, false);
 		}
+	});
+
+	// The column checkboxes show and hide columns through the stylesheet. The hidden ones go in a cookie for a
+	// year, so the next page, which the server renders from that cookie, keeps them hidden.
+	document.addEventListener('change', (event) => {
+		const toggle = event.target;
+
+		if (!(toggle instanceof HTMLInputElement) || !toggle.matches('[data-mac-members-column-toggle]')) {
+			return;
+		}
+
+		const root = toggle.closest(rootSelector);
+
+		if (!root) {
+			return;
+		}
+
+		const hidden = [...root.querySelectorAll('[data-mac-members-column-toggle]')]
+			.filter((box) => !box.checked)
+			.map((box) => box.value);
+		const secure = window.location.protocol === 'https:' ? '; Secure' : '';
+
+		document.cookie = `${columnsCookie}=${encodeURIComponent(hidden.join(','))}; path=/; max-age=31536000; SameSite=Lax${secure}`;
 	});
 
 	// The role and search form leaves out empty fields, so the page address only has the choices that are set.

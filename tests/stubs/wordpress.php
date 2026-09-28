@@ -581,6 +581,7 @@ function mac_members_tests_reset_wp_state(): void {
 	$GLOBALS['mac_members_test_mail_fail_next']     = 0;
 
 	$_GET     = array();
+	$_COOKIE  = array();
 	$_POST    = array();
 	$_REQUEST = array();
 	$_SERVER  = array(

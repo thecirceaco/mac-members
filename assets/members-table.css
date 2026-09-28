@@ -59,6 +59,44 @@
 	gap: 0.75ch;
 }
 
+/* A checkbox for each column. A column is hidden while its checkbox is unchecked. */
+.mac-members-columns {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 0.5ch 1.5ch;
+	font-size: var(--text-s);
+}
+
+.mac-members-columns__label {
+	font-weight: 700;
+}
+
+.mac-members-columns__option {
+	display: inline-flex;
+	align-items: center;
+	gap: 0.5ch;
+	cursor: pointer;
+}
+
+.mac-members-columns__option input {
+	margin: 0;
+	accent-color: var(--neutral);
+}
+
+.mac-members-table:has([data-mac-members-column-toggle][value="user_id"]:not(:checked)) [data-mac-members-column="user_id"],
+.mac-members-table:has([data-mac-members-column-toggle][value="email"]:not(:checked)) [data-mac-members-column="email"],
+.mac-members-table:has([data-mac-members-column-toggle][value="first_name"]:not(:checked)) [data-mac-members-column="first_name"],
+.mac-members-table:has([data-mac-members-column-toggle][value="last_name"]:not(:checked)) [data-mac-members-column="last_name"],
+.mac-members-table:has([data-mac-members-column-toggle][value="username"]:not(:checked)) [data-mac-members-column="username"],
+.mac-members-table:has([data-mac-members-column-toggle][value="registered"]:not(:checked)) [data-mac-members-column="registered"],
+.mac-members-table:has([data-mac-members-column-toggle][value="profile"]:not(:checked)) [data-mac-members-column="profile"],
+.mac-members-table:has([data-mac-members-column-toggle][value="status"]:not(:checked)) [data-mac-members-column="status"],
+.mac-members-table:has([data-mac-members-column-toggle][value="roles"]:not(:checked)) [data-mac-members-column="roles"],
+.mac-members-table:has([data-mac-members-column-toggle][value="actions"]:not(:checked)) [data-mac-members-column="actions"] {
+	display: none;
+}
+
 /*
  * ACSS styles form fields only for WS Form, so the role filter and the search use the tokens ACSS gives WS
  * Form fields: the border, the radius, the field background and the text font and color.
@@ -148,14 +186,14 @@
 }
 
 .mac-members-list th {
-	background-color: var(--bg-light);
-	color: var(--bg-light-text);
+	background-color: var(--bg-ultra-light);
+	color: var(--bg-ultra-light-text);
 	white-space: nowrap;
 }
 
 /*
- * Striped rows: every second row is --bg-ultra-light. Only the header is --bg-light. Every row keeps the page's
- * text color, so both stripes read the same.
+ * Striped rows: every second row is --bg-ultra-light, like the header. Every row keeps the page's text color, so
+ * both stripes read the same.
  */
 .mac-members-list tbody tr:nth-child(even) {
 	background-color: var(--bg-ultra-light);

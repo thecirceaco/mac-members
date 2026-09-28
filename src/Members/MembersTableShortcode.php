@@ -37,6 +37,11 @@ final class MembersTableShortcode implements Service
 	public const VIEW_ALL = 'all';
 
 	/**
+	 * Cookie the script writes with the columns the viewer hid, comma-separated.
+	 */
+	public const COLUMNS_COOKIE = 'mac_members_hidden_columns';
+
+	/**
 	 * no-store keeps the table, its nonce and its render token out of browser, proxy and page caches.
 	 */
 	private const CACHE_CONTROL = 'no-cache, must-revalidate, max-age=0, no-store, private';
@@ -105,7 +110,8 @@ final class MembersTableShortcode implements Service
 			$this->get_pagination( $view, $page, $per_page, $members['total'], $base_url, $kept ),
 			$this->settings->get_missing_role_slugs(),
 			$this->render_token->issue( $this->get_user_ids( $members['users'] ) ),
-			$this->get_search_form( null === $fixed_view ? $view : null, $base_url, $roles, $role, $search )
+			$this->get_search_form( null === $fixed_view ? $view : null, $base_url, $roles, $role, $search ),
+			$this->get_hidden_columns()
 		);
 	}
 
@@ -192,7 +198,7 @@ final class MembersTableShortcode implements Service
 	/**
 	 * @param array<int,object> $users Members on this page.
 	 *
-	 * @return array<int,array{user:object,status:?MemberStatus}>
+	 * @return array<int,array{user:object,status:?MemberStatus,roles:array<string,string>}>
 	 */
 	private function get_rows( array $users ): array
 	{
@@ -202,10 +208,25 @@ final class MembersTableShortcode implements Service
 			$rows[] = array(
 				'user'   => $user,
 				'status' => $this->query->get_status( $user ),
+				'roles'  => $this->query->get_other_roles( $user ),
 			);
 		}
 
 		return $rows;
+	}
+
+	/**
+	 * @return array<int,string> Keys of the columns the viewer hid, from the cookie the script writes.
+	 */
+	private function get_hidden_columns(): array
+	{
+		if ( ! isset( $_COOKIE[ self::COLUMNS_COOKIE ] ) || ! \is_string( $_COOKIE[ self::COLUMNS_COOKIE ] ) ) {
+			return array();
+		}
+
+		$keys = array_map( 'sanitize_key', explode( ',', \sanitize_text_field( \wp_unslash( $_COOKIE[ self::COLUMNS_COOKIE ] ) ) ) );
+
+		return array_values( array_intersect( MembersTableRenderer::COLUMN_KEYS, $keys ) );
 	}
 
 	/**

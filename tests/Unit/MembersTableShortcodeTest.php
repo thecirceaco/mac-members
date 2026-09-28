@@ -180,12 +180,57 @@ final class MembersTableShortcodeTest extends TestCase {
 
 		$output = $this->create_shortcode()->render();
 
-		self::assertSame( 9, preg_match_all( '/<th scope="col">([^<]+)<\/th>/', $output, $headers ) );
+		self::assertSame( 10, preg_match_all( '/<th scope="col" data-mac-members-column="([^"]+)">([^<]+)<\/th>/', $output, $headers ) );
 		self::assertSame(
-			array( 'User ID', 'Email', 'First Name', 'Last Name', 'Username', 'Registered', 'Profile', 'Status', 'Actions' ),
-			$headers[1]
+			array( 'User ID', 'Email', 'First Name', 'Last Name', 'Username', 'Registered', 'Profile', 'Status', 'Roles', 'Actions' ),
+			$headers[2]
 		);
-		self::assertStringContainsString( '<tr class="mac-members-list__row" data-mac-members-user-id="7" data-mac-members-status="pending"><td>7</td><td>member7@example.test</td>', $output );
+		self::assertSame( MembersTableRenderer::COLUMN_KEYS, $headers[1] );
+		self::assertStringContainsString( '<tr class="mac-members-list__row" data-mac-members-user-id="7" data-mac-members-status="pending"><td data-mac-members-column="user_id">7</td><td data-mac-members-column="email">member7@example.test</td>', $output );
+	}
+
+	public function test_roles_column_lists_the_other_roles_of_each_member(): void {
+		$this->add_union_roles();
+		$this->store_people(
+			array(
+				1 => array( 'roles' => array( 'mac_members_approved', 'officer', 'trustee' ) ),
+				2 => array( 'roles' => array( 'mac_members_approved' ) ),
+			)
+		);
+		$_GET['mac_members_status'] = 'approved';
+
+		$output = $this->create_shortcode()->render();
+
+		self::assertStringContainsString( '<td class="mac-members-roles" data-mac-members-column="roles">Officer, Trustee</td>', $output );
+		self::assertStringContainsString( '<td class="mac-members-roles" data-mac-members-column="roles"></td>', $output );
+	}
+
+	public function test_column_checkboxes_are_all_checked_by_default(): void {
+		$this->store_members( array( 1 => 'mac_members_pending' ) );
+
+		$output = $this->create_shortcode()->render();
+
+		self::assertSame( 10, preg_match_all( '/<input type="checkbox" value="([^"]+)" data-mac-members-column-toggle( checked)?>/', $output, $boxes ) );
+		self::assertSame( MembersTableRenderer::COLUMN_KEYS, $boxes[1] );
+		self::assertSame( array_fill( 0, 10, ' checked' ), $boxes[2] );
+		self::assertStringContainsString( '<label class="mac-members-columns__option"><input type="checkbox" value="roles" data-mac-members-column-toggle checked>Roles</label>', $output );
+	}
+
+	public function test_the_cookie_unchecks_the_columns_the_viewer_hid(): void {
+		$this->store_members( array( 1 => 'mac_members_pending' ) );
+		$_COOKIE['mac_members_hidden_columns'] = 'email,roles,nope';
+
+		$output = $this->create_shortcode()->render();
+
+		self::assertStringContainsString( '<input type="checkbox" value="email" data-mac-members-column-toggle>', $output );
+		self::assertStringContainsString( '<input type="checkbox" value="roles" data-mac-members-column-toggle>', $output );
+		self::assertStringContainsString( '<input type="checkbox" value="user_id" data-mac-members-column-toggle checked>', $output );
+		// Hidden columns are still rendered: the stylesheet hides them while their checkbox is unchecked.
+		self::assertStringContainsString( '<td data-mac-members-column="email">member1@example.test</td>', $output );
+	}
+
+	public function test_empty_view_has_no_column_checkboxes(): void {
+		self::assertStringNotContainsString( 'mac-members-columns', $this->create_shortcode()->render() );
 	}
 
 	public function test_buttons_use_automatic_css_classes(): void {
