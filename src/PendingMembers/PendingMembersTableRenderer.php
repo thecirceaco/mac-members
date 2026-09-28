@@ -9,16 +9,23 @@ declare(strict_types=1);
 
 namespace MacMembers\PendingMembers;
 
+if ( ! defined( 'ABSPATH' ) ) {
+	exit; // Exit if accessed directly.
+}
+
 final class PendingMembersTableRenderer
 {
 	/**
 	 * @param array<int,object> $users Pending users.
+	 * @param array<int,string> $missing_roles Configured role slugs that do not exist.
+	 * @param string            $render_token Token that approve and deny requests from this table must send.
 	 */
-	public function render( array $users ): string
+	public function render( array $users, array $missing_roles = array(), string $render_token = '' ): string
 	{
 		$rows = $this->render_rows( $users );
 
-		$output  = '<div class="mac-members-pending" data-mac-members-pending-table>';
+		$output  = '<div class="mac-members-pending" data-mac-members-pending-table data-mac-members-render-token="' . esc_attr( $render_token ) . '">';
+		$output .= $this->render_missing_roles_warning( $missing_roles );
 		$output .= '<div class="mac-members-notices" aria-live="polite" aria-atomic="true"></div>';
 
 		if ( '' === $rows ) {
@@ -79,6 +86,24 @@ final class PendingMembersTableRenderer
 		}
 
 		return $rows;
+	}
+
+	/**
+	 * @param array<int,string> $missing_roles Configured role slugs that do not exist.
+	 */
+	private function render_missing_roles_warning( array $missing_roles ): string
+	{
+		if ( array() === $missing_roles ) {
+			return '';
+		}
+
+		$message = sprintf(
+			/* translators: %s: comma-separated list of role slugs. */
+			__( 'MAC Members: One or more configured roles do not exist (%s). Approve and deny are blocked for any action that needs a missing role. Please review Settings > MAC Members.', 'mac-members' ),
+			implode( ', ', $missing_roles )
+		);
+
+		return '<p class="mac-members-notice mac-members-notice--warning" role="alert">' . esc_html( $message ) . '</p>';
 	}
 
 	private function render_action_button( string $action, string $label, int $user_id ): string

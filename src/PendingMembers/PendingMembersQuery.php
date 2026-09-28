@@ -11,6 +11,10 @@ namespace MacMembers\PendingMembers;
 
 use MacMembers\Settings\SettingsRepositoryInterface;
 
+if ( ! defined( 'ABSPATH' ) ) {
+	exit; // Exit if accessed directly.
+}
+
 final class PendingMembersQuery
 {
 	public function __construct(

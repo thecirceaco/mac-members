@@ -20,6 +20,10 @@ use MacMembers\Settings\SettingsController;
 use MacMembers\Settings\SettingsSchema;
 use MacMembers\Settings\WordPressSettingsRepository;
 
+if ( ! defined( 'ABSPATH' ) ) {
+	exit; // Exit if accessed directly.
+}
+
 final class Kernel
 {
 	private static bool $booted = false;
@@ -55,13 +59,15 @@ final class Kernel
 		$pending_members_query = new PendingMembersQuery( $settings_repository );
 		$notifications        = new MemberNotificationService( $settings_repository );
 		$services             = [
+			new Installer(),
 			new SettingsController( $settings_repository, $settings_schema ),
 			new MemberActionController( $settings_repository, $notifications ),
 			$frontend_assets,
 			new PendingMembersShortcode(
 				$pending_members_query,
 				new PendingMembersTableRenderer(),
-				$frontend_assets
+				$frontend_assets,
+				$settings_repository
 			),
 		];
 

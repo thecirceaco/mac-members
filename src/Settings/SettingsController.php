@@ -11,6 +11,10 @@ namespace MacMembers\Settings;
 
 use MacMembers\Contracts\Service;
 
+if ( ! defined( 'ABSPATH' ) ) {
+	exit; // Exit if accessed directly.
+}
+
 final class SettingsController implements Service
 {
 	public const NONCE_ACTION = 'mac_members_save_settings';
@@ -77,6 +81,16 @@ final class SettingsController implements Service
 			// phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- Settings are unslashed here and sanitized by schema in WordPressSettingsRepository.
 			? \wp_unslash( $_POST['mac_members_settings'] )
 			: array();
+
+		$role_errors = $this->settings->validate_roles( $submitted );
+
+		if ( array() !== $role_errors ) {
+			foreach ( $role_errors as $code => $message ) {
+				$this->add_settings_error( $code, $message );
+			}
+
+			return;
+		}
 
 		$this->settings->save( $submitted );
 

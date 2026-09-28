@@ -13,6 +13,7 @@ use MacMembers\Settings\SettingsController;
 use MacMembers\Settings\SettingsSchema;
 use MacMembers\Settings\WordPressSettingsRepository;
 use PHPUnit\Framework\Attributes\CoversClass;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 
 use function mac_members_tests_reset_wp_state;
@@ -88,6 +89,66 @@ final class SettingsControllerTest extends TestCase {
 		self::assertFalse( $settings['send_admin_approval_email'] );
 		self::assertTrue( $settings['send_admin_denial_email'] );
 		self::assertSame( 'settings_saved', $GLOBALS['mac_members_test_settings_errors'][0]['code'] );
+	}
+
+	/**
+	 * @param array<string,string> $roles Submitted roles.
+	 */
+	#[DataProvider( 'provide_role_submissions_that_are_not_allowed' )]
+	public function test_handle_save_shows_a_settings_error_and_saves_nothing_for_roles_that_are_not_allowed( array $roles, string $code, string $message ): void {
+		$_GET['page']              = MAC_MEMBERS_ADMIN_SLUG;
+		$_SERVER['REQUEST_METHOD'] = 'POST';
+		$_POST                     = array(
+			'mac_members_action'         => 'save_settings',
+			'mac_members_settings_nonce' => wp_create_nonce( SettingsController::NONCE_ACTION ),
+			'mac_members_settings'       => array_merge(
+				array(
+					'pending_role'  => 'member-pending',
+					'approved_role' => 'member',
+					'denied_role'   => 'member-invalid',
+					'from_email'    => 'from@example.test',
+				),
+				$roles
+			),
+		);
+
+		$this->create_controller()->handle_save();
+
+		self::assertArrayNotHasKey( MAC_MEMBERS_SETTINGS_OPTION, $GLOBALS['mac_members_test_options'] );
+		self::assertSame(
+			array(
+				array(
+					'setting' => MAC_MEMBERS_SETTINGS_OPTION,
+					'code'    => $code,
+					'message' => $message,
+					'type'    => 'error',
+				),
+			),
+			$GLOBALS['mac_members_test_settings_errors']
+		);
+	}
+
+	/**
+	 * @return array<string,array{0:array<string,string>,1:string,2:string}>
+	 */
+	public static function provide_role_submissions_that_are_not_allowed(): array {
+		return array(
+			'same role twice'         => array(
+				array( 'denied_role' => 'member' ),
+				'roles_not_distinct',
+				'The pending, approved and denied roles must be three different roles. The settings were not saved.',
+			),
+			'sensitive approved role' => array(
+				array( 'approved_role' => 'administrator' ),
+				'approved_role_sensitive',
+				'The approved role "Administrator" grants administrative capabilities (manage_options, edit_users, promote_users, unfiltered_html). Choose a role without them. The settings were not saved.',
+			),
+			'sensitive denied role'   => array(
+				array( 'denied_role' => 'administrator' ),
+				'denied_role_sensitive',
+				'The denied role "Administrator" grants administrative capabilities (manage_options, edit_users, promote_users, unfiltered_html). Choose a role without them. The settings were not saved.',
+			),
+		);
 	}
 
 	public function test_handle_save_rejects_invalid_nonce(): void {

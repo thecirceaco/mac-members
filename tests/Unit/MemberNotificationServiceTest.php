@@ -15,6 +15,7 @@ use MacMembers\Settings\WordPressSettingsRepository;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\TestCase;
 
+use function add_filter;
 use function mac_members_tests_reset_wp_state;
 
 #[CoversClass( MemberNotificationService::class )]
@@ -32,7 +33,7 @@ final class MemberNotificationServiceTest extends TestCase {
 
 		$user = $this->create_user(
 			array(
-				'first_name'   => 'Mia <Admin>',
+				'first_name'   => 'Mia & "Co" <Admin>',
 				'last_name'    => 'O\'Connor',
 				'display_name' => 'Mia Admin',
 			)
@@ -47,12 +48,72 @@ final class MemberNotificationServiceTest extends TestCase {
 
 		self::assertSame( 'pending@example.test', $mail['to'] );
 		self::assertSame( 'Your account has been approved', $mail['subject'] );
-		self::assertStringContainsString( 'Hi Mia &lt;Admin&gt;,', $mail['message'] );
+		// Tags are removed from the applicant's value, and what is left is still escaped.
+		self::assertStringContainsString( 'Hi Mia &amp; &quot;Co&quot;,', $mail['message'] );
 		self::assertStringContainsString( 'Your account has been approved and your membership is now active.', $mail['message'] );
 		self::assertStringContainsString( 'https://example.test/wp-login.php', $mail['message'] );
 		self::assertStringContainsString( 'Best,<br>', $mail['message'] );
 		self::assertStringContainsString( 'Example &lt;Site&gt;', $mail['message'] );
-		self::assertStringNotContainsString( 'Mia <Admin>', $mail['message'] );
+		self::assertStringNotContainsString( '<Admin>', $mail['message'] );
+		self::assertStringNotContainsString( '&lt;Admin&gt;', $mail['message'] );
+	}
+
+	public function test_applicant_values_cannot_add_lines_to_an_email(): void {
+		$user = $this->create_user(
+			array( 'first_name' => "Mia\r\n\r\nYour payment failed. Pay at https://pay.example.test\nThanks" )
+		);
+
+		$this->create_service()->send_approval_notifications( $user );
+
+		$message = $GLOBALS['mac_members_test_mail'][0]['message'];
+
+		self::assertStringContainsString( 'Hi Mia Your payment failed. Pay at https://pay.example.test Thanks,<br>', $message );
+		self::assertSame( substr_count( $this->render_plain_member_approval(), '<br>' ), substr_count( $message, '<br>' ) );
+		self::assertStringNotContainsString( "\r", $message );
+	}
+
+	public function test_line_breaks_are_removed_even_if_a_sanitize_filter_returns_them(): void {
+		add_filter(
+			'sanitize_text_field',
+			static fn ( string $filtered ): string => str_replace( 'Mia', "Mia\r\n\r\nExtra line", $filtered )
+		);
+
+		$this->create_service()->send_approval_notifications( $this->create_user() );
+
+		self::assertStringContainsString( 'Hi Mia Extra line,<br>', $GLOBALS['mac_members_test_mail'][0]['message'] );
+		self::assertStringNotContainsString( "\r", $GLOBALS['mac_members_test_mail'][0]['message'] );
+	}
+
+	public function test_admin_email_cleans_every_applicant_value(): void {
+		$user = $this->create_user(
+			array(
+				'ID'         => 42,
+				'first_name' => "Mia\nMember",
+				'last_name'  => "<b>Bold</b>\r\nLast",
+				'user_login' => "mia\tmember",
+			)
+		);
+
+		$this->create_service()->send_denial_notifications( $user );
+
+		$message = $GLOBALS['mac_members_test_mail'][1]['message'];
+
+		self::assertStringContainsString( "First Name: Mia Member<br>\nLast Name: Bold Last<br>\nUsername: mia member<br>\nEmail Address: pending@example.test<br>\nUser ID: 42<br>", $message );
+	}
+
+	public function test_applicant_values_are_capped_at_100_characters(): void {
+		$user = $this->create_user(
+			array(
+				'first_name' => str_repeat( 'a', 300 ),
+				'last_name'  => str_repeat( 'é', 150 ),
+			)
+		);
+
+		$this->create_service()->send_approval_notifications( $user );
+
+		self::assertStringContainsString( 'Hi ' . str_repeat( 'a', 100 ) . ',', $GLOBALS['mac_members_test_mail'][0]['message'] );
+		self::assertStringNotContainsString( str_repeat( 'a', 101 ), $GLOBALS['mac_members_test_mail'][0]['message'] );
+		self::assertStringContainsString( 'Last Name: ' . str_repeat( 'é', 100 ) . '<br>', $GLOBALS['mac_members_test_mail'][1]['message'] );
 	}
 
 	public function test_admin_approval_email_contains_member_fields_and_profile_url(): void {
@@ -182,6 +243,17 @@ final class MemberNotificationServiceTest extends TestCase {
 				$overrides
 			)
 		);
+	}
+
+	private function render_plain_member_approval(): string {
+		$GLOBALS['mac_members_test_mail'] = array();
+
+		$this->create_service()->send_approval_notifications( $this->create_user() );
+
+		$message                          = $GLOBALS['mac_members_test_mail'][0]['message'];
+		$GLOBALS['mac_members_test_mail'] = array();
+
+		return $message;
 	}
 
 	private function create_service(): MemberNotificationService {

@@ -11,28 +11,107 @@ if ( ! defined( 'ABSPATH' ) ) {
 	define( 'ABSPATH', dirname( __DIR__, 2 ) . '/' );
 }
 
+if ( ! defined( 'HOUR_IN_SECONDS' ) ) {
+	define( 'HOUR_IN_SECONDS', 3600 );
+}
+
+if ( ! class_exists( 'WP_Post' ) ) {
+	final class WP_Post {
+		public int $ID;
+		public string $post_content;
+
+		/**
+		 * @param array<string,mixed> $data Post data.
+		 */
+		public function __construct( array $data ) {
+			$this->ID           = (int) ( $data['ID'] ?? 0 );
+			$this->post_content = (string) ( $data['post_content'] ?? '' );
+		}
+	}
+}
+
+if ( ! class_exists( 'WP_Role' ) ) {
+	final class WP_Role {
+		public string $name;
+
+		/**
+		 * @var array<string,bool>
+		 */
+		public array $capabilities;
+
+		/**
+		 * @param array<string,bool> $capabilities Capabilities.
+		 */
+		public function __construct( string $role, array $capabilities ) {
+			$this->name         = $role;
+			$this->capabilities = $capabilities;
+		}
+
+		public function add_cap( string $cap, bool $grant = true ): void {
+			$this->capabilities[ $cap ] = $grant;
+
+			$GLOBALS['mac_members_test_roles'][ $this->name ]['capabilities'][ $cap ] = $grant;
+		}
+
+		public function remove_cap( string $cap ): void {
+			unset( $this->capabilities[ $cap ], $GLOBALS['mac_members_test_roles'][ $this->name ]['capabilities'][ $cap ] );
+		}
+
+		public function has_cap( string $cap ): bool {
+			return ! empty( $this->capabilities[ $cap ] );
+		}
+	}
+}
+
 if ( ! class_exists( 'WP_Roles' ) ) {
 	final class WP_Roles {
 		/**
 		 * Registered roles.
 		 *
-		 * @var array<string,array<string,string>>
+		 * @var array<string,array<string,mixed>>
 		 */
 		public array $roles = array();
 
 		/**
+		 * @var array<string,WP_Role>
+		 */
+		public array $role_objects = array();
+
+		/**
 		 * Create the roles object.
 		 *
-		 * @param array<string,array<string,string>> $roles Roles.
+		 * @param array<string,array<string,mixed>> $roles Roles.
 		 */
 		public function __construct( array $roles ) {
 			$this->roles = $roles;
+
+			foreach ( $roles as $slug => $role ) {
+				$this->role_objects[ $slug ] = new WP_Role( (string) $slug, (array) ( $role['capabilities'] ?? array() ) );
+			}
+		}
+
+		public function is_role( string $role ): bool {
+			return isset( $this->roles[ $role ] );
+		}
+
+		public function get_role( string $role ): ?WP_Role {
+			return $this->role_objects[ $role ] ?? null;
 		}
 	}
 }
 
 if ( ! class_exists( 'MacMembers_Test_Ajax_Exit' ) ) {
+	/**
+	 * Thrown by the wp_send_json_*() stubs, where WordPress would exit.
+	 */
 	final class MacMembers_Test_Ajax_Exit extends RuntimeException {}
+}
+
+if ( ! class_exists( 'MacMembers_Test_Request_Ended' ) ) {
+	/**
+	 * Thrown by the end_request closure that tests give the action controller.
+	 */
+	final class MacMembers_Test_Request_Ended extends RuntimeException {}
 }
 
 if ( ! class_exists( 'WP_User' ) ) {
@@ -61,6 +140,18 @@ if ( ! class_exists( 'WP_User' ) ) {
 		private bool $can_update_roles;
 
 		/**
+		 * Roles add_role() silently fails to add, like a write that did not happen.
+		 *
+		 * @var array<int,string>
+		 */
+		private array $blocked_roles;
+
+		/**
+		 * Whether role changes reach the stored roles that get_user_by() reads.
+		 */
+		private bool $persist_roles;
+
+		/**
 		 * @param array<string,mixed> $data User data.
 		 */
 		public function __construct( array $data ) {
@@ -73,6 +164,12 @@ if ( ! class_exists( 'WP_User' ) ) {
 			$this->data            = $data;
 			$this->caps            = array_map( 'boolval', $data['caps'] ?? array() );
 			$this->can_update_roles = (bool) ( $data['can_update_roles'] ?? true );
+			$this->blocked_roles    = array_values( array_map( 'strval', $data['blocked_roles'] ?? array() ) );
+			$this->persist_roles    = (bool) ( $data['persist_roles'] ?? true );
+
+			if ( 0 < $this->ID ) {
+				$GLOBALS['mac_members_test_user_roles'][ $this->ID ] = $this->roles;
+			}
 		}
 
 		public function get( string $key ): mixed {
@@ -80,14 +177,19 @@ if ( ! class_exists( 'WP_User' ) ) {
 		}
 
 		public function add_role( string $role ): void {
-			if ( ! $this->can_update_roles || in_array( $role, $this->roles, true ) ) {
+			$GLOBALS['mac_members_test_role_changes'][] = array( 'add', $this->ID, $role );
+
+			if ( ! $this->can_update_roles || in_array( $role, $this->roles, true ) || in_array( $role, $this->blocked_roles, true ) ) {
 				return;
 			}
 
 			$this->roles[] = $role;
+			$this->store_roles();
 		}
 
 		public function remove_role( string $role ): void {
+			$GLOBALS['mac_members_test_role_changes'][] = array( 'remove', $this->ID, $role );
+
 			if ( ! $this->can_update_roles ) {
 				return;
 			}
@@ -98,10 +200,160 @@ if ( ! class_exists( 'WP_User' ) ) {
 					static fn ( string $current_role ): bool => $current_role !== $role
 				)
 			);
+			$this->store_roles();
+		}
+
+		/**
+		 * Replaces the roles in memory with the stored roles, as a fresh read from the database would.
+		 */
+		public function reload_roles(): void {
+			if ( isset( $GLOBALS['mac_members_test_user_roles'][ $this->ID ] ) ) {
+				$this->roles = $GLOBALS['mac_members_test_user_roles'][ $this->ID ];
+			}
+		}
+
+		private function store_roles(): void {
+			if ( $this->persist_roles ) {
+				$GLOBALS['mac_members_test_user_roles'][ $this->ID ] = $this->roles;
+			}
 		}
 
 		public function has_cap( string $capability ): bool {
 			return (bool) ( $this->caps[ $capability ] ?? false );
+		}
+	}
+}
+
+if ( ! class_exists( 'MacMembers_Test_Wpdb' ) ) {
+	/**
+	 * Enough of wpdb for the member lock: an options table whose option_name is unique, as in MySQL.
+	 * Any other query throws, so a test notices when the plugin sends SQL this fake does not know.
+	 */
+	final class MacMembers_Test_Wpdb {
+		public string $options = 'wp_options';
+
+		/**
+		 * Rows of the options table written through queries, by option_name.
+		 *
+		 * @var array<string,string>
+		 */
+		public array $rows = array();
+
+		/**
+		 * @var array<int,string>
+		 */
+		public array $queries = array();
+
+		/**
+		 * When true, the next query fails like a database error.
+		 */
+		public bool $fail_next_query = false;
+
+		public function prepare( string $query, mixed ...$args ): string {
+			return vsprintf(
+				$query,
+				array_map(
+					static fn ( mixed $arg ): string => "'" . addslashes( (string) $arg ) . "'",
+					$args
+				)
+			);
+		}
+
+		public function esc_like( string $text ): string {
+			return addcslashes( $text, '_%\\' );
+		}
+
+		public function query( string $query ): int|false {
+			$this->queries[] = $query;
+
+			if ( $this->fail_next_query ) {
+				$this->fail_next_query = false;
+
+				return false;
+			}
+
+			$values = $this->get_quoted_values( $query );
+
+			if ( str_starts_with( $query, "INSERT IGNORE INTO {$this->options} (option_name, option_value, autoload) VALUES (" ) ) {
+				if ( isset( $this->rows[ $values[0] ] ) ) {
+					return 0;
+				}
+
+				$this->rows[ $values[0] ] = $values[1];
+
+				// Lets a test change data at the moment a lock is taken, as a concurrent request could.
+				if ( is_callable( $GLOBALS['mac_members_test_after_lock_insert'] ?? null ) ) {
+					( $GLOBALS['mac_members_test_after_lock_insert'] )( $values[0] );
+				}
+
+				return 1;
+			}
+
+			if ( str_starts_with( $query, "DELETE FROM {$this->options} WHERE option_name = " ) && str_contains( $query, ' AND option_value = ' ) ) {
+				if ( ( $this->rows[ $values[0] ] ?? null ) !== $values[1] ) {
+					return 0;
+				}
+
+				unset( $this->rows[ $values[0] ] );
+
+				return 1;
+			}
+
+			if ( str_starts_with( $query, "DELETE FROM {$this->options} WHERE option_name LIKE " ) ) {
+				$pattern = $this->like_to_regex( $values[0] );
+				$deleted = 0;
+
+				foreach ( array_keys( $this->rows ) as $name ) {
+					if ( 1 === preg_match( $pattern, $name ) ) {
+						unset( $this->rows[ $name ] );
+						++$deleted;
+					}
+				}
+
+				return $deleted;
+			}
+
+			throw new RuntimeException( 'Unexpected query: ' . $query );
+		}
+
+		public function get_var( string $query ): ?string {
+			$this->queries[] = $query;
+
+			if ( str_starts_with( $query, "SELECT option_value FROM {$this->options} WHERE option_name = " ) ) {
+				return $this->rows[ $this->get_quoted_values( $query )[0] ] ?? null;
+			}
+
+			throw new RuntimeException( 'Unexpected query: ' . $query );
+		}
+
+		/**
+		 * @return array<int,string>
+		 */
+		private function get_quoted_values( string $query ): array {
+			preg_match_all( "/'((?:[^'\\\\]|\\\\.)*)'/", $query, $matches );
+
+			return array_map( 'stripslashes', $matches[1] );
+		}
+
+		private function like_to_regex( string $pattern ): string {
+			$regex  = '';
+			$length = strlen( $pattern );
+
+			for ( $i = 0; $i < $length; $i++ ) {
+				$char = $pattern[ $i ];
+
+				if ( '\\' === $char && $i + 1 < $length ) {
+					$regex .= preg_quote( $pattern[ ++$i ], '/' );
+				} elseif ( '%' === $char ) {
+					$regex .= '.*';
+				} elseif ( '_' === $char ) {
+					$regex .= '.';
+				} else {
+					$regex .= preg_quote( $char, '/' );
+				}
+			}
+
+			return '/^' . $regex . '$/s';
 		}
 	}
 }
@@ -148,16 +400,48 @@ function mac_members_tests_reset_wp_state(): void {
 		'name' => 'Example Site',
 	);
 	$GLOBALS['mac_members_test_roles']            = array(
-		'administrator'  => array( 'name' => 'Administrator' ),
-		'member-pending' => array( 'name' => 'Member Pending' ),
-		'member'         => array( 'name' => 'Member' ),
-		'member-invalid' => array( 'name' => 'Member Invalid' ),
-		'subscriber'     => array( 'name' => 'Subscriber' ),
+		'administrator'  => array(
+			'name'         => 'Administrator',
+			'capabilities' => array(
+				'read'            => true,
+				'manage_options'  => true,
+				'edit_users'      => true,
+				'promote_users'   => true,
+				'unfiltered_html' => true,
+			),
+		),
+		'member-pending' => array(
+			'name'         => 'Member Pending',
+			'capabilities' => array( 'read' => true ),
+		),
+		'member'         => array(
+			'name'         => 'Member',
+			'capabilities' => array( 'read' => true ),
+		),
+		'member-invalid' => array(
+			'name'         => 'Member Invalid',
+			'capabilities' => array( 'read' => true ),
+		),
+		'subscriber'     => array(
+			'name'         => 'Subscriber',
+			'capabilities' => array( 'read' => true ),
+		),
 	);
 	$GLOBALS['mac_members_test_current_user_caps'] = array(
-		'manage_options' => true,
-		'promote_users'  => true,
+		'manage_options'     => true,
+		'promote_users'      => true,
+		'mac_members_review' => true,
 	);
+	// Capabilities checked for one object, such as current_user_can( 'promote_user', 12 ), keyed by capability and ID.
+	$GLOBALS['mac_members_test_current_user_object_caps'] = array();
+	$GLOBALS['mac_members_test_uninstall_hooks']          = array();
+	$GLOBALS['mac_members_test_doing_it_wrong']           = array();
+	$GLOBALS['mac_members_test_session_token']            = 'session-one';
+	$GLOBALS['mac_members_test_is_singular']              = false;
+	$GLOBALS['mac_members_test_queried_object']           = null;
+	$GLOBALS['mac_members_test_nocache_headers_calls']    = 0;
+	$GLOBALS['mac_members_test_after_lock_insert']        = null;
+	$GLOBALS['wpdb']                                      = new MacMembers_Test_Wpdb();
 	$GLOBALS['mac_members_test_options_pages']     = array();
 	$GLOBALS['mac_members_test_settings_errors']   = array();
 	$GLOBALS['mac_members_test_nonces']            = array();
@@ -165,6 +449,8 @@ function mac_members_tests_reset_wp_state(): void {
 	$GLOBALS['mac_members_test_shortcodes']        = array();
 	$GLOBALS['mac_members_test_users']             = array();
 	$GLOBALS['mac_members_test_users_by_id']       = array();
+	$GLOBALS['mac_members_test_user_roles']        = array();
+	$GLOBALS['mac_members_test_cleaned_user_cache'] = array();
 	$GLOBALS['mac_members_test_last_user_query']   = null;
 	$GLOBALS['mac_members_test_registered_styles'] = array();
 	$GLOBALS['mac_members_test_registered_scripts'] = array();
@@ -173,12 +459,17 @@ function mac_members_tests_reset_wp_state(): void {
 	$GLOBALS['mac_members_test_inline_scripts']     = array();
 	$GLOBALS['mac_members_test_current_user_id']    = 1;
 	$GLOBALS['mac_members_test_ajax_response']      = null;
+	$GLOBALS['mac_members_test_ajax_responses']     = array();
+	$GLOBALS['mac_members_test_ajax_send_exits']    = true;
+	$GLOBALS['mac_members_test_ajax_referer_checks'] = array();
+	$GLOBALS['mac_members_test_role_changes']       = array();
 	$GLOBALS['mac_members_test_mail']               = array();
 	$GLOBALS['mac_members_test_mail_fail_next']     = 0;
 
-	$_GET    = array();
-	$_POST   = array();
-	$_SERVER = array(
+	$_GET     = array();
+	$_POST    = array();
+	$_REQUEST = array();
+	$_SERVER  = array(
 		'REQUEST_METHOD' => 'GET',
 	);
 
@@ -219,7 +510,18 @@ function apply_filters( string $hook_name, mixed $value, mixed ...$args ): mixed
 }
 
 function register_activation_hook( string $file, callable $callback ): void {
-	$GLOBALS['mac_members_test_activation_hooks'][ $file ] = $callback;
+	$GLOBALS['mac_members_test_activation_hooks'][ $file ][] = $callback;
+}
+
+function register_uninstall_hook( string $file, callable $callback ): void {
+	// Like WordPress, which stores the callback in an option: object methods are refused.
+	if ( is_array( $callback ) && is_object( $callback[0] ) ) {
+		$GLOBALS['mac_members_test_doing_it_wrong'][] = 'register_uninstall_hook';
+
+		return;
+	}
+
+	$GLOBALS['mac_members_test_uninstall_hooks'][ $file ] = $callback;
 }
 
 function get_option( string $option, mixed $default_value = false ): mixed {
@@ -248,6 +550,17 @@ function wp_roles(): WP_Roles {
 	return new WP_Roles( $GLOBALS['mac_members_test_roles'] ?? array() );
 }
 
+function get_role( string $role ): ?WP_Role {
+	return wp_roles()->get_role( $role );
+}
+
+/**
+ * @return array<string,array<string,mixed>>
+ */
+function get_editable_roles(): array {
+	return apply_filters( 'editable_roles', $GLOBALS['mac_members_test_roles'] ?? array() );
+}
+
 function sanitize_key( string $key ): string {
 	$key = strtolower( $key );
 
@@ -255,11 +568,12 @@ function sanitize_key( string $key ): string {
 }
 
 function sanitize_text_field( mixed $value ): string {
-	$value = (string) $value;
-	$value = preg_replace( '/[\r\n\t]+/', ' ', $value ) ?? '';
-	$value = trim( strip_tags( $value ) );
+	$original = (string) $value;
+	$value    = strip_tags( $original );
+	// Like WordPress: line breaks, tabs and runs of spaces become one space.
+	$value = preg_replace( '/[\r\n\t ]+/', ' ', $value ) ?? '';
 
-	return $value;
+	return (string) apply_filters( 'sanitize_text_field', trim( $value ), $original );
 }
 
 function sanitize_email( mixed $email ): string {
@@ -302,7 +616,16 @@ function esc_attr__( string $text, string $domain = 'default' ): string {
 	return esc_attr( __( $text, $domain ) );
 }
 
-function current_user_can( string $capability ): bool {
+function current_user_can( string $capability, mixed ...$args ): bool {
+	if ( isset( $args[0] ) && isset( $GLOBALS['mac_members_test_current_user_object_caps'][ $capability ][ (int) $args[0] ] ) ) {
+		return (bool) $GLOBALS['mac_members_test_current_user_object_caps'][ $capability ][ (int) $args[0] ];
+	}
+
+	// map_meta_cap() maps promote_user to promote_users.
+	if ( 'promote_user' === $capability ) {
+		$capability = 'promote_users';
+	}
+
 	return (bool) ( $GLOBALS['mac_members_test_current_user_caps'][ $capability ] ?? false );
 }
 
@@ -319,7 +642,23 @@ function get_user_by( string $field, mixed $value ): WP_User|false {
 		return false;
 	}
 
-	return $GLOBALS['mac_members_test_users_by_id'][ (int) $value ] ?? false;
+	$user = $GLOBALS['mac_members_test_users_by_id'][ (int) $value ] ?? false;
+
+	if ( $user instanceof WP_User ) {
+		$user->reload_roles();
+	}
+
+	return $user;
+}
+
+function clean_user_cache( WP_User|int $user ): void {
+	$GLOBALS['mac_members_test_cleaned_user_cache'][] = $user instanceof WP_User ? $user->ID : $user;
+}
+
+function wp_cache_delete( int|string $key, string $group = '' ): bool {
+	unset( $key, $group );
+
+	return true;
 }
 
 function user_can( mixed $user, string $capability ): bool {
@@ -369,6 +708,32 @@ function settings_errors( string $setting = '' ): void {
 
 		echo '<div class="' . esc_attr( $error['type'] ) . '"><p>' . esc_html( $error['message'] ) . '</p></div>';
 	}
+}
+
+function wp_salt( string $scheme = 'auth' ): string {
+	return 'test-salt-' . $scheme;
+}
+
+function wp_get_session_token(): string {
+	return (string) ( $GLOBALS['mac_members_test_session_token'] ?? '' );
+}
+
+function is_singular( string|array $post_types = '' ): bool {
+	unset( $post_types );
+
+	return (bool) ( $GLOBALS['mac_members_test_is_singular'] ?? false );
+}
+
+function get_queried_object(): ?object {
+	return $GLOBALS['mac_members_test_queried_object'] ?? null;
+}
+
+function has_shortcode( string $content, string $tag ): bool {
+	return 1 === preg_match( '/\[' . preg_quote( $tag, '/' ) . '[\s\]\/]/', $content );
+}
+
+function nocache_headers(): void {
+	++$GLOBALS['mac_members_test_nocache_headers_calls'];
 }
 
 function wp_create_nonce( string $action ): string {
@@ -469,28 +834,71 @@ function wp_json_encode( mixed $data, int $options = 0, int $depth = 512 ): stri
 	return json_encode( $data, $options, $depth );
 }
 
+/**
+ * Records a JSON response. WordPress exits after sending it; the stub throws instead, or, when
+ * $GLOBALS['mac_members_test_ajax_send_exits'] is false, returns like a wp_die handler that does not exit.
+ *
+ * @param array{success:bool,data:mixed,status:int} $response Response.
+ */
+function mac_members_tests_send_json( array $response ): void {
+	$GLOBALS['mac_members_test_ajax_response']     = $response;
+	$GLOBALS['mac_members_test_ajax_responses'][] = $response;
+
+	if ( $GLOBALS['mac_members_test_ajax_send_exits'] ?? true ) {
+		throw new MacMembers_Test_Ajax_Exit();
+	}
+}
+
 function wp_send_json_success( mixed $data = null, ?int $status_code = null, int $flags = 0 ): void {
 	unset( $flags );
 
-	$GLOBALS['mac_members_test_ajax_response'] = array(
-		'success' => true,
-		'data'    => $data,
-		'status'  => $status_code ?? 200,
+	mac_members_tests_send_json(
+		array(
+			'success' => true,
+			'data'    => $data,
+			'status'  => $status_code ?? 200,
+		)
 	);
-
-	throw new MacMembers_Test_Ajax_Exit();
 }
 
 function wp_send_json_error( mixed $data = null, ?int $status_code = null, int $flags = 0 ): void {
 	unset( $flags );
 
-	$GLOBALS['mac_members_test_ajax_response'] = array(
-		'success' => false,
-		'data'    => $data,
-		'status'  => $status_code ?? 400,
+	mac_members_tests_send_json(
+		array(
+			'success' => false,
+			'data'    => $data,
+			'status'  => $status_code ?? 400,
+		)
+	);
+}
+
+function check_ajax_referer( int|string $action = -1, string|false $query_arg = false, bool $stop = true ): int|false {
+	$GLOBALS['mac_members_test_ajax_referer_checks'][] = array(
+		'action'    => $action,
+		'query_arg' => $query_arg,
+		'stop'      => $stop,
 	);
 
-	throw new MacMembers_Test_Ajax_Exit();
+	// Same lookup order as WordPress: the named argument, then _ajax_nonce, then _wpnonce, from $_REQUEST.
+	$nonce = '';
+
+	if ( $query_arg && isset( $_REQUEST[ $query_arg ] ) ) {
+		$nonce = (string) $_REQUEST[ $query_arg ];
+	} elseif ( isset( $_REQUEST['_ajax_nonce'] ) ) {
+		$nonce = (string) $_REQUEST['_ajax_nonce'];
+	} elseif ( isset( $_REQUEST['_wpnonce'] ) ) {
+		$nonce = (string) $_REQUEST['_wpnonce'];
+	}
+
+	$result = wp_verify_nonce( $nonce, (string) $action );
+
+	if ( $stop && false === $result ) {
+		// WordPress calls wp_die( -1, 403 ) here.
+		throw new MacMembers_Test_Ajax_Exit();
+	}
+
+	return $result;
 }
 
 function wp_mail(

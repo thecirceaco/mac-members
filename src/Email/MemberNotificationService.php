@@ -11,12 +11,21 @@ namespace MacMembers\Email;
 
 use MacMembers\Settings\SettingsRepositoryInterface;
 
+if ( ! defined( 'ABSPATH' ) ) {
+	exit; // Exit if accessed directly.
+}
+
 final class MemberNotificationService
 {
 	private const BODY_MEMBER_APPROVAL = "Hi {first_name},\n\nYour account has been approved and your membership is now active. You can now log in and access your account.\n\n{login_url}\n\nBest,\n{site_name}";
 	private const BODY_MEMBER_DENIAL = "Hi {first_name},\n\nYour account request has been reviewed and was not approved at this time.\n\nIf you believe this was a mistake, please contact us for assistance.\n\nBest,\n{site_name}";
 	private const BODY_ADMIN_APPROVAL = "Hi,\n\nA pending member account has been approved on {site_name}.\n\nFirst Name: {first_name}\nLast Name: {last_name}\nUsername: {username}\nEmail Address: {email}\nUser ID: {user_id}\nProfile: {profile_url}\n\nBest,\n{site_name}";
 	private const BODY_ADMIN_DENIAL = "Hi,\n\nA pending member account has been denied on {site_name}.\n\nFirst Name: {first_name}\nLast Name: {last_name}\nUsername: {username}\nEmail Address: {email}\nUser ID: {user_id}\nProfile: {profile_url}\n\nBest,\n{site_name}";
+
+	/**
+	 * Longest value, in characters, that an applicant can put into an email through a placeholder.
+	 */
+	private const MAX_USER_VALUE_LENGTH = 100;
 
 	public function __construct(
 		private readonly SettingsRepositoryInterface $settings
@@ -135,15 +144,28 @@ final class MemberNotificationService
 
 		return array(
 			'{site_name}'    => $this->get_site_name(),
-			'{first_name}'   => $this->get_user_value( $user, 'first_name' ),
-			'{last_name}'    => $this->get_user_value( $user, 'last_name' ),
-			'{display_name}' => $this->get_user_value( $user, 'display_name' ),
-			'{username}'     => $this->get_user_value( $user, 'user_login' ),
-			'{email}'        => $this->get_user_email( $user ),
+			'{first_name}'   => $this->clean_user_value( $this->get_user_value( $user, 'first_name' ) ),
+			'{last_name}'    => $this->clean_user_value( $this->get_user_value( $user, 'last_name' ) ),
+			'{display_name}' => $this->clean_user_value( $this->get_user_value( $user, 'display_name' ) ),
+			'{username}'     => $this->clean_user_value( $this->get_user_value( $user, 'user_login' ) ),
+			'{email}'        => $this->clean_user_value( $this->get_user_email( $user ) ),
 			'{user_id}'      => (string) $user_id,
 			'{login_url}'    => \wp_login_url(),
 			'{profile_url}'  => \admin_url( 'user-edit.php?user_id=' . $user_id ),
 		);
+	}
+
+	/**
+	 * Cleans a value the applicant controls before it goes into a template: no tags, no line breaks, no more
+	 * than MAX_USER_VALUE_LENGTH characters. The rendered body is still escaped as a whole.
+	 */
+	private function clean_user_value( string $value ): string
+	{
+		$value = \sanitize_text_field( $value );
+		// After sanitize_text_field(), so a filter on it cannot bring line breaks back.
+		$value = (string) preg_replace( '/[\r\n]+/', ' ', $value );
+
+		return trim( mb_substr( $value, 0, self::MAX_USER_VALUE_LENGTH ) );
 	}
 
 	private function get_admin_email(): string
