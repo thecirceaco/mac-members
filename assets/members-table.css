@@ -1,13 +1,14 @@
 /*
- * MAC Members table. Every color, border, radius, space and text size is an Automatic.css token, and every
- * button is an ACSS button, so the table follows each site's ACSS settings. It needs ACSS with the status
- * colors (success, danger, warning and info) and the neutral color turned on.
+ * MAC Members table. Every color, border and radius is an Automatic.css token, and every button is an ACSS
+ * button, so the table follows each site's ACSS settings. Spacing inside the table is in em and ch, because
+ * the ACSS space tokens are too large at this size. It needs ACSS with the status colors (success, danger,
+ * warning and info) and the neutral color turned on.
  */
 
 .mac-members-table {
 	display: flex;
 	flex-direction: column;
-	gap: var(--space-s);
+	gap: 1em;
 	inline-size: 100%;
 }
 
@@ -17,8 +18,8 @@
 
 .mac-members-notice {
 	margin: 0;
-	padding-block: var(--space-xs);
-	padding-inline: var(--space-s);
+	padding-block: 0.75em;
+	padding-inline: 1em;
 	border: var(--border-size) var(--border-style) var(--info);
 	border-radius: var(--radius);
 	background: var(--info-ultra-light);
@@ -46,7 +47,7 @@
 .mac-members-filters ul {
 	display: flex;
 	flex-wrap: wrap;
-	gap: var(--space-xs);
+	gap: 1ch;
 	margin: 0;
 	padding: 0;
 	list-style: none;
@@ -55,34 +56,46 @@
 /* ACSS gives buttons a minimum width. The filters only take the width of their text, as ACSS does for its skip link. */
 .mac-members-filter {
 	--btn-min-width: fit-content;
-	gap: var(--space-xs);
+	gap: 0.75ch;
 }
 
+/*
+ * ACSS styles form fields only for WS Form, so the role filter and the search use the tokens ACSS gives WS
+ * Form fields: the border, the radius, the field background and the text font and color.
+ */
 .mac-members-search {
 	display: flex;
 	flex-wrap: wrap;
-	align-items: end;
-	gap: var(--space-s);
+	gap: 1ch;
 }
 
-.mac-members-search__field {
-	display: flex;
-	flex-direction: column;
-	gap: var(--space-xs);
-	font-size: var(--text-s);
-}
-
-.mac-members-search__field select,
-.mac-members-search__field input {
-	padding-block: var(--space-xs);
-	padding-inline: var(--space-s);
+.mac-members-search__role,
+.mac-members-search__input {
+	padding-block: 0.5em;
+	padding-inline: 0.75em;
 	border: var(--border);
 	border-radius: var(--radius);
-	font: inherit;
+	background-color: var(--white);
+	color: var(--text-dark);
+	font-family: var(--text-font-family);
+	font-size: var(--text-m);
+	line-height: var(--text-line-height);
 }
 
+.mac-members-search__input {
+	flex: 1 1 auto;
+	appearance: none;
+}
+
+.mac-members-search__input::placeholder {
+	color: var(--text-dark-muted);
+}
+
+/* The wrapper draws the outer border and rounds the corners, and the cells only draw the lines between them. */
 .mac-members-table-wrap {
 	overflow-x: auto;
+	border: var(--border);
+	border-radius: var(--card-radius, var(--radius));
 }
 
 .mac-members-list {
@@ -93,44 +106,62 @@
 
 .mac-members-list th,
 .mac-members-list td {
-	padding-block: var(--space-xs);
-	padding-inline: var(--space-s);
-	border: var(--border);
+	padding-block: 0.5em;
+	padding-inline: 1em;
+	border-block-end: var(--border);
+	border-inline-end: var(--border);
 	text-align: start;
 	vertical-align: middle;
 }
 
+.mac-members-list tr > :last-child {
+	border-inline-end: 0;
+}
+
+.mac-members-list tbody tr:last-child > * {
+	border-block-end: 0;
+}
+
 .mac-members-list th {
-	background: var(--base-ultra-light);
-	color: var(--text-dark);
+	background-color: var(--bg-light);
+	color: var(--bg-light-text);
 	white-space: nowrap;
+}
+
+/* Striped rows: every second row is --bg-ultra-light. Only the header is --bg-light. */
+.mac-members-list tbody tr:nth-child(even) {
+	background-color: var(--bg-ultra-light);
+	color: var(--bg-ultra-light-text);
 }
 
 .mac-members-status__label {
 	display: inline-block;
-	padding-inline: var(--space-xs);
+	padding-block: 0.25ch;
+	padding-inline: 0.75ch;
 	border-radius: var(--radius);
+	font-weight: 700;
 	white-space: nowrap;
 }
 
 .mac-members-status__label--pending {
 	background: var(--warning-ultra-light);
-	color: var(--warning-ultra-dark);
+	color: var(--warning-semi-dark);
 }
 
 .mac-members-status__label--approved {
 	background: var(--success-ultra-light);
-	color: var(--success-ultra-dark);
+	color: var(--success-semi-dark);
 }
 
+/* Neutral light, because the striped rows use --bg-ultra-light, which is neutral ultra-light by default. */
 .mac-members-status__label--inactive {
-	background: var(--neutral-ultra-light);
-	color: var(--neutral-ultra-dark);
+	background: var(--neutral-light);
+	color: var(--neutral-semi-dark);
 }
 
 .mac-members-status__label--denied {
 	background: var(--danger-ultra-light);
-	color: var(--danger-ultra-dark);
+	color: var(--danger-semi-dark);
 }
 
 .mac-members-actions {
@@ -138,7 +169,21 @@
 }
 
 .mac-members-actions > .mac-members-button + .mac-members-button {
-	margin-inline-start: var(--space-xs);
+	margin-inline-start: 1ch;
+}
+
+/*
+ * ACSS keeps its btn-- classes in a cascade layer, and any rule outside a layer beats them. ACSS's own reset
+ * `input, button, textarea, select { font: inherit; }` is outside, so a button loses the ACSS button font
+ * while a link with the same classes keeps it. Theme resets outside a layer can do the same to the background,
+ * border and color. revert-layer drops those rules for the table buttons, so the ACSS button styles apply,
+ * hover included.
+ */
+.mac-members-button {
+	background: revert-layer;
+	border: revert-layer;
+	color: revert-layer;
+	font: revert-layer;
 }
 
 .mac-members-button:disabled {
@@ -156,16 +201,17 @@
 
 .mac-members-empty {
 	margin: 0;
-	padding: var(--space-s);
+	padding-block: 0.75em;
+	padding-inline: 1em;
 	border: var(--border);
-	border-radius: var(--radius);
-	background: var(--base-ultra-light);
-	color: var(--text-dark);
+	border-radius: var(--card-radius, var(--radius));
+	background: var(--bg-ultra-light);
+	color: var(--bg-ultra-light-text);
 }
 
 .mac-members-pagination {
 	display: flex;
 	flex-wrap: wrap;
 	align-items: center;
-	gap: var(--space-s);
+	gap: 1ch;
 }

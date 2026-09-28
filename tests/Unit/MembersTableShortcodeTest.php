@@ -118,7 +118,7 @@ final class MembersTableShortcodeTest extends TestCase {
 
 		self::assertStringContainsString( 'data-mac-members-view="pending"', $output );
 		self::assertStringContainsString( 'aria-label="Member status"', $output );
-		self::assertStringContainsString( '<a class="mac-members-filter btn--primary is-current btn--s" href="/members/?tab=x&amp;mac_members_status=pending" aria-current="page">Pending <span class="mac-members-count" data-mac-members-count-for="pending">2</span></a>', $output );
+		self::assertStringContainsString( '<a class="mac-members-filter btn--neutral is-current btn--s" href="/members/?tab=x&amp;mac_members_status=pending" aria-current="page">Pending <span class="mac-members-count" data-mac-members-count-for="pending">2</span></a>', $output );
 		self::assertStringContainsString( 'href="/members/?tab=x&amp;mac_members_status=approved">Approved <span class="mac-members-count" data-mac-members-count-for="approved">1</span>', $output );
 		self::assertStringContainsString( 'data-mac-members-count-for="inactive">0</span>', $output );
 		self::assertStringContainsString( 'data-mac-members-count-for="denied">1</span>', $output );
@@ -195,7 +195,7 @@ final class MembersTableShortcodeTest extends TestCase {
 
 		self::assertStringContainsString( 'class="mac-members-button mac-members-button--approve btn--success btn--s"', $output );
 		self::assertStringContainsString( 'class="mac-members-button mac-members-button--deny btn--danger btn--s"', $output );
-		self::assertStringContainsString( 'class="mac-members-filter btn--primary btn--outline btn--s" href="/?mac_members_status=approved"', $output );
+		self::assertStringContainsString( 'class="mac-members-filter btn--neutral btn--outline btn--s" href="/?mac_members_status=approved"', $output );
 	}
 
 	public function test_unknown_status_query_argument_falls_back_to_pending(): void {
@@ -242,7 +242,7 @@ final class MembersTableShortcodeTest extends TestCase {
 		$first = $this->create_shortcode()->render();
 
 		self::assertStringContainsString( '<span class="mac-members-page-count">Page 1 of 2</span>', $first );
-		self::assertStringContainsString( '<a class="mac-members-page-link btn--primary btn--outline btn--s" href="/members/?mac_members_status=approved&amp;mac_members_page=2">Next</a>', $first );
+		self::assertStringContainsString( '<a class="mac-members-page-link btn--neutral btn--outline btn--s" href="/members/?mac_members_status=approved&amp;mac_members_page=2">Next</a>', $first );
 		self::assertStringNotContainsString( '>Previous</a>', $first );
 
 		$_GET['mac_members_page'] = '2';
@@ -282,7 +282,9 @@ final class MembersTableShortcodeTest extends TestCase {
 		self::assertStringContainsString( 'href="/members/?mac_members_status=pending&amp;mac_members_role=officer">Pending <span class="mac-members-count" data-mac-members-count-for="pending">1</span>', $output );
 		self::assertStringContainsString( 'data-mac-members-count-for="approved">1</span>', $output );
 		self::assertStringContainsString( 'data-mac-members-count-for="all">2</span>', $output );
-		self::assertStringContainsString( '<a class="mac-members-search__clear btn--primary btn--outline btn--s" href="/members/?mac_members_status=approved">Clear</a>', $output );
+		// Choosing a role sends the form, so the dropdown needs no button next to it.
+		self::assertStringContainsString( '<select class="mac-members-search__role" name="mac_members_role" aria-label="Role" data-mac-members-role-filter>', $output );
+		self::assertStringNotContainsString( '<button type="submit"', $output );
 	}
 
 	public function test_role_that_is_not_offered_is_ignored(): void {
@@ -301,8 +303,7 @@ final class MembersTableShortcodeTest extends TestCase {
 		self::assertStringContainsString( 'data-mac-members-user-id="2"', $output );
 		// No member holds a role the filter offers, so only the search shows.
 		self::assertStringNotContainsString( '<select', $output );
-		self::assertStringContainsString( '<input type="search" name="mac_members_search" value=""', $output );
-		self::assertStringNotContainsString( 'mac-members-search__clear', $output );
+		self::assertStringContainsString( '<input class="mac-members-search__input" type="search" name="mac_members_search" value=""', $output );
 	}
 
 	public function test_search_narrows_the_view_and_the_counts_and_stays_in_the_links(): void {
@@ -333,7 +334,7 @@ final class MembersTableShortcodeTest extends TestCase {
 		self::assertStringContainsString( 'data-mac-members-count-for="approved">1</span>', $output );
 		self::assertStringContainsString( 'data-mac-members-count-for="all">1</span>', $output );
 		self::assertStringContainsString( 'href="/?mac_members_status=pending&amp;mac_members_search=test+doi"', $output );
-		self::assertStringContainsString( '<input type="search" name="mac_members_search" value="test doi" maxlength="100" placeholder="Name, email or username">', $output );
+		self::assertStringContainsString( '<input class="mac-members-search__input" type="search" name="mac_members_search" value="test doi" maxlength="100" placeholder="Search by name, email or username" aria-label="Search members">', $output );
 	}
 
 	public function test_links_encode_the_search(): void {
@@ -354,7 +355,6 @@ final class MembersTableShortcodeTest extends TestCase {
 
 		self::assertStringContainsString( '<p class="mac-members-empty">No members match these filters.</p>', $output );
 		self::assertStringContainsString( 'data-mac-members-count-for="all">0</span>', $output );
-		self::assertStringContainsString( '<a class="mac-members-search__clear btn--primary btn--outline btn--s" href="/?mac_members_status=pending">Clear</a>', $output );
 	}
 
 	public function test_form_sends_the_page_query_arguments_and_the_view(): void {
@@ -363,8 +363,9 @@ final class MembersTableShortcodeTest extends TestCase {
 
 		$output = $this->create_shortcode()->render();
 
-		self::assertStringContainsString( '<form class="mac-members-search" method="get" action="/" role="search" aria-label="Filter members"><input type="hidden" name="page_id" value="5"><input type="hidden" name="mac_members_status" value="denied"><label class="mac-members-search__field">', $output );
-		self::assertStringContainsString( '<button type="submit" class="mac-members-search__submit btn--primary btn--s">Filter</button></form>', $output );
+		// Without a role to offer, the form is the hidden fields and the search. Enter sends it.
+		self::assertStringContainsString( '<form class="mac-members-search" method="get" action="/" role="search" aria-label="Filter members"><input type="hidden" name="page_id" value="5"><input type="hidden" name="mac_members_status" value="denied"><input class="mac-members-search__input" type="search"', $output );
+		self::assertStringContainsString( 'aria-label="Search members"></form>', $output );
 	}
 
 	public function test_fixed_view_form_has_no_status_field(): void {

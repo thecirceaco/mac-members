@@ -22,7 +22,7 @@ final class MembersTableRenderer
 	 * @param array{page?:int,pages?:int,previous_url?:string,next_url?:string} $pagination Pagination.
 	 * @param array<int,string>                                      $missing_roles Configured role slugs that do not exist.
 	 * @param string                                                 $render_token Token that status changes from this table must send.
-	 * @param array{action?:string,hidden?:array<string,string>,roles?:array<string,string>,role?:string,search?:string,clear_url?:string} $search_form Role and search form; empty hides it.
+	 * @param array{action?:string,hidden?:array<string,string>,roles?:array<string,string>,role?:string,search?:string} $search_form Role and search form; empty hides it.
 	 */
 	public function render(
 		array $rows,
@@ -140,9 +140,9 @@ final class MembersTableRenderer
 		foreach ( $filters as $filter ) {
 			$current = ! empty( $filter['current'] );
 
-			// The current filter is a solid ACSS button, the others outline buttons.
+			// The current filter is a solid neutral ACSS button, the others outline buttons.
 			$output .= '<li>';
-			$output .= '<a class="mac-members-filter btn--primary' . ( $current ? ' is-current' : ' btn--outline' ) . ' btn--s" href="' . esc_url( $filter['url'] ) . '"' . ( $current ? ' aria-current="page"' : '' ) . '>';
+			$output .= '<a class="mac-members-filter btn--neutral' . ( $current ? ' is-current' : ' btn--outline' ) . ' btn--s" href="' . esc_url( $filter['url'] ) . '"' . ( $current ? ' aria-current="page"' : '' ) . '>';
 			$output .= esc_html( $filter['label'] ) . ' ';
 			$output .= '<span class="mac-members-count" data-mac-members-count-for="' . esc_attr( $filter['view'] ) . '">' . esc_html( (string) (int) $filter['count'] ) . '</span>';
 			$output .= '</a>';
@@ -155,10 +155,10 @@ final class MembersTableRenderer
 	}
 
 	/**
-	 * A GET form: the role filter when members hold other roles, the search, and Filter. Clear shows while a
-	 * role or search is set.
+	 * A GET form without buttons: the role filter, when members hold other roles, and the search. Enter in the
+	 * search sends the form, and the script sends it when the role changes.
 	 *
-	 * @param array{action?:string,hidden?:array<string,string>,roles?:array<string,string>,role?:string,search?:string,clear_url?:string} $form Role and search form.
+	 * @param array{action?:string,hidden?:array<string,string>,roles?:array<string,string>,role?:string,search?:string} $form Role and search form.
 	 */
 	private function render_search_form( array $form ): string
 	{
@@ -176,9 +176,7 @@ final class MembersTableRenderer
 		}
 
 		if ( array() !== $roles ) {
-			$output .= '<label class="mac-members-search__field">';
-			$output .= '<span class="mac-members-search__label">' . esc_html__( 'Role', 'mac-members' ) . '</span>';
-			$output .= '<select name="' . esc_attr( MembersTableShortcode::ROLE_QUERY_ARG ) . '">';
+			$output .= '<select class="mac-members-search__role" name="' . esc_attr( MembersTableShortcode::ROLE_QUERY_ARG ) . '" aria-label="' . esc_attr__( 'Role', 'mac-members' ) . '" data-mac-members-role-filter>';
 			$output .= '<option value="">' . esc_html__( 'All roles', 'mac-members' ) . '</option>';
 
 			foreach ( $roles as $slug => $name ) {
@@ -186,19 +184,9 @@ final class MembersTableRenderer
 			}
 
 			$output .= '</select>';
-			$output .= '</label>';
 		}
 
-		$output .= '<label class="mac-members-search__field">';
-		$output .= '<span class="mac-members-search__label">' . esc_html__( 'Search', 'mac-members' ) . '</span>';
-		$output .= '<input type="search" name="' . esc_attr( MembersTableShortcode::SEARCH_QUERY_ARG ) . '" value="' . esc_attr( $search ) . '" maxlength="' . esc_attr( (string) MembersQuery::SEARCH_MAX_LENGTH ) . '" placeholder="' . esc_attr__( 'Name, email or username', 'mac-members' ) . '">';
-		$output .= '</label>';
-		$output .= '<button type="submit" class="mac-members-search__submit btn--primary btn--s">' . esc_html__( 'Filter', 'mac-members' ) . '</button>';
-
-		if ( '' !== $role || '' !== $search ) {
-			$output .= '<a class="mac-members-search__clear btn--primary btn--outline btn--s" href="' . esc_url( (string) ( $form['clear_url'] ?? '' ) ) . '">' . esc_html__( 'Clear', 'mac-members' ) . '</a>';
-		}
-
+		$output .= '<input class="mac-members-search__input" type="search" name="' . esc_attr( MembersTableShortcode::SEARCH_QUERY_ARG ) . '" value="' . esc_attr( $search ) . '" maxlength="' . esc_attr( (string) MembersQuery::SEARCH_MAX_LENGTH ) . '" placeholder="' . esc_attr__( 'Search by name, email or username', 'mac-members' ) . '" aria-label="' . esc_attr__( 'Search members', 'mac-members' ) . '">';
 		$output .= '</form>';
 
 		return $output;
@@ -219,7 +207,7 @@ final class MembersTableRenderer
 		$output = '<nav class="mac-members-pagination" aria-label="' . esc_attr__( 'Members table pages', 'mac-members' ) . '">';
 
 		if ( '' !== ( $pagination['previous_url'] ?? '' ) ) {
-			$output .= '<a class="mac-members-page-link btn--primary btn--outline btn--s" href="' . esc_url( $pagination['previous_url'] ) . '">' . esc_html__( 'Previous', 'mac-members' ) . '</a>';
+			$output .= '<a class="mac-members-page-link btn--neutral btn--outline btn--s" href="' . esc_url( $pagination['previous_url'] ) . '">' . esc_html__( 'Previous', 'mac-members' ) . '</a>';
 		}
 
 		$output .= '<span class="mac-members-page-count">' . esc_html(
@@ -232,7 +220,7 @@ final class MembersTableRenderer
 		) . '</span>';
 
 		if ( '' !== ( $pagination['next_url'] ?? '' ) ) {
-			$output .= '<a class="mac-members-page-link btn--primary btn--outline btn--s" href="' . esc_url( $pagination['next_url'] ) . '">' . esc_html__( 'Next', 'mac-members' ) . '</a>';
+			$output .= '<a class="mac-members-page-link btn--neutral btn--outline btn--s" href="' . esc_url( $pagination['next_url'] ) . '">' . esc_html__( 'Next', 'mac-members' ) . '</a>';
 		}
 
 		$output .= '</nav>';

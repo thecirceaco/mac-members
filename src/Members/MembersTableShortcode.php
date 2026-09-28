@@ -226,7 +226,7 @@ final class MembersTableShortcode implements Service
 	 * @param string|null          $view  The current view, or null when the shortcode fixes it.
 	 * @param array<string,string> $roles Roles the role filter offers, keyed by slug.
 	 *
-	 * @return array{action:string,hidden:array<string,string>,roles:array<string,string>,role:string,search:string,clear_url:string}
+	 * @return array{action:string,hidden:array<string,string>,roles:array<string,string>,role:string,search:string}
 	 */
 	private function get_search_form( ?string $view, string $base_url, array $roles, string $role, string $search ): array
 	{
@@ -247,12 +247,11 @@ final class MembersTableShortcode implements Service
 		}
 
 		return array(
-			'action'    => $parts[0],
-			'hidden'    => $hidden,
-			'roles'     => $roles,
-			'role'      => $role,
-			'search'    => $search,
-			'clear_url' => null === $view ? $base_url : \add_query_arg( array( self::STATUS_QUERY_ARG => $view ), $base_url ),
+			'action' => $parts[0],
+			'hidden' => $hidden,
+			'roles'  => $roles,
+			'role'   => $role,
+			'search' => $search,
 		);
 	}
 

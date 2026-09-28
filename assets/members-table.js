@@ -237,4 +237,20 @@
 			setRowProcessing(row, false);
 		}
 	});
+
+	// The role filter has no button: choosing a role sends the form, like Enter in the search.
+	document.addEventListener('change', (event) => {
+		const select = event.target;
+
+		if (!(select instanceof HTMLSelectElement) || !select.matches('[data-mac-members-role-filter]') || !select.form) {
+			return;
+		}
+
+		if (typeof select.form.requestSubmit === 'function') {
+			select.form.requestSubmit();
+			return;
+		}
+
+		select.form.submit();
+	});
 })();

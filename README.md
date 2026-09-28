@@ -8,7 +8,7 @@ It provides a small admin settings page, a protected members table shortcode wit
 
 - WordPress 6.x
 - PHP 8.3+
-- Automatic.css 4 on the front end, with the status colors (success, danger, warning and info) and the neutral color turned on: every color, border, radius, space and text size in the members table is an ACSS token, and its buttons are ACSS buttons (`btn--success`, `btn--danger`, `btn--primary`, `btn--outline`, `btn--s`), so it follows each site's ACSS settings
+- Automatic.css 4 on the front end, with the status colors (success, danger, warning and info) and the neutral color turned on: every color, border and radius in the members table is an ACSS token, and its buttons are ACSS buttons (`btn--success`, `btn--danger`, `btn--neutral`, `btn--outline`, `btn--s`), so it follows each site's ACSS settings. Spacing inside the table is in `em` and `ch`, because the ACSS space tokens are too large at this size
 
 ## Installation
 
@@ -67,12 +67,14 @@ The table has a filter for each status (Pending, Approved, Inactive, Denied) and
 
 Pending requests are listed oldest first, like a queue; the other views show the newest registrations first. The table shows 50 members per page, with Previous and Next links (`mac_members_page`). The columns are User ID, Email, First Name, Last Name, Username, Registered, Profile, Status and Actions; the Actions column has only the status changes the member's status allows.
 
-A form above the table narrows any view:
+A form above the table narrows any view. It has no buttons:
 
-- **Role** lists the other roles members hold, for example Officer or Trustee. It leaves out the four status roles, and the roles that "Roles left out of the role filter" names by slug or name, or that have a capability it names. It shows only when members hold such a role.
-- **Search** matches members whose first name, last name, email, username or display name contains every word. A number also matches the user ID.
+- **Role** lists the other roles members hold, for example Officer or Trustee. It leaves out the four status roles, and the roles that "Roles left out of the role filter" names by slug or name, or that have a capability it names. It shows only when members hold such a role, and choosing a role reloads the table.
+- **Search** fills the rest of the row and matches members whose first name, last name, email, username or display name contains every word. A number also matches the user ID. Enter runs the search, and an empty search shows everyone again.
 
-The role and the search are kept in the `mac_members_role` and `mac_members_search` query arguments. The status filters, their counts and the page links keep them, and Clear removes both.
+The role and the search are kept in the `mac_members_role` and `mac_members_search` query arguments. The status filters, their counts and the page links keep them.
+
+ACSS keeps its `btn--` classes in a cascade layer, while its reset `input, button, textarea, select { font: inherit; }` is outside any layer, so on a `<button>` the reset wins and the button loses the ACSS button font. The table's buttons use `revert-layer` for their background, border, color and font, so the ACSS button styles apply, hover included.
 
 After a change, a row that no longer belongs in a filtered view disappears, and in the All view the row shows its new status and buttons. The filter counts follow the changes.
 
