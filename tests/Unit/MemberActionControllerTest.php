@@ -42,6 +42,89 @@ final class MemberActionControllerTest extends TestCase {
 		self::assertArrayNotHasKey( 'wp_ajax_nopriv_mac_members_deny_user', $GLOBALS['mac_members_test_actions'] );
 	}
 
+	/**
+	 * Regression test: wp_send_json_*() only records here and returns, as it does under a wp_die
+	 * handler that does not exit. Every failed check must still end the request before a role changes.
+	 */
+	#[DataProvider( 'provide_failed_gates' )]
+	public function test_failed_gate_ends_the_request_before_any_role_change( string $gate, string $expected_code ): void {
+		$GLOBALS['mac_members_test_ajax_send_exits'] = false;
+
+		$this->store_user( 12, array( 'member-pending' ) );
+		$this->prepare_ajax_request( FrontendAssets::APPROVE_ACTION, 12 );
+		$this->arrange_failed_gate( $gate );
+
+		$roles_before = $GLOBALS['mac_members_test_user_roles'][12];
+
+		try {
+			$this->create_controller()->approve();
+			self::fail( 'The request was not ended after the failed check.' );
+		} catch ( \MacMembers_Test_Request_Ended ) {
+			// The controller ended the request itself after sending the error.
+		}
+
+		self::assertCount( 1, $GLOBALS['mac_members_test_ajax_responses'] );
+		self::assertFalse( $GLOBALS['mac_members_test_ajax_responses'][0]['success'] );
+		self::assertSame( $expected_code, $GLOBALS['mac_members_test_ajax_responses'][0]['data']['code'] );
+		self::assertSame( array(), $GLOBALS['mac_members_test_role_changes'] );
+		self::assertSame( $roles_before, $GLOBALS['mac_members_test_user_roles'][12] );
+	}
+
+	/**
+	 * @return array<string,array{0:string,1:string}>
+	 */
+	public static function provide_failed_gates(): array {
+		return array(
+			'invalid nonce'   => array( 'invalid nonce', 'invalid_request' ),
+			'wrong action'    => array( 'wrong action', 'invalid_request' ),
+			'no capability'   => array( 'no capability', 'permission_denied' ),
+			'no user id'      => array( 'no user id', 'invalid_user' ),
+			'unknown user'    => array( 'unknown user', 'invalid_user' ),
+			'self action'     => array( 'self action', 'permission_denied' ),
+			'elevated target' => array( 'elevated target', 'permission_denied' ),
+			'missing role'    => array( 'missing role', 'missing_role' ),
+			'not pending'     => array( 'not pending', 'not_pending' ),
+		);
+	}
+
+	public function test_success_response_ends_the_request_once(): void {
+		$GLOBALS['mac_members_test_ajax_send_exits'] = false;
+
+		$user = $this->store_user( 12, array( 'member-pending' ) );
+		$this->prepare_ajax_request( FrontendAssets::APPROVE_ACTION, $user->ID );
+
+		try {
+			$this->create_controller()->approve();
+			self::fail( 'The request was not ended after the success response.' );
+		} catch ( \MacMembers_Test_Request_Ended ) {
+			// The controller ended the request itself after sending the response.
+		}
+
+		self::assertCount( 1, $GLOBALS['mac_members_test_ajax_responses'] );
+		self::assertTrue( $GLOBALS['mac_members_test_ajax_responses'][0]['success'] );
+		self::assertSame( array( 'member' ), $user->roles );
+	}
+
+	public function test_nonce_is_checked_with_check_ajax_referer(): void {
+		$user = $this->store_user( 12, array( 'member-pending' ) );
+		$this->prepare_ajax_request( FrontendAssets::APPROVE_ACTION, $user->ID );
+
+		$this->capture_ajax_response(
+			fn (): mixed => $this->create_controller()->approve()
+		);
+
+		self::assertSame(
+			array(
+				array(
+					'action'    => FrontendAssets::NONCE_ACTION,
+					'query_arg' => 'nonce',
+					'stop'      => false,
+				),
+			),
+			$GLOBALS['mac_members_test_ajax_referer_checks']
+		);
+	}
+
 	public function test_capability_denial_returns_permission_error(): void {
 		$user = $this->store_user( 12, array( 'member-pending' ) );
 		$GLOBALS['mac_members_test_current_user_caps']['promote_users'] = false;
@@ -61,11 +144,12 @@ final class MemberActionControllerTest extends TestCase {
 	public function test_invalid_nonce_returns_invalid_request(): void {
 		$user = $this->store_user( 12, array( 'member-pending' ) );
 
-		$_POST = array(
+		$_POST    = array(
 			'action'  => FrontendAssets::APPROVE_ACTION,
 			'nonce'   => 'bad-nonce',
 			'user_id' => (string) $user->ID,
 		);
+		$_REQUEST = $_POST;
 
 		$response = $this->capture_ajax_response(
 			fn (): mixed => $this->create_controller()->approve()
@@ -398,12 +482,49 @@ final class MemberActionControllerTest extends TestCase {
 		return $user;
 	}
 
+	private function arrange_failed_gate( string $gate ): void {
+		switch ( $gate ) {
+			case 'invalid nonce':
+				$_POST['nonce'] = 'bad-nonce';
+				break;
+			case 'wrong action':
+				$_POST['action'] = FrontendAssets::DENY_ACTION;
+				break;
+			case 'no capability':
+				$GLOBALS['mac_members_test_current_user_caps']['promote_users'] = false;
+				break;
+			case 'no user id':
+				$_POST['user_id'] = '0';
+				break;
+			case 'unknown user':
+				$_POST['user_id'] = '999';
+				break;
+			case 'self action':
+				$GLOBALS['mac_members_test_current_user_id'] = 12;
+				break;
+			case 'elevated target':
+				$this->store_user( 12, array( 'member-pending' ), array( 'manage_options' => true ) );
+				break;
+			case 'missing role':
+				unset( $GLOBALS['mac_members_test_roles']['member'] );
+				break;
+			case 'not pending':
+				$this->store_user( 12, array( 'subscriber' ) );
+				break;
+			default:
+				self::fail( 'Unknown gate: ' . $gate );
+		}
+
+		$_REQUEST = $_POST;
+	}
+
 	private function prepare_ajax_request( string $action, int $user_id ): void {
-		$_POST = array(
+		$_POST    = array(
 			'action'  => $action,
 			'nonce'   => wp_create_nonce( FrontendAssets::NONCE_ACTION ),
 			'user_id' => (string) $user_id,
 		);
+		$_REQUEST = $_POST;
 	}
 
 	/**
@@ -414,17 +535,20 @@ final class MemberActionControllerTest extends TestCase {
 	private function capture_ajax_response( callable $callback ): array {
 		try {
 			$callback();
-		} catch ( \MacMembers_Test_Ajax_Exit ) {
+		} catch ( \MacMembers_Test_Ajax_Exit | \MacMembers_Test_Request_Ended ) {
 			return $GLOBALS['mac_members_test_ajax_response'];
 		}
 
-		self::fail( 'Expected wp_send_json_* to stop execution.' );
+		self::fail( 'Expected the request to end after the response.' );
 	}
 
 	private function create_controller( ?MemberNotificationService $notifications = null ): MemberActionController {
 		return new MemberActionController(
 			new WordPressSettingsRepository( new SettingsSchema() ),
-			$notifications
+			$notifications,
+			end_request: static function (): never {
+				throw new \MacMembers_Test_Request_Ended();
+			}
 		);
 	}
 

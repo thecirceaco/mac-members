@@ -77,7 +77,9 @@ Each notification type can be toggled from the settings page. Email delivery fai
 
 ## Security
 
-MAC Members uses authenticated WordPress AJAX actions for approval and denial. It checks nonces, requires the acting user to have `promote_users`, verifies that the target user is still pending, blocks self-actions, and blocks actions against elevated target users.
+MAC Members uses authenticated WordPress AJAX actions for approval and denial. It checks the nonce with `check_ajax_referer()`, requires the acting user to have `promote_users`, verifies that the target user is still pending, blocks self-actions, and blocks actions against elevated target users.
+
+Every check that fails sends an error and ends the request, and so does the success response, so a failed check can never reach the role change, even when a `wp_die` handler does not exit.
 
 The plugin does not expose public unauthenticated approval endpoints and does not provide a REST API in v0.2.0.
 

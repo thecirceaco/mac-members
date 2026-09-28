@@ -26,9 +26,15 @@ final class MemberActionController implements Service
 	private const SUCCESS_APPROVED = 'approved';
 	private const SUCCESS_DENIED = 'denied';
 
+	/**
+	 * @param \Closure|null $end_request Runs before the request exits, after a response was sent. Tests pass a
+	 *                                   closure that throws, to see where the request ended. The request exits
+	 *                                   even when the closure returns.
+	 */
 	public function __construct(
 		private readonly SettingsRepositoryInterface $settings,
-		private readonly ?MemberNotificationService $notifications = null
+		private readonly ?MemberNotificationService $notifications = null,
+		private readonly ?\Closure $end_request = null
 	) {}
 
 	public function register(): void
@@ -47,30 +53,39 @@ final class MemberActionController implements Service
 		$this->handle( FrontendAssets::DENY_ACTION, 'denied_role', 'approved_role', self::SUCCESS_DENIED );
 	}
 
+	/**
+	 * Every failed check sends an error and returns. send_error() also ends the request itself, so a
+	 * response function that does not exit can never let a failed check reach the role change.
+	 */
 	private function handle( string $expected_action, string $target_role_setting, string $other_role_setting, string $success_code ): void
 	{
 		if ( ! $this->is_valid_request( $expected_action ) ) {
 			$this->send_error( self::ERROR_INVALID_REQUEST, 400 );
+			return;
 		}
 
 		if ( ! \current_user_can( 'promote_users' ) ) {
 			$this->send_error( self::ERROR_PERMISSION, 403 );
+			return;
 		}
 
 		$user_id = $this->get_posted_user_id();
 
 		if ( 1 > $user_id ) {
 			$this->send_error( self::ERROR_INVALID_USER, 404 );
+			return;
 		}
 
 		$user = \get_user_by( 'id', $user_id );
 
 		if ( ! $user instanceof \WP_User ) {
 			$this->send_error( self::ERROR_INVALID_USER, 404 );
+			return;
 		}
 
 		if ( $user_id === \get_current_user_id() || $this->is_elevated_target( $user ) ) {
 			$this->send_error( self::ERROR_PERMISSION, 403 );
+			return;
 		}
 
 		$pending_role = (string) $this->settings->get( 'pending_role', 'member-pending' );
@@ -86,14 +101,17 @@ final class MemberActionController implements Service
 		// Check the roles before any write, so a missing role cannot leave the user half-changed.
 		if ( ! $this->settings->role_exists( $pending_role ) || ! $this->settings->role_exists( $target_role ) ) {
 			$this->send_error( self::ERROR_MISSING_ROLE, 500 );
+			return;
 		}
 
 		if ( ! $this->user_has_role( $user, $pending_role ) ) {
 			$this->send_error( self::ERROR_NOT_PENDING, 409 );
+			return;
 		}
 
 		if ( ! $this->change_roles( $user, $pending_role, $target_role, $other_role ) ) {
 			$this->send_error( self::ERROR_UPDATE_FAILED, 500 );
+			return;
 		}
 
 		$this->send_success(
@@ -105,7 +123,7 @@ final class MemberActionController implements Service
 	private function is_valid_request( string $expected_action ): bool
 	{
 		return $expected_action === $this->get_post_string( 'action' )
-			&& false !== \wp_verify_nonce( $this->get_post_string( 'nonce' ), FrontendAssets::NONCE_ACTION );
+			&& false !== \check_ajax_referer( FrontendAssets::NONCE_ACTION, 'nonce', false );
 	}
 
 	private function get_posted_user_id(): int
@@ -218,7 +236,7 @@ final class MemberActionController implements Service
 			: $this->notifications->send_denial_notifications( $user );
 	}
 
-	private function send_success( string $message, ?NotificationResult $notification_result = null ): void
+	private function send_success( string $message, ?NotificationResult $notification_result = null ): never
 	{
 		$response_message = self::SUCCESS_APPROVED === $message
 			? __( 'Member approved successfully.', 'mac-members' )
@@ -237,9 +255,11 @@ final class MemberActionController implements Service
 			$response,
 			200
 		);
+
+		$this->end_request();
 	}
 
-	private function send_error( string $code, int $status_code ): void
+	private function send_error( string $code, int $status_code ): never
 	{
 		\wp_send_json_error(
 			array(
@@ -248,6 +268,21 @@ final class MemberActionController implements Service
 			),
 			$status_code
 		);
+
+		$this->end_request();
+	}
+
+	/**
+	 * Ends the request after a response was sent. wp_send_json_*() normally ends it through wp_die(),
+	 * but a wp_die handler can return, so the request is ended here as well.
+	 */
+	private function end_request(): never
+	{
+		if ( null !== $this->end_request ) {
+			( $this->end_request )();
+		}
+
+		exit;
 	}
 
 	private function get_error_message( string $code ): string

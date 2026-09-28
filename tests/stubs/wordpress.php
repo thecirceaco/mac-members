@@ -36,7 +36,17 @@ if ( ! class_exists( 'WP_Roles' ) ) {
 }
 
 if ( ! class_exists( 'MacMembers_Test_Ajax_Exit' ) ) {
+	/**
+	 * Thrown by the wp_send_json_*() stubs, where WordPress would exit.
+	 */
 	final class MacMembers_Test_Ajax_Exit extends RuntimeException {}
+}
+
+if ( ! class_exists( 'MacMembers_Test_Request_Ended' ) ) {
+	/**
+	 * Thrown by the end_request closure that tests give the action controller.
+	 */
+	final class MacMembers_Test_Request_Ended extends RuntimeException {}
 }
 
 if ( ! class_exists( 'WP_User' ) ) {
@@ -102,6 +112,8 @@ if ( ! class_exists( 'WP_User' ) ) {
 		}
 
 		public function add_role( string $role ): void {
+			$GLOBALS['mac_members_test_role_changes'][] = array( 'add', $this->ID, $role );
+
 			if ( ! $this->can_update_roles || in_array( $role, $this->roles, true ) || in_array( $role, $this->blocked_roles, true ) ) {
 				return;
 			}
@@ -111,6 +123,8 @@ if ( ! class_exists( 'WP_User' ) ) {
 		}
 
 		public function remove_role( string $role ): void {
+			$GLOBALS['mac_members_test_role_changes'][] = array( 'remove', $this->ID, $role );
+
 			if ( ! $this->can_update_roles ) {
 				return;
 			}
@@ -214,12 +228,17 @@ function mac_members_tests_reset_wp_state(): void {
 	$GLOBALS['mac_members_test_inline_scripts']     = array();
 	$GLOBALS['mac_members_test_current_user_id']    = 1;
 	$GLOBALS['mac_members_test_ajax_response']      = null;
+	$GLOBALS['mac_members_test_ajax_responses']     = array();
+	$GLOBALS['mac_members_test_ajax_send_exits']    = true;
+	$GLOBALS['mac_members_test_ajax_referer_checks'] = array();
+	$GLOBALS['mac_members_test_role_changes']       = array();
 	$GLOBALS['mac_members_test_mail']               = array();
 	$GLOBALS['mac_members_test_mail_fail_next']     = 0;
 
-	$_GET    = array();
-	$_POST   = array();
-	$_SERVER = array(
+	$_GET     = array();
+	$_POST    = array();
+	$_REQUEST = array();
+	$_SERVER  = array(
 		'REQUEST_METHOD' => 'GET',
 	);
 
@@ -526,28 +545,71 @@ function wp_json_encode( mixed $data, int $options = 0, int $depth = 512 ): stri
 	return json_encode( $data, $options, $depth );
 }
 
+/**
+ * Records a JSON response. WordPress exits after sending it; the stub throws instead, or, when
+ * $GLOBALS['mac_members_test_ajax_send_exits'] is false, returns like a wp_die handler that does not exit.
+ *
+ * @param array{success:bool,data:mixed,status:int} $response Response.
+ */
+function mac_members_tests_send_json( array $response ): void {
+	$GLOBALS['mac_members_test_ajax_response']     = $response;
+	$GLOBALS['mac_members_test_ajax_responses'][] = $response;
+
+	if ( $GLOBALS['mac_members_test_ajax_send_exits'] ?? true ) {
+		throw new MacMembers_Test_Ajax_Exit();
+	}
+}
+
 function wp_send_json_success( mixed $data = null, ?int $status_code = null, int $flags = 0 ): void {
 	unset( $flags );
 
-	$GLOBALS['mac_members_test_ajax_response'] = array(
-		'success' => true,
-		'data'    => $data,
-		'status'  => $status_code ?? 200,
+	mac_members_tests_send_json(
+		array(
+			'success' => true,
+			'data'    => $data,
+			'status'  => $status_code ?? 200,
+		)
 	);
-
-	throw new MacMembers_Test_Ajax_Exit();
 }
 
 function wp_send_json_error( mixed $data = null, ?int $status_code = null, int $flags = 0 ): void {
 	unset( $flags );
 
-	$GLOBALS['mac_members_test_ajax_response'] = array(
-		'success' => false,
-		'data'    => $data,
-		'status'  => $status_code ?? 400,
+	mac_members_tests_send_json(
+		array(
+			'success' => false,
+			'data'    => $data,
+			'status'  => $status_code ?? 400,
+		)
+	);
+}
+
+function check_ajax_referer( int|string $action = -1, string|false $query_arg = false, bool $stop = true ): int|false {
+	$GLOBALS['mac_members_test_ajax_referer_checks'][] = array(
+		'action'    => $action,
+		'query_arg' => $query_arg,
+		'stop'      => $stop,
 	);
 
-	throw new MacMembers_Test_Ajax_Exit();
+	// Same lookup order as WordPress: the named argument, then _ajax_nonce, then _wpnonce, from $_REQUEST.
+	$nonce = '';
+
+	if ( $query_arg && isset( $_REQUEST[ $query_arg ] ) ) {
+		$nonce = (string) $_REQUEST[ $query_arg ];
+	} elseif ( isset( $_REQUEST['_ajax_nonce'] ) ) {
+		$nonce = (string) $_REQUEST['_ajax_nonce'];
+	} elseif ( isset( $_REQUEST['_wpnonce'] ) ) {
+		$nonce = (string) $_REQUEST['_wpnonce'];
+	}
+
+	$result = wp_verify_nonce( $nonce, (string) $action );
+
+	if ( $stop && false === $result ) {
+		// WordPress calls wp_die( -1, 403 ) here.
+		throw new MacMembers_Test_Ajax_Exit();
+	}
+
+	return $result;
 }
 
 function wp_mail(
