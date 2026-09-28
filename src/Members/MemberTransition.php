@@ -61,14 +61,16 @@ enum MemberTransition: string
 	}
 
 	/**
-	 * Automatic.css button classes: the success button for changes that give access, the danger button for
-	 * changes that take it away. The colors come from the site's ACSS status colors.
+	 * Automatic.css button classes, in the site's ACSS status colors: success to approve, danger to deny,
+	 * warning to deactivate and info to reactivate.
 	 */
 	public function button_classes(): string
 	{
 		return match ( $this ) {
-			self::Approve, self::Reactivate => 'btn--success btn--s',
-			self::Deny, self::Deactivate    => 'btn--danger btn--s',
+			self::Approve    => 'btn--success btn--s',
+			self::Deny       => 'btn--danger btn--s',
+			self::Deactivate => 'btn--warning btn--s',
+			self::Reactivate => 'btn--info btn--s',
 		};
 	}
 

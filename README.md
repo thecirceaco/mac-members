@@ -8,7 +8,7 @@ It provides a small admin settings page, a protected members table shortcode wit
 
 - WordPress 6.x
 - PHP 8.3+
-- Automatic.css 4 on the front end, with the status colors (success, danger, warning and info) and the neutral color turned on: every color, border and radius in the members table is an ACSS token, and its buttons are ACSS buttons (`btn--success`, `btn--danger`, `btn--neutral`, `btn--outline`, `btn--s`), so it follows each site's ACSS settings. Spacing inside the table is in `em` and `ch`, because the ACSS space tokens are too large at this size
+- Automatic.css 4 on the front end, with the status colors (success, danger, warning and info) and the neutral color turned on: every color, border and radius in the members table is an ACSS token, and its buttons are ACSS buttons (`btn--success` to approve, `btn--danger` to deny, `btn--warning` to deactivate, `btn--info` to reactivate, and `btn--neutral`, `btn--outline` and `btn--s` for the filters and page links), so it follows each site's ACSS settings. Spacing inside the table is in `em` and `ch`, because the ACSS space tokens are too large at this size
 
 ## Installation
 

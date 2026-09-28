@@ -164,8 +164,8 @@ final class MembersTableShortcodeTest extends TestCase {
 
 		self::assertStringContainsString( 'data-mac-members-view="all"', $output );
 		self::assertMatchesRegularExpression( '/data-mac-members-user-id="1" data-mac-members-status="pending">.*data-mac-members-action="approve".*data-mac-members-action="deny"/s', $output );
-		self::assertStringContainsString( 'data-mac-members-action="deactivate" data-mac-members-user-id="2"', $output );
-		self::assertStringContainsString( 'data-mac-members-action="reactivate" data-mac-members-user-id="3"', $output );
+		self::assertStringContainsString( 'class="mac-members-button mac-members-button--deactivate btn--warning btn--s" data-mac-members-action="deactivate" data-mac-members-user-id="2"', $output );
+		self::assertStringContainsString( 'class="mac-members-button mac-members-button--reactivate btn--info btn--s" data-mac-members-action="reactivate" data-mac-members-user-id="3"', $output );
 		self::assertStringContainsString( 'data-mac-members-action="approve" data-mac-members-user-id="4"', $output );
 		self::assertStringNotContainsString( 'data-mac-members-action="deny" data-mac-members-user-id="4"', $output );
 		self::assertStringNotContainsString( 'data-mac-members-user-id="5"', $output );
