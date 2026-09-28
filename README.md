@@ -139,7 +139,7 @@ The plugin does not expose public unauthenticated endpoints and does not provide
 
 Activating the plugin gives the `administrator` role the `mac_members_review` capability. A site that updates the plugin without reactivating it gets the same step once, on the next request. To let another role review members, give it `mac_members_review` and `promote_users` with a role editor.
 
-Deleting the plugin from the Plugins screen keeps its data, like MAC Core, unless "Delete plugin data on uninstall" is on in the settings; it is off by default. With it on, deleting the plugin removes the settings, `mac_members_review` from every role, and the four member roles that no user holds. Roles that users still hold stay, so nobody is left without a role. The per-user lock rows always go, because they only exist while a status change runs.
+Deleting the plugin from the Plugins screen keeps its data, like MAC Core, unless "Delete plugin data on uninstall" is on in the settings; it is off by default. With it on, deleting the plugin removes the settings, `mac_members_review` from every role, and the four member roles that no user holds. Roles that users still hold stay, so nobody is left without a role; the settings page shows how many users hold each member role next to the setting. The per-user lock rows always go, because they only exist while a status change runs.
 
 ## Development
 

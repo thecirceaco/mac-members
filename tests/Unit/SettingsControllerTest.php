@@ -243,6 +243,28 @@ final class SettingsControllerTest extends TestCase {
 		self::assertStringContainsString( '<p class="description" id="mac-members-delete_data_on_uninstall-description">When the plugin is deleted, remove its settings, the review capability and the member roles that no user holds.', $output );
 	}
 
+	public function test_uninstall_setting_shows_how_many_users_hold_each_member_role(): void {
+		$GLOBALS['mac_members_test_users'] = array(
+			new \WP_User( array( 'ID' => 1, 'roles' => array( 'mac_members_approved' ) ) ),
+			new \WP_User( array( 'ID' => 2, 'roles' => array( 'mac_members_approved', 'subscriber' ) ) ),
+			new \WP_User( array( 'ID' => 3, 'roles' => array( 'mac_members_pending' ) ) ),
+		);
+
+		self::assertStringContainsString(
+			'<p class="description mac-members-role-usage">Users per member role: Member (Pending): 1, Member: 2, Member (Inactive): 0, Member (Denied): 0. The roles that users hold stay when the plugin is deleted.</p>',
+			$this->render_page( false )
+		);
+	}
+
+	public function test_uninstall_setting_says_when_no_user_holds_a_member_role(): void {
+		unset( $GLOBALS['mac_members_test_roles']['mac_members_denied'] );
+
+		self::assertStringContainsString(
+			'Users per member role: Member (Pending): 0, Member: 0, Member (Inactive): 0. No user holds a member role, so deleting the plugin with this setting on removes them all.',
+			$this->render_page( false )
+		);
+	}
+
 	public function test_save_redirects_back_to_the_page_with_the_notices_in_a_transient(): void {
 		$this->prepare_save( array( 'from_email' => 'from@example.test' ) );
 
