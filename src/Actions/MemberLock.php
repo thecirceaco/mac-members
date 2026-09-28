@@ -9,6 +9,10 @@ declare(strict_types=1);
 
 namespace MacMembers\Actions;
 
+if ( ! defined( 'ABSPATH' ) ) {
+	exit; // Exit if accessed directly.
+}
+
 /**
  * Lets only one request at a time change a member's roles.
  *

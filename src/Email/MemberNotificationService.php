@@ -11,6 +11,10 @@ namespace MacMembers\Email;
 
 use MacMembers\Settings\SettingsRepositoryInterface;
 
+if ( ! defined( 'ABSPATH' ) ) {
+	exit; // Exit if accessed directly.
+}
+
 final class MemberNotificationService
 {
 	private const BODY_MEMBER_APPROVAL = "Hi {first_name},\n\nYour account has been approved and your membership is now active. You can now log in and access your account.\n\n{login_url}\n\nBest,\n{site_name}";

@@ -14,6 +14,10 @@ use MacMembers\Contracts\Service;
 use MacMembers\Security\Capabilities;
 use MacMembers\Settings\SettingsRepositoryInterface;
 
+if ( ! defined( 'ABSPATH' ) ) {
+	exit; // Exit if accessed directly.
+}
+
 final class PendingMembersShortcode implements Service
 {
 	public const SHORTCODE = 'mac_members_pending_table';

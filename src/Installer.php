@@ -13,6 +13,10 @@ use MacMembers\Actions\MemberLock;
 use MacMembers\Contracts\Service;
 use MacMembers\Security\Capabilities;
 
+if ( ! defined( 'ABSPATH' ) ) {
+	exit; // Exit if accessed directly.
+}
+
 final class Installer implements Service
 {
 	/**

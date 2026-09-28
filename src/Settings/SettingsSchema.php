@@ -9,6 +9,10 @@ declare(strict_types=1);
 
 namespace MacMembers\Settings;
 
+if ( ! defined( 'ABSPATH' ) ) {
+	exit; // Exit if accessed directly.
+}
+
 final class SettingsSchema
 {
 	public const TYPE_ROLE   = 'role';

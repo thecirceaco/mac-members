@@ -11,6 +11,10 @@ namespace MacMembers\Settings;
 
 use MacMembers\Security\Capabilities;
 
+if ( ! defined( 'ABSPATH' ) ) {
+	exit; // Exit if accessed directly.
+}
+
 final class WordPressSettingsRepository implements SettingsRepositoryInterface
 {
 	private ?array $settings = null;

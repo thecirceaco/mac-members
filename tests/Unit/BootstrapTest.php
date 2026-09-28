@@ -9,9 +9,14 @@ declare(strict_types=1);
 
 namespace MacMembers\Tests\Unit;
 
+use FilesystemIterator;
 use MacMembers\Kernel;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
+use RecursiveDirectoryIterator;
+use RecursiveIteratorIterator;
 use ReflectionClass;
+use SplFileInfo;
 
 final class BootstrapTest extends TestCase
 {
@@ -54,6 +59,42 @@ final class BootstrapTest extends TestCase
 
 		self::assertTrue( interface_exists( \MacMembers\Contracts\Service::class ) );
 		self::assertTrue( class_exists( Kernel::class ) );
+	}
+
+	/**
+	 * Requesting a plugin file directly, without WordPress, must stop before any code runs.
+	 */
+	#[DataProvider( 'provide_src_files' )]
+	public function test_src_file_exits_when_loaded_without_wordpress( string $file ): void
+	{
+		self::assertStringContainsString(
+			"if ( ! defined( 'ABSPATH' ) ) {\n\texit; // Exit if accessed directly.\n}",
+			(string) file_get_contents( $file )
+		);
+
+		exec( escapeshellarg( PHP_BINARY ) . ' -n -d display_errors=1 -d error_reporting=-1 ' . escapeshellarg( $file ) . ' 2>&1', $output, $exit_code );
+
+		self::assertSame( array(), $output, implode( "\n", $output ) );
+		self::assertSame( 0, $exit_code );
+	}
+
+	/**
+	 * @return array<string,array{0:string}>
+	 */
+	public static function provide_src_files(): array
+	{
+		$root  = dirname( __DIR__, 2 );
+		$files = array();
+
+		foreach ( new RecursiveIteratorIterator( new RecursiveDirectoryIterator( $root . '/src', FilesystemIterator::SKIP_DOTS ) ) as $file ) {
+			if ( $file instanceof SplFileInfo && 'php' === $file->getExtension() ) {
+				$files[ substr( $file->getPathname(), strlen( $root ) + 1 ) ] = array( $file->getPathname() );
+			}
+		}
+
+		ksort( $files );
+
+		return $files;
 	}
 
 	public function test_kernel_registers_filtered_services_once(): void

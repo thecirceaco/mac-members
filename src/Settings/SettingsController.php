@@ -11,6 +11,10 @@ namespace MacMembers\Settings;
 
 use MacMembers\Contracts\Service;
 
+if ( ! defined( 'ABSPATH' ) ) {
+	exit; // Exit if accessed directly.
+}
+
 final class SettingsController implements Service
 {
 	public const NONCE_ACTION = 'mac_members_save_settings';

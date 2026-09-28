@@ -9,6 +9,10 @@ declare(strict_types=1);
 
 namespace MacMembers\Email;
 
+if ( ! defined( 'ABSPATH' ) ) {
+	exit; // Exit if accessed directly.
+}
+
 final class NotificationResult
 {
 	public function __construct(

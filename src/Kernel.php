@@ -20,6 +20,10 @@ use MacMembers\Settings\SettingsController;
 use MacMembers\Settings\SettingsSchema;
 use MacMembers\Settings\WordPressSettingsRepository;
 
+if ( ! defined( 'ABSPATH' ) ) {
+	exit; // Exit if accessed directly.
+}
+
 final class Kernel
 {
 	private static bool $booted = false;

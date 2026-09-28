@@ -11,6 +11,10 @@ namespace MacMembers\Assets;
 
 use MacMembers\Contracts\Service;
 
+if ( ! defined( 'ABSPATH' ) ) {
+	exit; // Exit if accessed directly.
+}
+
 final class FrontendAssets implements Service
 {
 	public const STYLE_HANDLE  = 'mac-members-pending-members';

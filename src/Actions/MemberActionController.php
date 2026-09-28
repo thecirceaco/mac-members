@@ -17,6 +17,10 @@ use MacMembers\PendingMembers\RenderToken;
 use MacMembers\Security\Capabilities;
 use MacMembers\Settings\SettingsRepositoryInterface;
 
+if ( ! defined( 'ABSPATH' ) ) {
+	exit; // Exit if accessed directly.
+}
+
 final class MemberActionController implements Service
 {
 	private const ERROR_INVALID_REQUEST = 'invalid_request';
