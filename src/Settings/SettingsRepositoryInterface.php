@@ -38,6 +38,11 @@ interface SettingsRepositoryInterface
 	public function get_from_name(): string;
 
 	/**
+	 * Whether the role is registered on the site.
+	 */
+	public function role_exists( string $role ): bool;
+
+	/**
 	 * @return array<int,string>
 	 */
 	public function get_missing_role_slugs(): array;

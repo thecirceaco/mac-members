@@ -58,6 +58,8 @@ Denying a pending user removes the configured pending and approved roles and add
 
 Approve and deny exclude each other, so a user who is moved back to pending never keeps the outcome role of an earlier review.
 
+Before any change, the plugin checks that the pending role and the role being added exist. After the change it reads the user's roles again, and if they are not what was expected it restores the roles the user had before and returns an error. When a configured role is missing, the pending-members table shows a warning as well as the settings page.
+
 Existing unrelated roles are preserved in both flows.
 
 ## Email Notifications

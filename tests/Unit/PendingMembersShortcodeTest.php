@@ -92,6 +92,26 @@ final class PendingMembersShortcodeTest extends TestCase {
 
 		self::assertStringContainsString( 'There are no pending members.', $output );
 		self::assertStringNotContainsString( '<table', $output );
+		self::assertStringNotContainsString( 'do not exist', $output );
+	}
+
+	public function test_render_warns_about_missing_roles_in_the_table(): void {
+		unset( $GLOBALS['mac_members_test_roles']['member-pending'], $GLOBALS['mac_members_test_roles']['member-invalid'] );
+
+		$output = $this->create_shortcode()->render();
+
+		self::assertStringContainsString( 'mac-members-notice--warning', $output );
+		self::assertStringContainsString(
+			'MAC Members: One or more configured roles do not exist (member-pending, member-invalid). Approve and deny are blocked for any action that needs a missing role. Please review Settings &gt; MAC Members.',
+			$output
+		);
+	}
+
+	public function test_renderer_escapes_missing_role_names(): void {
+		$output = ( new PendingMembersTableRenderer() )->render( array(), array( '<b>role</b>' ) );
+
+		self::assertStringContainsString( '&lt;b&gt;role&lt;/b&gt;', $output );
+		self::assertStringNotContainsString( '<b>role</b>', $output );
 	}
 
 	private function create_shortcode(): PendingMembersShortcode {
@@ -101,7 +121,8 @@ final class PendingMembersShortcodeTest extends TestCase {
 		return new PendingMembersShortcode(
 			new PendingMembersQuery( $repository ),
 			new PendingMembersTableRenderer(),
-			new FrontendAssets()
+			new FrontendAssets(),
+			$repository
 		);
 	}
 }

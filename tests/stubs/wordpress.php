@@ -28,6 +28,10 @@ if ( ! class_exists( 'WP_Roles' ) ) {
 		public function __construct( array $roles ) {
 			$this->roles = $roles;
 		}
+
+		public function is_role( string $role ): bool {
+			return isset( $this->roles[ $role ] );
+		}
 	}
 }
 
@@ -61,6 +65,18 @@ if ( ! class_exists( 'WP_User' ) ) {
 		private bool $can_update_roles;
 
 		/**
+		 * Roles add_role() silently fails to add, like a write that did not happen.
+		 *
+		 * @var array<int,string>
+		 */
+		private array $blocked_roles;
+
+		/**
+		 * Whether role changes reach the stored roles that get_user_by() reads.
+		 */
+		private bool $persist_roles;
+
+		/**
 		 * @param array<string,mixed> $data User data.
 		 */
 		public function __construct( array $data ) {
@@ -73,6 +89,12 @@ if ( ! class_exists( 'WP_User' ) ) {
 			$this->data            = $data;
 			$this->caps            = array_map( 'boolval', $data['caps'] ?? array() );
 			$this->can_update_roles = (bool) ( $data['can_update_roles'] ?? true );
+			$this->blocked_roles    = array_values( array_map( 'strval', $data['blocked_roles'] ?? array() ) );
+			$this->persist_roles    = (bool) ( $data['persist_roles'] ?? true );
+
+			if ( 0 < $this->ID ) {
+				$GLOBALS['mac_members_test_user_roles'][ $this->ID ] = $this->roles;
+			}
 		}
 
 		public function get( string $key ): mixed {
@@ -80,11 +102,12 @@ if ( ! class_exists( 'WP_User' ) ) {
 		}
 
 		public function add_role( string $role ): void {
-			if ( ! $this->can_update_roles || in_array( $role, $this->roles, true ) ) {
+			if ( ! $this->can_update_roles || in_array( $role, $this->roles, true ) || in_array( $role, $this->blocked_roles, true ) ) {
 				return;
 			}
 
 			$this->roles[] = $role;
+			$this->store_roles();
 		}
 
 		public function remove_role( string $role ): void {
@@ -98,6 +121,22 @@ if ( ! class_exists( 'WP_User' ) ) {
 					static fn ( string $current_role ): bool => $current_role !== $role
 				)
 			);
+			$this->store_roles();
+		}
+
+		/**
+		 * Replaces the roles in memory with the stored roles, as a fresh read from the database would.
+		 */
+		public function reload_roles(): void {
+			if ( isset( $GLOBALS['mac_members_test_user_roles'][ $this->ID ] ) ) {
+				$this->roles = $GLOBALS['mac_members_test_user_roles'][ $this->ID ];
+			}
+		}
+
+		private function store_roles(): void {
+			if ( $this->persist_roles ) {
+				$GLOBALS['mac_members_test_user_roles'][ $this->ID ] = $this->roles;
+			}
 		}
 
 		public function has_cap( string $capability ): bool {
@@ -165,6 +204,8 @@ function mac_members_tests_reset_wp_state(): void {
 	$GLOBALS['mac_members_test_shortcodes']        = array();
 	$GLOBALS['mac_members_test_users']             = array();
 	$GLOBALS['mac_members_test_users_by_id']       = array();
+	$GLOBALS['mac_members_test_user_roles']        = array();
+	$GLOBALS['mac_members_test_cleaned_user_cache'] = array();
 	$GLOBALS['mac_members_test_last_user_query']   = null;
 	$GLOBALS['mac_members_test_registered_styles'] = array();
 	$GLOBALS['mac_members_test_registered_scripts'] = array();
@@ -319,7 +360,23 @@ function get_user_by( string $field, mixed $value ): WP_User|false {
 		return false;
 	}
 
-	return $GLOBALS['mac_members_test_users_by_id'][ (int) $value ] ?? false;
+	$user = $GLOBALS['mac_members_test_users_by_id'][ (int) $value ] ?? false;
+
+	if ( $user instanceof WP_User ) {
+		$user->reload_roles();
+	}
+
+	return $user;
+}
+
+function clean_user_cache( WP_User|int $user ): void {
+	$GLOBALS['mac_members_test_cleaned_user_cache'][] = $user instanceof WP_User ? $user->ID : $user;
+}
+
+function wp_cache_delete( int|string $key, string $group = '' ): bool {
+	unset( $key, $group );
+
+	return true;
 }
 
 function user_can( mixed $user, string $capability ): bool {

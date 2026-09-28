@@ -11,6 +11,7 @@ namespace MacMembers\PendingMembers;
 
 use MacMembers\Assets\FrontendAssets;
 use MacMembers\Contracts\Service;
+use MacMembers\Settings\SettingsRepositoryInterface;
 
 final class PendingMembersShortcode implements Service
 {
@@ -19,7 +20,8 @@ final class PendingMembersShortcode implements Service
 	public function __construct(
 		private readonly PendingMembersQuery $query,
 		private readonly PendingMembersTableRenderer $renderer,
-		private readonly FrontendAssets $assets
+		private readonly FrontendAssets $assets,
+		private readonly SettingsRepositoryInterface $settings
 	) {}
 
 	public function register(): void
@@ -40,6 +42,9 @@ final class PendingMembersShortcode implements Service
 
 		$this->assets->enqueue_pending_members();
 
-		return $this->renderer->render( $this->query->get_pending_users() );
+		return $this->renderer->render(
+			$this->query->get_pending_users(),
+			$this->settings->get_missing_role_slugs()
+		);
 	}
 }

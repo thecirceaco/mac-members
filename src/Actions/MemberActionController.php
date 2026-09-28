@@ -22,6 +22,7 @@ final class MemberActionController implements Service
 	private const ERROR_PERMISSION = 'permission_denied';
 	private const ERROR_NOT_PENDING = 'not_pending';
 	private const ERROR_UPDATE_FAILED = 'role_update_failed';
+	private const ERROR_MISSING_ROLE = 'missing_role';
 	private const SUCCESS_APPROVED = 'approved';
 	private const SUCCESS_DENIED = 'denied';
 
@@ -82,23 +83,16 @@ final class MemberActionController implements Service
 			$other_role = '';
 		}
 
+		// Check the roles before any write, so a missing role cannot leave the user half-changed.
+		if ( ! $this->settings->role_exists( $pending_role ) || ! $this->settings->role_exists( $target_role ) ) {
+			$this->send_error( self::ERROR_MISSING_ROLE, 500 );
+		}
+
 		if ( ! $this->user_has_role( $user, $pending_role ) ) {
 			$this->send_error( self::ERROR_NOT_PENDING, 409 );
 		}
 
-		$user->remove_role( $pending_role );
-
-		if ( '' !== $other_role ) {
-			$user->remove_role( $other_role );
-		}
-
-		$user->add_role( $target_role );
-
-		if (
-			$this->user_has_role( $user, $pending_role )
-			|| $this->user_has_role( $user, $other_role )
-			|| ! $this->user_has_role( $user, $target_role )
-		) {
+		if ( ! $this->change_roles( $user, $pending_role, $target_role, $other_role ) ) {
 			$this->send_error( self::ERROR_UPDATE_FAILED, 500 );
 		}
 
@@ -138,6 +132,79 @@ final class MemberActionController implements Service
 	private function user_has_role( \WP_User $user, string $role ): bool
 	{
 		return '' !== $role && in_array( $role, (array) $user->roles, true );
+	}
+
+	/**
+	 * Moves the user from the pending role to the target role. When the stored roles do not match the
+	 * expected result, the roles the user had before are restored and false is returned.
+	 */
+	private function change_roles( \WP_User $user, string $pending_role, string $target_role, string $other_role ): bool
+	{
+		$original_roles = $this->get_roles( $user );
+
+		$user->remove_role( $pending_role );
+
+		if ( '' !== $other_role ) {
+			$user->remove_role( $other_role );
+		}
+
+		$user->add_role( $target_role );
+
+		// Check what was stored, not the object in memory: add_role() and remove_role() do not report failed writes.
+		$stored = $this->read_user( $user->ID );
+
+		if ( ! $stored instanceof \WP_User ) {
+			return false;
+		}
+
+		if (
+			$this->user_has_role( $stored, $target_role )
+			&& ! $this->user_has_role( $stored, $pending_role )
+			&& ! $this->user_has_role( $stored, $other_role )
+		) {
+			return true;
+		}
+
+		$this->restore_roles( $stored, $original_roles );
+
+		return false;
+	}
+
+	/**
+	 * @param array<int,string> $original_roles Roles the user had before the change.
+	 */
+	private function restore_roles( \WP_User $user, array $original_roles ): void
+	{
+		$current_roles = $this->get_roles( $user );
+
+		foreach ( array_diff( $current_roles, $original_roles ) as $role ) {
+			$user->remove_role( $role );
+		}
+
+		foreach ( array_diff( $original_roles, $current_roles ) as $role ) {
+			$user->add_role( $role );
+		}
+	}
+
+	/**
+	 * Reads the user again, bypassing the object cache.
+	 */
+	private function read_user( int $user_id ): ?\WP_User
+	{
+		\clean_user_cache( $user_id );
+		\wp_cache_delete( $user_id, 'user_meta' );
+
+		$user = \get_user_by( 'id', $user_id );
+
+		return $user instanceof \WP_User ? $user : null;
+	}
+
+	/**
+	 * @return array<int,string>
+	 */
+	private function get_roles( \WP_User $user ): array
+	{
+		return array_values( array_map( 'strval', (array) $user->roles ) );
 	}
 
 	private function send_notifications( string $success_code, \WP_User $user ): ?NotificationResult
@@ -190,6 +257,7 @@ final class MemberActionController implements Service
 			self::ERROR_PERMISSION => __( 'You do not have permission to perform this action.', 'mac-members' ),
 			self::ERROR_NOT_PENDING => __( 'This user is no longer pending.', 'mac-members' ),
 			self::ERROR_UPDATE_FAILED => __( 'Unable to update user role.', 'mac-members' ),
+			self::ERROR_MISSING_ROLE => __( 'A role needed for this action does not exist. Please review Settings > MAC Members.', 'mac-members' ),
 			default => __( 'Invalid request.', 'mac-members' ),
 		};
 	}

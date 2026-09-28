@@ -61,7 +61,8 @@ final class Kernel
 			new PendingMembersShortcode(
 				$pending_members_query,
 				new PendingMembersTableRenderer(),
-				$frontend_assets
+				$frontend_assets,
+				$settings_repository
 			),
 		];
 

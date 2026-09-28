@@ -98,16 +98,20 @@ final class WordPressSettingsRepository implements SettingsRepositoryInterface
 		return \sanitize_text_field( \get_bloginfo( 'name' ) );
 	}
 
+	public function role_exists( string $role ): bool
+	{
+		return '' !== $role && \wp_roles()->is_role( $role );
+	}
+
 	public function get_missing_role_slugs(): array
 	{
-		$settings  = $this->all();
-		$available = $this->get_available_roles();
-		$missing   = array();
+		$settings = $this->all();
+		$missing  = array();
 
 		foreach ( $this->schema->get_role_fields() as $field_key ) {
 			$role = isset( $settings[ $field_key ] ) ? \sanitize_key( (string) $settings[ $field_key ] ) : '';
 
-			if ( '' !== $role && ! array_key_exists( $role, $available ) ) {
+			if ( '' !== $role && ! $this->role_exists( $role ) ) {
 				$missing[] = $role;
 			}
 		}

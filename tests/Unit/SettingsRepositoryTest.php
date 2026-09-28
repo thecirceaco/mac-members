@@ -109,6 +109,14 @@ final class SettingsRepositoryTest extends TestCase {
 		self::assertTrue( $repository->has_missing_roles() );
 	}
 
+	public function test_role_exists_checks_registered_roles(): void {
+		$repository = $this->create_repository();
+
+		self::assertTrue( $repository->role_exists( 'member' ) );
+		self::assertFalse( $repository->role_exists( 'not-a-role' ) );
+		self::assertFalse( $repository->role_exists( '' ) );
+	}
+
 	public function test_ensure_defaults_persists_settings_when_option_missing(): void {
 		delete_option( MAC_MEMBERS_SETTINGS_OPTION );
 
