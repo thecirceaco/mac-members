@@ -3,6 +3,7 @@
 
 	const config = window.macMembers || {};
 	const rootSelector = '[data-mac-members-pending-table]';
+	const rowSelector = 'tr[data-mac-members-user-id]';
 	const actionSelector = '[data-mac-members-action][data-mac-members-user-id]';
 
 	const getMessage = (response, fallback) => {
@@ -11,6 +12,14 @@
 		}
 
 		return fallback;
+	};
+
+	const getErrorCode = (response) => {
+		if (response && response.data && typeof response.data.code === 'string') {
+			return response.data.code;
+		}
+
+		return '';
 	};
 
 	const showNotice = (root, type, message) => {
@@ -66,11 +75,12 @@
 		}
 	};
 
-	const sendAction = async (ajaxAction, userId) => {
+	const sendAction = async (ajaxAction, userId, renderToken) => {
 		const body = new URLSearchParams();
 		body.set('action', ajaxAction);
 		body.set('nonce', config.nonce || '');
 		body.set('user_id', userId);
+		body.set('render_token', renderToken);
 
 		const response = await window.fetch(config.ajaxUrl, {
 			method: 'POST',
@@ -102,7 +112,7 @@
 		}
 
 		const root = button.closest(rootSelector);
-		const row = button.closest('[data-mac-members-user-id]');
+		const row = button.closest(rowSelector);
 
 		if (!root || !row || !config.ajaxUrl) {
 			return;
@@ -110,6 +120,7 @@
 
 		const actionType = button.dataset.macMembersAction;
 		const userId = button.dataset.macMembersUserId;
+		const renderToken = root.dataset.macMembersRenderToken || '';
 		const isApprove = actionType === 'approve';
 		const ajaxAction = isApprove ? config.approveAction : config.denyAction;
 		const confirmMessage = isApprove ? config.confirmApprove : config.confirmDeny;
@@ -121,12 +132,13 @@
 		setRowProcessing(row, true);
 
 		try {
-			const result = await sendAction(ajaxAction, userId);
+			const result = await sendAction(ajaxAction, userId, renderToken);
 
 			if (!result.ok) {
 				showNotice(root, 'error', getMessage(result.data, config.genericError || 'Something went wrong. Please try again.'));
 
-				if (result.status === 409 || (result.data && result.data.data && result.data.data.code === 'not_pending')) {
+				// The user was approved or denied elsewhere, so this row is out of date.
+				if (getErrorCode(result.data) === 'not_pending') {
 					row.classList.add('is-success');
 					window.setTimeout(() => {
 						row.remove();

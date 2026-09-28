@@ -11,6 +11,25 @@ if ( ! defined( 'ABSPATH' ) ) {
 	define( 'ABSPATH', dirname( __DIR__, 2 ) . '/' );
 }
 
+if ( ! defined( 'HOUR_IN_SECONDS' ) ) {
+	define( 'HOUR_IN_SECONDS', 3600 );
+}
+
+if ( ! class_exists( 'WP_Post' ) ) {
+	final class WP_Post {
+		public int $ID;
+		public string $post_content;
+
+		/**
+		 * @param array<string,mixed> $data Post data.
+		 */
+		public function __construct( array $data ) {
+			$this->ID           = (int) ( $data['ID'] ?? 0 );
+			$this->post_content = (string) ( $data['post_content'] ?? '' );
+		}
+	}
+}
+
 if ( ! class_exists( 'WP_Role' ) ) {
 	final class WP_Role {
 		public string $name;
@@ -283,6 +302,10 @@ function mac_members_tests_reset_wp_state(): void {
 	$GLOBALS['mac_members_test_current_user_object_caps'] = array();
 	$GLOBALS['mac_members_test_uninstall_hooks']          = array();
 	$GLOBALS['mac_members_test_doing_it_wrong']           = array();
+	$GLOBALS['mac_members_test_session_token']            = 'session-one';
+	$GLOBALS['mac_members_test_is_singular']              = false;
+	$GLOBALS['mac_members_test_queried_object']           = null;
+	$GLOBALS['mac_members_test_nocache_headers_calls']    = 0;
 	$GLOBALS['mac_members_test_options_pages']     = array();
 	$GLOBALS['mac_members_test_settings_errors']   = array();
 	$GLOBALS['mac_members_test_nonces']            = array();
@@ -548,6 +571,32 @@ function settings_errors( string $setting = '' ): void {
 
 		echo '<div class="' . esc_attr( $error['type'] ) . '"><p>' . esc_html( $error['message'] ) . '</p></div>';
 	}
+}
+
+function wp_salt( string $scheme = 'auth' ): string {
+	return 'test-salt-' . $scheme;
+}
+
+function wp_get_session_token(): string {
+	return (string) ( $GLOBALS['mac_members_test_session_token'] ?? '' );
+}
+
+function is_singular( string|array $post_types = '' ): bool {
+	unset( $post_types );
+
+	return (bool) ( $GLOBALS['mac_members_test_is_singular'] ?? false );
+}
+
+function get_queried_object(): ?object {
+	return $GLOBALS['mac_members_test_queried_object'] ?? null;
+}
+
+function has_shortcode( string $content, string $tag ): bool {
+	return 1 === preg_match( '/\[' . preg_quote( $tag, '/' ) . '[\s\]\/]/', $content );
+}
+
+function nocache_headers(): void {
+	++$GLOBALS['mac_members_test_nocache_headers_calls'];
 }
 
 function wp_create_nonce( string $action ): string {

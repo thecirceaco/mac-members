@@ -12,6 +12,7 @@ namespace MacMembers\Tests\Unit;
 use MacMembers\Actions\MemberActionController;
 use MacMembers\Assets\FrontendAssets;
 use MacMembers\Email\MemberNotificationService;
+use MacMembers\PendingMembers\RenderToken;
 use MacMembers\Settings\SettingsSchema;
 use MacMembers\Settings\WordPressSettingsRepository;
 use PHPUnit\Framework\Attributes\CoversClass;
@@ -89,6 +90,7 @@ final class MemberActionControllerTest extends TestCase {
 			'cannot promote'  => array( 'cannot promote', 'permission_denied' ),
 			'unsafe roles'    => array( 'unsafe roles', 'invalid_role_settings' ),
 			'not editable'    => array( 'not editable', 'permission_denied' ),
+			'stale table'     => array( 'stale table', 'stale_table' ),
 		);
 	}
 
@@ -128,6 +130,54 @@ final class MemberActionControllerTest extends TestCase {
 			),
 			$GLOBALS['mac_members_test_ajax_referer_checks']
 		);
+	}
+
+	#[DataProvider( 'provide_render_tokens_that_do_not_allow_the_action' )]
+	public function test_request_without_a_matching_render_token_is_refused( string $case ): void {
+		$user = $this->store_user( 12, array( 'member-pending' ) );
+		$this->prepare_ajax_request( FrontendAssets::APPROVE_ACTION, $user->ID, $this->make_render_token( $case ) );
+
+		$response = $this->capture_ajax_response(
+			fn (): mixed => $this->create_controller()->approve()
+		);
+
+		self::assertFalse( $response['success'] );
+		self::assertSame( 403, $response['status'] );
+		self::assertSame( 'stale_table', $response['data']['code'] );
+		self::assertSame( 'This table is out of date. Please reload the page and try again.', $response['data']['message'] );
+		self::assertSame( array( 'member-pending' ), $user->roles );
+		self::assertSame( array(), $GLOBALS['mac_members_test_role_changes'] );
+	}
+
+	/**
+	 * @return array<string,array{0:string}>
+	 */
+	public static function provide_render_tokens_that_do_not_allow_the_action(): array {
+		return array(
+			'no token'                    => array( 'no token' ),
+			'malformed token'             => array( 'malformed token' ),
+			'table without this user'     => array( 'table without this user' ),
+			'table rendered for another user' => array( 'table rendered for another user' ),
+			'table from another session'  => array( 'table from another session' ),
+			'user list changed'           => array( 'user list changed' ),
+			'expired table'               => array( 'expired table' ),
+		);
+	}
+
+	public function test_render_token_for_a_table_with_several_users_allows_each_of_them(): void {
+		$token = ( new RenderToken() )->issue( array( 11, 12, 13 ) );
+
+		foreach ( array( 11, 12, 13 ) as $user_id ) {
+			$user = $this->store_user( $user_id, array( 'member-pending' ) );
+			$this->prepare_ajax_request( FrontendAssets::APPROVE_ACTION, $user_id, $token );
+
+			$response = $this->capture_ajax_response(
+				fn (): mixed => $this->create_controller()->approve()
+			);
+
+			self::assertTrue( $response['success'], (string) $user_id );
+			self::assertSame( array( 'member' ), $user->roles );
+		}
 	}
 
 	public function test_capability_denial_returns_permission_error(): void {
@@ -642,10 +692,16 @@ final class MemberActionControllerTest extends TestCase {
 				$_POST['user_id'] = '0';
 				break;
 			case 'unknown user':
-				$_POST['user_id'] = '999';
+				$_POST['user_id']      = '999';
+				$_POST['render_token'] = ( new RenderToken() )->issue( array( 999 ) );
 				break;
 			case 'self action':
 				$GLOBALS['mac_members_test_current_user_id'] = 12;
+				// The table was rendered for this user.
+				$_POST['render_token'] = ( new RenderToken() )->issue( array( 12 ) );
+				break;
+			case 'stale table':
+				$_POST['render_token'] = ( new RenderToken() )->issue( array( 13 ) );
 				break;
 			case 'elevated target':
 				$this->store_user( 12, array( 'member-pending' ), array( 'manage_options' => true ) );
@@ -675,6 +731,38 @@ final class MemberActionControllerTest extends TestCase {
 		$_REQUEST = $_POST;
 	}
 
+	private function make_render_token( string $case ): string {
+		switch ( $case ) {
+			case 'no token':
+				return '';
+			case 'malformed token':
+				return 'not-a-token';
+			case 'table without this user':
+				return ( new RenderToken() )->issue( array( 13, 14 ) );
+			case 'table rendered for another user':
+				$GLOBALS['mac_members_test_current_user_id'] = 2;
+				$token = ( new RenderToken() )->issue( array( 12 ) );
+				$GLOBALS['mac_members_test_current_user_id'] = 1;
+
+				return $token;
+			case 'table from another session':
+				$GLOBALS['mac_members_test_session_token'] = 'session-two';
+				$token = ( new RenderToken() )->issue( array( 12 ) );
+				$GLOBALS['mac_members_test_session_token'] = 'session-one';
+
+				return $token;
+			case 'user list changed':
+				$parts    = explode( '.', ( new RenderToken() )->issue( array( 13 ) ) );
+				$parts[1] = '12';
+
+				return implode( '.', $parts );
+			case 'expired table':
+				return ( new RenderToken( -1 ) )->issue( array( 12 ) );
+		}
+
+		self::fail( 'Unknown token case: ' . $case );
+	}
+
 	private function remove_editable_role( string $role ): void {
 		add_filter(
 			'editable_roles',
@@ -686,11 +774,12 @@ final class MemberActionControllerTest extends TestCase {
 		);
 	}
 
-	private function prepare_ajax_request( string $action, int $user_id ): void {
+	private function prepare_ajax_request( string $action, int $user_id, ?string $render_token = null ): void {
 		$_POST    = array(
-			'action'  => $action,
-			'nonce'   => wp_create_nonce( FrontendAssets::NONCE_ACTION ),
-			'user_id' => (string) $user_id,
+			'action'       => $action,
+			'nonce'        => wp_create_nonce( FrontendAssets::NONCE_ACTION ),
+			'user_id'      => (string) $user_id,
+			'render_token' => $render_token ?? ( new RenderToken() )->issue( array( $user_id ) ),
 		);
 		$_REQUEST = $_POST;
 	}

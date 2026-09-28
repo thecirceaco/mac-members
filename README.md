@@ -48,9 +48,13 @@ Add the pending-members table to a protected admin or internal page with:
 [mac_members_pending_table]
 ```
 
-The shortcode shows pending users to logged-in users who can `promote_users`. Users without that capability see no output.
+The shortcode shows pending users to logged-in users who have the `mac_members_review` capability and can `promote_users`. Other users see no output.
 
 The table lists pending users by the configured pending role and shows the oldest registrations first. Each row includes account details, a profile link, and approve/deny actions.
+
+Each time the table is rendered it gets a token that lists the users it shows and is signed for the current user and login session. Approve and deny requests must send that token, and the server only acts on users the token lists, so buttons or requests that did not come from a rendered table are refused. A token is valid for 12 hours; after that the table has to be reloaded.
+
+On a page whose content contains the shortcode, the plugin defines `DONOTCACHEPAGE` and sends `Cache-Control: no-store` and `Content-Security-Policy: frame-ancestors 'self'` from `template_redirect`, before any output. When the shortcode is placed outside the post content, for example by a page builder or in a template, return `true` from the `mac_members_is_pending_table_page` filter for that request. The shortcode also sends these headers when it renders, if output has not started yet.
 
 ## Approval and Denial
 

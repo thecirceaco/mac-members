@@ -13,6 +13,7 @@ use MacMembers\Assets\FrontendAssets;
 use MacMembers\Contracts\Service;
 use MacMembers\Email\MemberNotificationService;
 use MacMembers\Email\NotificationResult;
+use MacMembers\PendingMembers\RenderToken;
 use MacMembers\Security\Capabilities;
 use MacMembers\Settings\SettingsRepositoryInterface;
 
@@ -25,6 +26,7 @@ final class MemberActionController implements Service
 	private const ERROR_UPDATE_FAILED = 'role_update_failed';
 	private const ERROR_MISSING_ROLE = 'missing_role';
 	private const ERROR_ROLE_SETTINGS = 'invalid_role_settings';
+	private const ERROR_STALE_TABLE = 'stale_table';
 	private const SUCCESS_APPROVED = 'approved';
 	private const SUCCESS_DENIED = 'denied';
 
@@ -36,6 +38,7 @@ final class MemberActionController implements Service
 	public function __construct(
 		private readonly SettingsRepositoryInterface $settings,
 		private readonly ?MemberNotificationService $notifications = null,
+		private readonly RenderToken $render_token = new RenderToken(),
 		private readonly ?\Closure $end_request = null
 	) {}
 
@@ -75,6 +78,12 @@ final class MemberActionController implements Service
 
 		if ( 1 > $user_id ) {
 			$this->send_error( self::ERROR_INVALID_USER, 404 );
+			return;
+		}
+
+		// Only rows of a table the plugin rendered for this user and session can be acted on.
+		if ( ! $this->render_token->allows( $this->get_post_string( 'render_token' ), $user_id ) ) {
+			$this->send_error( self::ERROR_STALE_TABLE, 403 );
 			return;
 		}
 
@@ -343,6 +352,7 @@ final class MemberActionController implements Service
 			self::ERROR_UPDATE_FAILED => __( 'Unable to update user role.', 'mac-members' ),
 			self::ERROR_MISSING_ROLE => __( 'A role needed for this action does not exist. Please review Settings > MAC Members.', 'mac-members' ),
 			self::ERROR_ROLE_SETTINGS => __( 'The role settings are not allowed: the three roles must differ, and the role being added must not grant administrative capabilities. Please review Settings > MAC Members.', 'mac-members' ),
+			self::ERROR_STALE_TABLE => __( 'This table is out of date. Please reload the page and try again.', 'mac-members' ),
 			default => __( 'Invalid request.', 'mac-members' ),
 		};
 	}
