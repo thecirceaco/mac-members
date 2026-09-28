@@ -214,6 +214,10 @@ final class MembersTableShortcodeTest extends TestCase {
 		self::assertSame( MembersTableRenderer::COLUMN_KEYS, $boxes[1] );
 		self::assertSame( array_fill( 0, 10, ' checked' ), $boxes[2] );
 		self::assertStringContainsString( '<label class="mac-members-columns__option"><input type="checkbox" value="roles" data-mac-members-column-toggle checked>Roles</label>', $output );
+		// The checkboxes sit right above the table, under the status filters and the role and search form.
+		self::assertLessThan( strpos( $output, 'class="mac-members-search"' ), strpos( $output, 'class="mac-members-filters"' ) );
+		self::assertLessThan( strpos( $output, 'class="mac-members-columns"' ), strpos( $output, 'class="mac-members-search"' ) );
+		self::assertLessThan( strpos( $output, 'class="mac-members-table-wrap"' ), strpos( $output, 'class="mac-members-columns"' ) );
 	}
 
 	public function test_the_cookie_unchecks_the_columns_the_viewer_hid(): void {

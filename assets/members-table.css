@@ -192,33 +192,54 @@
 }
 
 /*
- * Striped rows: every second row is --bg-ultra-light, like the header. Every row keeps the page's text color, so
- * both stripes read the same.
+ * Striped rows: every second row is --bg-ultra-light, like the header. Every cell has its own background, so a
+ * sticky cell hides the cells that scroll under it. Every row keeps the page's text color, so both stripes read
+ * the same.
  */
-.mac-members-list tbody tr:nth-child(even) {
+.mac-members-list tbody td {
+	background-color: var(--body-bg-color);
+}
+
+.mac-members-list tbody tr:nth-child(even) > td {
 	background-color: var(--bg-ultra-light);
 }
 
-/* The header stays at the top and the User ID column at the left while the table scrolls. */
+/* The header stays at the top while the table scrolls. */
 .mac-members-list thead th {
 	position: sticky;
 	inset-block-start: 0;
 	z-index: 2;
 }
 
-/* Sticky cells need their own background, or the cells scrolling under them show through. */
-.mac-members-list tbody td:first-child {
+/*
+ * The first visible column stays at the left while the table scrolls sideways: User ID, or, while its checkbox
+ * is unchecked, the first column after it whose checkbox is checked.
+ */
+.mac-members-table tbody [data-mac-members-column="user_id"],
+.mac-members-table:has([data-mac-members-column-toggle][value="user_id"]:not(:checked)) tbody [data-mac-members-column="email"],
+.mac-members-table:has([data-mac-members-column-toggle][value="user_id"]:not(:checked)):has([data-mac-members-column-toggle][value="email"]:not(:checked)) tbody [data-mac-members-column="first_name"],
+.mac-members-table:has([data-mac-members-column-toggle][value="user_id"]:not(:checked)):has([data-mac-members-column-toggle][value="email"]:not(:checked)):has([data-mac-members-column-toggle][value="first_name"]:not(:checked)) tbody [data-mac-members-column="last_name"],
+.mac-members-table:has([data-mac-members-column-toggle][value="user_id"]:not(:checked)):has([data-mac-members-column-toggle][value="email"]:not(:checked)):has([data-mac-members-column-toggle][value="first_name"]:not(:checked)):has([data-mac-members-column-toggle][value="last_name"]:not(:checked)) tbody [data-mac-members-column="username"],
+.mac-members-table:has([data-mac-members-column-toggle][value="user_id"]:not(:checked)):has([data-mac-members-column-toggle][value="email"]:not(:checked)):has([data-mac-members-column-toggle][value="first_name"]:not(:checked)):has([data-mac-members-column-toggle][value="last_name"]:not(:checked)):has([data-mac-members-column-toggle][value="username"]:not(:checked)) tbody [data-mac-members-column="registered"],
+.mac-members-table:has([data-mac-members-column-toggle][value="user_id"]:not(:checked)):has([data-mac-members-column-toggle][value="email"]:not(:checked)):has([data-mac-members-column-toggle][value="first_name"]:not(:checked)):has([data-mac-members-column-toggle][value="last_name"]:not(:checked)):has([data-mac-members-column-toggle][value="username"]:not(:checked)):has([data-mac-members-column-toggle][value="registered"]:not(:checked)) tbody [data-mac-members-column="profile"],
+.mac-members-table:has([data-mac-members-column-toggle][value="user_id"]:not(:checked)):has([data-mac-members-column-toggle][value="email"]:not(:checked)):has([data-mac-members-column-toggle][value="first_name"]:not(:checked)):has([data-mac-members-column-toggle][value="last_name"]:not(:checked)):has([data-mac-members-column-toggle][value="username"]:not(:checked)):has([data-mac-members-column-toggle][value="registered"]:not(:checked)):has([data-mac-members-column-toggle][value="profile"]:not(:checked)) tbody [data-mac-members-column="status"],
+.mac-members-table:has([data-mac-members-column-toggle][value="user_id"]:not(:checked)):has([data-mac-members-column-toggle][value="email"]:not(:checked)):has([data-mac-members-column-toggle][value="first_name"]:not(:checked)):has([data-mac-members-column-toggle][value="last_name"]:not(:checked)):has([data-mac-members-column-toggle][value="username"]:not(:checked)):has([data-mac-members-column-toggle][value="registered"]:not(:checked)):has([data-mac-members-column-toggle][value="profile"]:not(:checked)):has([data-mac-members-column-toggle][value="status"]:not(:checked)) tbody [data-mac-members-column="roles"],
+.mac-members-table:has([data-mac-members-column-toggle][value="user_id"]:not(:checked)):has([data-mac-members-column-toggle][value="email"]:not(:checked)):has([data-mac-members-column-toggle][value="first_name"]:not(:checked)):has([data-mac-members-column-toggle][value="last_name"]:not(:checked)):has([data-mac-members-column-toggle][value="username"]:not(:checked)):has([data-mac-members-column-toggle][value="registered"]:not(:checked)):has([data-mac-members-column-toggle][value="profile"]:not(:checked)):has([data-mac-members-column-toggle][value="status"]:not(:checked)):has([data-mac-members-column-toggle][value="roles"]:not(:checked)) tbody [data-mac-members-column="actions"] {
 	position: sticky;
 	inset-inline-start: 0;
 	z-index: 1;
-	background-color: var(--body-bg-color);
 }
 
-.mac-members-list tbody tr:nth-child(even) > td:first-child {
-	background-color: var(--bg-ultra-light);
-}
-
-.mac-members-list thead th:first-child {
+.mac-members-table thead [data-mac-members-column="user_id"],
+.mac-members-table:has([data-mac-members-column-toggle][value="user_id"]:not(:checked)) thead [data-mac-members-column="email"],
+.mac-members-table:has([data-mac-members-column-toggle][value="user_id"]:not(:checked)):has([data-mac-members-column-toggle][value="email"]:not(:checked)) thead [data-mac-members-column="first_name"],
+.mac-members-table:has([data-mac-members-column-toggle][value="user_id"]:not(:checked)):has([data-mac-members-column-toggle][value="email"]:not(:checked)):has([data-mac-members-column-toggle][value="first_name"]:not(:checked)) thead [data-mac-members-column="last_name"],
+.mac-members-table:has([data-mac-members-column-toggle][value="user_id"]:not(:checked)):has([data-mac-members-column-toggle][value="email"]:not(:checked)):has([data-mac-members-column-toggle][value="first_name"]:not(:checked)):has([data-mac-members-column-toggle][value="last_name"]:not(:checked)) thead [data-mac-members-column="username"],
+.mac-members-table:has([data-mac-members-column-toggle][value="user_id"]:not(:checked)):has([data-mac-members-column-toggle][value="email"]:not(:checked)):has([data-mac-members-column-toggle][value="first_name"]:not(:checked)):has([data-mac-members-column-toggle][value="last_name"]:not(:checked)):has([data-mac-members-column-toggle][value="username"]:not(:checked)) thead [data-mac-members-column="registered"],
+.mac-members-table:has([data-mac-members-column-toggle][value="user_id"]:not(:checked)):has([data-mac-members-column-toggle][value="email"]:not(:checked)):has([data-mac-members-column-toggle][value="first_name"]:not(:checked)):has([data-mac-members-column-toggle][value="last_name"]:not(:checked)):has([data-mac-members-column-toggle][value="username"]:not(:checked)):has([data-mac-members-column-toggle][value="registered"]:not(:checked)) thead [data-mac-members-column="profile"],
+.mac-members-table:has([data-mac-members-column-toggle][value="user_id"]:not(:checked)):has([data-mac-members-column-toggle][value="email"]:not(:checked)):has([data-mac-members-column-toggle][value="first_name"]:not(:checked)):has([data-mac-members-column-toggle][value="last_name"]:not(:checked)):has([data-mac-members-column-toggle][value="username"]:not(:checked)):has([data-mac-members-column-toggle][value="registered"]:not(:checked)):has([data-mac-members-column-toggle][value="profile"]:not(:checked)) thead [data-mac-members-column="status"],
+.mac-members-table:has([data-mac-members-column-toggle][value="user_id"]:not(:checked)):has([data-mac-members-column-toggle][value="email"]:not(:checked)):has([data-mac-members-column-toggle][value="first_name"]:not(:checked)):has([data-mac-members-column-toggle][value="last_name"]:not(:checked)):has([data-mac-members-column-toggle][value="username"]:not(:checked)):has([data-mac-members-column-toggle][value="registered"]:not(:checked)):has([data-mac-members-column-toggle][value="profile"]:not(:checked)):has([data-mac-members-column-toggle][value="status"]:not(:checked)) thead [data-mac-members-column="roles"],
+.mac-members-table:has([data-mac-members-column-toggle][value="user_id"]:not(:checked)):has([data-mac-members-column-toggle][value="email"]:not(:checked)):has([data-mac-members-column-toggle][value="first_name"]:not(:checked)):has([data-mac-members-column-toggle][value="last_name"]:not(:checked)):has([data-mac-members-column-toggle][value="username"]:not(:checked)):has([data-mac-members-column-toggle][value="registered"]:not(:checked)):has([data-mac-members-column-toggle][value="profile"]:not(:checked)):has([data-mac-members-column-toggle][value="status"]:not(:checked)):has([data-mac-members-column-toggle][value="roles"]:not(:checked)) thead [data-mac-members-column="actions"] {
 	inset-inline-start: 0;
 	z-index: 3;
 }

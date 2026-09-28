@@ -48,8 +48,8 @@ final class MembersTableRenderer
 		$output  = '<div class="mac-members-table" data-mac-members-table data-mac-members-view="' . esc_attr( $view ) . '" data-mac-members-render-token="' . esc_attr( $render_token ) . '">';
 		$output .= $this->render_missing_roles_warning( $missing_roles );
 		$output .= $this->render_filters( $filters );
-		$output .= '' === $body ? '' : $this->render_column_toggles( $hidden_columns );
 		$output .= $this->render_search_form( $search_form, $form_id );
+		$output .= '' === $body ? '' : $this->render_column_toggles( $hidden_columns );
 		$output .= '<div class="mac-members-notices" aria-live="polite" aria-atomic="true"></div>';
 		$output .= '<p class="mac-members-empty"' . ( '' === $body ? '' : ' hidden' ) . '>' . esc_html( $this->get_empty_text( $view, $narrowed ) ) . '</p>';
 
