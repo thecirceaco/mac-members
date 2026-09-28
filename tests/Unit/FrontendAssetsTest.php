@@ -77,6 +77,7 @@ final class FrontendAssetsTest extends TestCase {
 
 		self::assertSame( 'https://example.test/wp-admin/admin-ajax.php', $config['ajaxUrl'] );
 		self::assertSame( 'nonce-' . FrontendAssets::NONCE_ACTION, $config['nonce'] );
+		self::assertSame( '%1$s-%2$s of %3$s', $config['rangeText'] );
 		self::assertSame(
 			array(
 				'approve'    => array(

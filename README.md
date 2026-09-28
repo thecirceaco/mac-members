@@ -65,7 +65,9 @@ The table has a filter for each status (Pending, Approved, Inactive, Denied) and
 [mac_members_table status="pending"]
 ```
 
-Pending requests are listed oldest first, like a queue; the other views show the newest registrations first. The table shows 50 members per page, with Previous and Next links (`mac_members_page`). The columns are User ID, Email, First Name, Last Name, Username, Registered, Profile, Status and Actions; the Actions column has only the status changes the member's status allows.
+Pending requests are listed oldest first, like a queue; the other views show the newest registrations first. The columns are User ID, Email, First Name, Last Name, Username, Registered, Profile, Status and Actions; the Actions column has only the status changes the member's status allows.
+
+Under the table, the page links sit on the left: Previous, the first and last page, the current page with one page on each side, gaps for the pages in between, and Next. On the right, "Per page" chooses 24, 48, 96 or 192 members per page, 24 by default, and the range shows which members the page lists, such as "1-24 of 2,353". The page and the page size are kept in the `mac_members_page` and `mac_members_per_page` query arguments. A page past the end, for example after a larger page size, shows the last page. The page size select belongs to the role and search form, so choosing a size keeps the role and the search and starts again at page 1.
 
 A form above the table narrows any view. It has no buttons:
 
@@ -76,7 +78,7 @@ The role and the search are kept in the `mac_members_role` and `mac_members_sear
 
 ACSS keeps its `btn--` classes in a cascade layer, while its reset `input, button, textarea, select { font: inherit; }` is outside any layer, so on a `<button>` the reset wins and the button loses the ACSS button font. The table's buttons use `revert-layer` for their background, border, color and font, so the ACSS button styles apply, hover included.
 
-After a change, a row that no longer belongs in a filtered view disappears, and in the All view the row shows its new status and buttons. The filter counts follow the changes.
+After a change, a row that no longer belongs in a filtered view disappears, and in the All view the row shows its new status and buttons. The filter counts and the range follow the changes. When the last row of a page goes and members are left on other pages, the page loads again to show them.
 
 The stylesheet and the script are versioned with the plugin version and the file's modification time, so a new build reaches browsers and CDNs that keep the old files for a year.
 

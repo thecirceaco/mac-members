@@ -10,6 +10,7 @@ declare(strict_types=1);
 namespace MacMembers\Assets;
 
 use MacMembers\Contracts\Service;
+use MacMembers\Members\MembersTableRenderer;
 use MacMembers\Members\MemberStatus;
 use MacMembers\Members\MemberTransition;
 
@@ -120,6 +121,7 @@ final class FrontendAssets implements Service
 			'statuses'       => $statuses,
 			'genericError'   => __( 'Something went wrong. Please try again.', 'mac-members' ),
 			'genericSuccess' => __( 'Member updated.', 'mac-members' ),
+			'rangeText'      => MembersTableRenderer::get_range_template(),
 		);
 	}
 }

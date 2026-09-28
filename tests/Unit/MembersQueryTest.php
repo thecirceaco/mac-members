@@ -36,7 +36,7 @@ final class MembersQueryTest extends TestCase {
 		self::assertSame(
 			array(
 				'role__in'    => array( 'subscriber' ),
-				'number'      => 50,
+				'number'      => 24,
 				'paged'       => 1,
 				'orderby'     => 'registered',
 				'order'       => 'ASC',
@@ -75,12 +75,15 @@ final class MembersQueryTest extends TestCase {
 
 		$query  = new MembersQuery( $this->create_settings_repository() );
 		$first  = $query->get_members( MemberStatus::Approved );
-		$second = $query->get_members( MemberStatus::Approved, 2 );
+		$third  = $query->get_members( MemberStatus::Approved, 3 );
+		$larger = $query->get_members( MemberStatus::Approved, 1, '', '', 48 );
 
-		self::assertCount( 50, $first['users'] );
+		self::assertCount( 24, $first['users'] );
 		self::assertSame( 51, $first['total'] );
-		self::assertSame( array( 51 ), array_map( static fn ( \WP_User $user ): int => $user->ID, $second['users'] ) );
+		self::assertSame( array( 49, 50, 51 ), array_map( static fn ( \WP_User $user ): int => $user->ID, $third['users'] ) );
+		self::assertCount( 48, $larger['users'] );
 		self::assertSame( 52, $query->get_members( null )['total'] );
+		self::assertSame( 96, $query->get_query_args( MemberStatus::Approved, 2, '', array(), 96 )['number'] );
 	}
 
 	public function test_count_by_status_counts_each_status_role(): void {

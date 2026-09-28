@@ -18,7 +18,11 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 final class MembersQuery
 {
-	public const PER_PAGE = 50;
+	/**
+	 * Members per page: the default, and the choices the table offers.
+	 */
+	public const PER_PAGE         = 24;
+	public const PER_PAGE_OPTIONS = array( 24, 48, 96, 192 );
 
 	/**
 	 * Longest search the table accepts.
@@ -50,17 +54,18 @@ final class MembersQuery
 	/**
 	 * Pending requests are listed oldest first, like a queue; the other views newest first.
 	 *
-	 * @param MemberStatus|null $status  Status to list, or null for every member.
-	 * @param string            $role    A role the members must also hold, or '' for any role.
-	 * @param array<int,int>    $include Only these users, or no limit when empty.
+	 * @param MemberStatus|null $status   Status to list, or null for every member.
+	 * @param string            $role     A role the members must also hold, or '' for any role.
+	 * @param array<int,int>    $include  Only these users, or no limit when empty.
+	 * @param int               $per_page Members per page.
 	 *
 	 * @return array<string,mixed>
 	 */
-	public function get_query_args( ?MemberStatus $status, int $page = 1, string $role = '', array $include = array() ): array
+	public function get_query_args( ?MemberStatus $status, int $page = 1, string $role = '', array $include = array(), int $per_page = self::PER_PAGE ): array
 	{
 		$args = array(
 			'role__in'    => null === $status ? array_values( $this->get_status_roles() ) : array( $this->get_role( $status ) ),
-			'number'      => self::PER_PAGE,
+			'number'      => max( 1, $per_page ),
 			'paged'       => max( 1, $page ),
 			'orderby'     => 'registered',
 			'order'       => MemberStatus::Pending === $status ? 'ASC' : 'DESC',
@@ -81,13 +86,14 @@ final class MembersQuery
 	}
 
 	/**
-	 * @param MemberStatus|null $status Status to list, or null for every member.
-	 * @param string            $role   A role the members must also hold, or '' for any role.
-	 * @param string            $search Words every listed member matches, or '' for no search.
+	 * @param MemberStatus|null $status   Status to list, or null for every member.
+	 * @param string            $role     A role the members must also hold, or '' for any role.
+	 * @param string            $search   Words every listed member matches, or '' for no search.
+	 * @param int               $per_page Members per page.
 	 *
 	 * @return array{users:array<int,object>,total:int} One page of members and the number of members in the view.
 	 */
-	public function get_members( ?MemberStatus $status, int $page = 1, string $role = '', string $search = '' ): array
+	public function get_members( ?MemberStatus $status, int $page = 1, string $role = '', string $search = '', int $per_page = self::PER_PAGE ): array
 	{
 		$include = $this->find_search_matches( $role, $search );
 
@@ -98,7 +104,7 @@ final class MembersQuery
 			);
 		}
 
-		$query = new \WP_User_Query( $this->get_query_args( $status, $page, $role, $include ?? array() ) );
+		$query = new \WP_User_Query( $this->get_query_args( $status, $page, $role, $include ?? array(), $per_page ) );
 		$users = $query->get_results();
 
 		return array(

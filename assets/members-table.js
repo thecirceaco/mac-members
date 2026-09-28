@@ -6,6 +6,7 @@
 	const statuses = config.statuses || {};
 	const genericError = config.genericError || 'Something went wrong. Please try again.';
 	const genericSuccess = config.genericSuccess || 'Member updated.';
+	const rangeText = config.rangeText || '%1$s-%2$s of %3$s';
 	const rootSelector = '[data-mac-members-table]';
 	const rowSelector = 'tr[data-mac-members-user-id]';
 	const actionSelector = '[data-mac-members-action][data-mac-members-user-id]';
@@ -59,6 +60,12 @@
 
 		if (tableWrap) {
 			tableWrap.remove();
+		}
+
+		const footer = root.querySelector('.mac-members-footer');
+
+		if (footer) {
+			footer.hidden = true;
 		}
 
 		const empty = root.querySelector('.mac-members-empty');
@@ -125,11 +132,48 @@
 		});
 	};
 
+	const formatNumber = (value) => value.toLocaleString(document.documentElement.lang || undefined);
+
+	// Keeps the range under the table, such as "1-24 of 2,353", in step when a row leaves the view.
+	const shrinkRange = (root) => {
+		const range = root.querySelector('[data-mac-members-range]');
+
+		if (!range) {
+			return null;
+		}
+
+		const first = parseInt(range.dataset.macMembersRangeFirst, 10);
+		const last = Math.max(0, parseInt(range.dataset.macMembersRangeLast, 10) - 1);
+		const total = Math.max(0, parseInt(range.dataset.macMembersRangeTotal, 10) - 1);
+
+		if ([first, last, total].some((value) => Number.isNaN(value))) {
+			return null;
+		}
+
+		range.dataset.macMembersRangeLast = String(last);
+		range.dataset.macMembersRangeTotal = String(total);
+		range.textContent = rangeText
+			.replace('%1$s', formatNumber(first))
+			.replace('%2$s', formatNumber(last))
+			.replace('%3$s', formatNumber(total));
+
+		return { total };
+	};
+
 	const removeRow = (root, row) => {
 		row.classList.add('is-success');
 
 		window.setTimeout(() => {
 			row.remove();
+
+			const range = shrinkRange(root);
+
+			// The page is empty but members are left on other pages: load the page again to show them.
+			if (range && range.total > 0 && !root.querySelector('tbody tr')) {
+				window.location.reload();
+				return;
+			}
+
 			showEmptyStateIfNeeded(root);
 		}, 900);
 	};
@@ -238,11 +282,23 @@
 		}
 	});
 
-	// The role filter has no button: choosing a role sends the form, like Enter in the search.
+	// The role and search form leaves out empty fields, so the page address only has the choices that are set.
+	document.querySelectorAll('form.mac-members-search').forEach((form) => {
+		form.addEventListener('formdata', (event) => {
+			[...event.formData.entries()].forEach(([name, value]) => {
+				if (value === '') {
+					event.formData.delete(name);
+				}
+			});
+		});
+	});
+
+	// The role filter and the page size have no button: choosing an option sends their form, like Enter in
+	// the search. The page size select belongs to that form through its form attribute.
 	document.addEventListener('change', (event) => {
 		const select = event.target;
 
-		if (!(select instanceof HTMLSelectElement) || !select.matches('[data-mac-members-role-filter]') || !select.form) {
+		if (!(select instanceof HTMLSelectElement) || !select.matches('[data-mac-members-autosubmit]') || !select.form) {
 			return;
 		}
 

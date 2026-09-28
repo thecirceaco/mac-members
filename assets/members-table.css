@@ -209,9 +209,57 @@
 	color: var(--bg-ultra-light-text);
 }
 
+/* Under the table: the page links on the left, the page size and the range on the right. */
+.mac-members-footer {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 1em;
+	font-size: var(--text-s);
+}
+
+.mac-members-footer[hidden] {
+	display: none;
+}
+
+.mac-members-footer__end {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 1em;
+	margin-inline-start: auto;
+}
+
 .mac-members-pagination {
 	display: flex;
 	flex-wrap: wrap;
 	align-items: center;
+	gap: 0.5ch;
+}
+
+/* Page links take the width of their text, like the filters. */
+.mac-members-page-link {
+	--btn-min-width: fit-content;
+}
+
+.mac-members-per-page {
+	display: flex;
+	align-items: center;
 	gap: 1ch;
+}
+
+.mac-members-per-page__select {
+	padding-block: 0.25em;
+	padding-inline: 0.5em;
+	border: var(--border);
+	border-radius: var(--radius);
+	background-color: var(--white);
+	color: var(--text-dark);
+	font-family: var(--text-font-family);
+	font-size: var(--text-s);
+	line-height: var(--text-line-height);
+}
+
+.mac-members-range {
+	margin: 0;
 }

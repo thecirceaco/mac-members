@@ -23,12 +23,13 @@ final class MembersTableShortcode implements Service
 	public const SHORTCODE = 'mac_members_table';
 
 	/**
-	 * Query arguments that choose the view, the page, the role and the search.
+	 * Query arguments that choose the view, the page, the page size, the role and the search.
 	 */
-	public const STATUS_QUERY_ARG = 'mac_members_status';
-	public const PAGE_QUERY_ARG   = 'mac_members_page';
-	public const ROLE_QUERY_ARG   = 'mac_members_role';
-	public const SEARCH_QUERY_ARG = 'mac_members_search';
+	public const STATUS_QUERY_ARG   = 'mac_members_status';
+	public const PAGE_QUERY_ARG     = 'mac_members_page';
+	public const PER_PAGE_QUERY_ARG = 'mac_members_per_page';
+	public const ROLE_QUERY_ARG     = 'mac_members_role';
+	public const SEARCH_QUERY_ARG   = 'mac_members_search';
 
 	/**
 	 * View that lists every member.
@@ -81,18 +82,27 @@ final class MembersTableShortcode implements Service
 		$view       = $fixed_view ?? $this->parse_view( $this->get_query_string( self::STATUS_QUERY_ARG ) ) ?? MemberStatus::Pending->value;
 		$status     = self::VIEW_ALL === $view ? null : MemberStatus::from( $view );
 		$page       = max( 1, \absint( $this->get_query_string( self::PAGE_QUERY_ARG ) ) );
+		$per_page   = $this->parse_per_page( $this->get_query_string( self::PER_PAGE_QUERY_ARG ) );
 		$roles      = $this->query->get_filter_roles();
 		$role       = $this->parse_role( $this->get_query_string( self::ROLE_QUERY_ARG ), $roles );
 		$search     = $this->parse_search( $this->get_query_string( self::SEARCH_QUERY_ARG ) );
-		$members    = $this->query->get_members( $status, $page, $role, $search );
-		$base_url   = \remove_query_arg( array( self::STATUS_QUERY_ARG, self::PAGE_QUERY_ARG, self::ROLE_QUERY_ARG, self::SEARCH_QUERY_ARG ) );
-		$narrowing  = $this->get_narrowing_args( $role, $search );
+		$members    = $this->query->get_members( $status, $page, $role, $search, $per_page );
+		$last_page  = max( 1, (int) ceil( $members['total'] / $per_page ) );
+
+		// A page past the end, for example after a larger page size or a search, shows the last page instead.
+		if ( $page > $last_page ) {
+			$page    = $last_page;
+			$members = $this->query->get_members( $status, $page, $role, $search, $per_page );
+		}
+
+		$base_url = \remove_query_arg( array( self::STATUS_QUERY_ARG, self::PAGE_QUERY_ARG, self::PER_PAGE_QUERY_ARG, self::ROLE_QUERY_ARG, self::SEARCH_QUERY_ARG ) );
+		$kept     = $this->get_kept_args( $role, $search, $per_page );
 
 		return $this->renderer->render(
 			$this->get_rows( $members['users'] ),
 			$view,
-			null === $fixed_view ? $this->get_filters( $view, $base_url, $role, $search ) : array(),
-			$this->get_pagination( $view, $page, $members['total'], $base_url, $narrowing ),
+			null === $fixed_view ? $this->get_filters( $view, $base_url, $role, $search, $kept ) : array(),
+			$this->get_pagination( $view, $page, $per_page, $members['total'], $base_url, $kept ),
 			$this->settings->get_missing_role_slugs(),
 			$this->render_token->issue( $this->get_user_ids( $members['users'] ) ),
 			$this->get_search_form( null === $fixed_view ? $view : null, $base_url, $roles, $role, $search )
@@ -139,17 +149,28 @@ final class MembersTableShortcode implements Service
 	}
 
 	/**
-	 * The role and search query arguments that are set, for links that keep them. They are encoded here
-	 * because add_query_arg() adds new values as they are.
+	 * @return int One of the page sizes the table offers, or the default.
+	 */
+	private function parse_per_page( string $value ): int
+	{
+		$per_page = \absint( $value );
+
+		return in_array( $per_page, MembersQuery::PER_PAGE_OPTIONS, true ) ? $per_page : MembersQuery::PER_PAGE;
+	}
+
+	/**
+	 * The page size, role and search query arguments that differ from the defaults, for links that keep
+	 * them. They are encoded here because add_query_arg() adds new values as they are.
 	 *
 	 * @return array<string,string>
 	 */
-	private function get_narrowing_args( string $role, string $search ): array
+	private function get_kept_args( string $role, string $search, int $per_page ): array
 	{
 		$args = array_filter(
 			array(
-				self::ROLE_QUERY_ARG   => $role,
-				self::SEARCH_QUERY_ARG => $search,
+				self::PER_PAGE_QUERY_ARG => MembersQuery::PER_PAGE === $per_page ? '' : (string) $per_page,
+				self::ROLE_QUERY_ARG     => $role,
+				self::SEARCH_QUERY_ARG   => $search,
 			),
 			static fn ( string $value ): bool => '' !== $value
 		);
@@ -188,22 +209,23 @@ final class MembersTableShortcode implements Service
 	}
 
 	/**
-	 * Status filters whose counts and links follow the role and the search.
+	 * Status filters whose counts follow the role and the search, and whose links keep them and the page size.
+	 *
+	 * @param array<string,string> $kept The page size, role and search query arguments that are set.
 	 *
 	 * @return array<int,array{view:string,label:string,count:int,url:string,current:bool}>
 	 */
-	private function get_filters( string $view, string $base_url, string $role, string $search ): array
+	private function get_filters( string $view, string $base_url, string $role, string $search, array $kept ): array
 	{
-		$counts    = $this->query->count_by_status( $role, $search );
-		$narrowing = $this->get_narrowing_args( $role, $search );
-		$filters   = array();
+		$counts  = $this->query->count_by_status( $role, $search );
+		$filters = array();
 
 		foreach ( MemberStatus::cases() as $status ) {
 			$filters[] = array(
 				'view'    => $status->value,
 				'label'   => $status->label(),
 				'count'   => $counts[ $status->value ] ?? 0,
-				'url'     => \add_query_arg( array( self::STATUS_QUERY_ARG => $status->value ) + $narrowing, $base_url ),
+				'url'     => \add_query_arg( array( self::STATUS_QUERY_ARG => $status->value ) + $kept, $base_url ),
 				'current' => $status->value === $view,
 			);
 		}
@@ -212,7 +234,7 @@ final class MembersTableShortcode implements Service
 			'view'    => self::VIEW_ALL,
 			'label'   => __( 'All', 'mac-members' ),
 			'count'   => array_sum( $counts ),
-			'url'     => \add_query_arg( array( self::STATUS_QUERY_ARG => self::VIEW_ALL ) + $narrowing, $base_url ),
+			'url'     => \add_query_arg( array( self::STATUS_QUERY_ARG => self::VIEW_ALL ) + $kept, $base_url ),
 			'current' => self::VIEW_ALL === $view,
 		);
 
@@ -256,31 +278,82 @@ final class MembersTableShortcode implements Service
 	}
 
 	/**
-	 * @param array<string,string> $narrowing The role and search query arguments that are set.
+	 * The page links, the members this page shows (first, last and total) and the page size.
 	 *
-	 * @return array{page:int,pages:int,previous_url:string,next_url:string}
+	 * @param array<string,string> $kept The page size, role and search query arguments that are set.
+	 *
+	 * @return array{page:int,pages:int,per_page:int,total:int,first:int,last:int,links:array<int,array{page:int,url:string,current:bool}|null>,previous_url:string,next_url:string}
 	 */
-	private function get_pagination( string $view, int $page, int $total, string $base_url, array $narrowing ): array
+	private function get_pagination( string $view, int $page, int $per_page, int $total, string $base_url, array $kept ): array
 	{
-		$pages = max( 1, (int) ceil( $total / MembersQuery::PER_PAGE ) );
+		$pages = max( 1, (int) ceil( $total / $per_page ) );
+		$links = array();
+
+		foreach ( $this->get_page_numbers( $page, $pages ) as $number ) {
+			$links[] = null === $number ? null : array(
+				'page'    => $number,
+				'url'     => $this->get_page_url( $view, $number, $base_url, $kept ),
+				'current' => $number === $page,
+			);
+		}
 
 		return array(
 			'page'         => $page,
 			'pages'        => $pages,
-			'previous_url' => 1 < $page ? $this->get_page_url( $view, $page - 1, $base_url, $narrowing ) : '',
-			'next_url'     => $page < $pages ? $this->get_page_url( $view, $page + 1, $base_url, $narrowing ) : '',
+			'per_page'     => $per_page,
+			'total'        => $total,
+			'first'        => 0 < $total ? ( $page - 1 ) * $per_page + 1 : 0,
+			'last'         => min( $total, $page * $per_page ),
+			'links'        => $links,
+			'previous_url' => 1 < $page ? $this->get_page_url( $view, $page - 1, $base_url, $kept ) : '',
+			'next_url'     => $page < $pages ? $this->get_page_url( $view, $page + 1, $base_url, $kept ) : '',
 		);
 	}
 
 	/**
-	 * @param array<string,string> $narrowing The role and search query arguments that are set.
+	 * The pages the pagination links to: the first and last page, the current page and one page on each side
+	 * of it. Null marks a gap; a gap of a single page shows that page instead.
+	 *
+	 * @return array<int,int|null>
 	 */
-	private function get_page_url( string $view, int $page, string $base_url, array $narrowing ): string
+	private function get_page_numbers( int $page, int $pages ): array
 	{
-		return \add_query_arg(
-			array( self::STATUS_QUERY_ARG => $view ) + $narrowing + array( self::PAGE_QUERY_ARG => $page ),
-			$base_url
+		$shown = array_filter(
+			array_unique( array( 1, $page - 1, $page, $page + 1, $pages ) ),
+			static fn ( int $number ): bool => 1 <= $number && $number <= $pages
 		);
+
+		sort( $shown );
+
+		$numbers  = array();
+		$previous = 0;
+
+		foreach ( $shown as $number ) {
+			if ( 2 === $number - $previous ) {
+				$numbers[] = $number - 1;
+			} elseif ( 2 < $number - $previous ) {
+				$numbers[] = null;
+			}
+
+			$numbers[] = $number;
+			$previous  = $number;
+		}
+
+		return $numbers;
+	}
+
+	/**
+	 * @param array<string,string> $kept The page size, role and search query arguments that are set.
+	 */
+	private function get_page_url( string $view, int $page, string $base_url, array $kept ): string
+	{
+		$args = array( self::STATUS_QUERY_ARG => $view ) + $kept;
+
+		if ( 1 < $page ) {
+			$args[ self::PAGE_QUERY_ARG ] = $page;
+		}
+
+		return \add_query_arg( $args, $base_url );
 	}
 
 	private function is_table_page(): bool

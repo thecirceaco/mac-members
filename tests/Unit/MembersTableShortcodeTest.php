@@ -228,30 +228,123 @@ final class MembersTableShortcodeTest extends TestCase {
 		self::assertStringContainsString( 'data-mac-members-view="pending"', $output );
 	}
 
-	public function test_pagination_links_keep_the_view(): void {
-		$members = array();
-
-		for ( $id = 1; $id <= 51; $id++ ) {
-			$members[ $id ] = 'mac_members_approved';
-		}
-
-		$this->store_members( $members );
+	public function test_footer_has_numbered_pages_the_range_and_the_page_size(): void {
+		$this->store_approved_members( 51 );
 		$_SERVER['REQUEST_URI']     = '/members/?mac_members_status=approved';
 		$_GET['mac_members_status'] = 'approved';
 
 		$first = $this->create_shortcode()->render();
 
-		self::assertStringContainsString( '<span class="mac-members-page-count">Page 1 of 2</span>', $first );
-		self::assertStringContainsString( '<a class="mac-members-page-link btn--neutral btn--outline btn--s" href="/members/?mac_members_status=approved&amp;mac_members_page=2">Next</a>', $first );
-		self::assertStringNotContainsString( '>Previous</a>', $first );
+		self::assertSame( 24, substr_count( $first, '<tr class="mac-members-list__row"' ) );
+		self::assertSame( array( '1', '2', '3', 'Next' ), $this->get_pagination_items( $first ) );
+		self::assertStringContainsString( '<span class="mac-members-page-link btn--neutral btn--s" aria-current="page">1</span>', $first );
+		self::assertStringContainsString( '<a class="mac-members-page-link btn--neutral btn--outline btn--s" href="/members/?mac_members_status=approved&amp;mac_members_page=2">2</a>', $first );
+		self::assertStringContainsString( 'href="/members/?mac_members_status=approved&amp;mac_members_page=2" rel="next">Next</a>', $first );
+		self::assertStringContainsString( 'data-mac-members-range-first="1" data-mac-members-range-last="24" data-mac-members-range-total="51">1-24 of 51</p>', $first );
+		// The page size select sits in the footer and belongs to the role and search form.
+		self::assertStringContainsString( '<form class="mac-members-search" id="mac-members-search-1"', $first );
+		self::assertStringContainsString( '<select class="mac-members-per-page__select" name="mac_members_per_page" form="mac-members-search-1" data-mac-members-autosubmit><option value="24" selected>24</option><option value="48">48</option><option value="96">96</option><option value="192">192</option></select>', $first );
 
-		$_GET['mac_members_page'] = '2';
-		$second                   = $this->create_shortcode()->render();
+		$_GET['mac_members_page'] = '3';
+		$third                    = $this->create_shortcode()->render();
 
-		self::assertStringContainsString( 'Page 2 of 2', $second );
-		self::assertStringContainsString( 'href="/members/?mac_members_status=approved&amp;mac_members_page=1">Previous</a>', $second );
-		self::assertStringNotContainsString( '>Next</a>', $second );
-		self::assertSame( 1, substr_count( $second, '<tr class="mac-members-list__row"' ) );
+		self::assertSame( 3, substr_count( $third, '<tr class="mac-members-list__row"' ) );
+		self::assertSame( array( 'Previous', '1', '2', '3' ), $this->get_pagination_items( $third ) );
+		// Page 1 needs no page argument.
+		self::assertStringContainsString( 'href="/members/?mac_members_status=approved">1</a>', $third );
+		self::assertStringContainsString( 'href="/members/?mac_members_status=approved&amp;mac_members_page=2" rel="prev">Previous</a>', $third );
+		self::assertStringContainsString( '>49-51 of 51</p>', $third );
+	}
+
+	public function test_pagination_shows_gaps_around_the_current_page(): void {
+		$this->store_approved_members( 200 );
+		$_GET = array(
+			'mac_members_status' => 'approved',
+			'mac_members_page'   => '5',
+		);
+
+		self::assertSame(
+			array( 'Previous', '1', '&hellip;', '4', '5', '6', '&hellip;', '9', 'Next' ),
+			$this->get_pagination_items( $this->create_shortcode()->render() )
+		);
+	}
+
+	public function test_a_gap_of_one_page_shows_that_page(): void {
+		$this->store_approved_members( 200 );
+		$_GET = array(
+			'mac_members_status' => 'approved',
+			'mac_members_page'   => '4',
+		);
+
+		self::assertSame(
+			array( 'Previous', '1', '2', '3', '4', '5', '&hellip;', '9', 'Next' ),
+			$this->get_pagination_items( $this->create_shortcode()->render() )
+		);
+	}
+
+	public function test_page_size_query_argument_sets_the_page_and_stays_in_the_links(): void {
+		$this->store_approved_members( 50 );
+		$_GET = array(
+			'mac_members_status'   => 'approved',
+			'mac_members_per_page' => '48',
+		);
+
+		$output = $this->create_shortcode()->render();
+
+		self::assertSame( 48, substr_count( $output, '<tr class="mac-members-list__row"' ) );
+		self::assertStringContainsString( '<option value="48" selected>48</option>', $output );
+		self::assertStringContainsString( '>1-48 of 50</p>', $output );
+		self::assertStringContainsString( 'href="/?mac_members_status=approved&amp;mac_members_per_page=48&amp;mac_members_page=2" rel="next">Next</a>', $output );
+		self::assertStringContainsString( 'href="/?mac_members_status=pending&amp;mac_members_per_page=48">Pending', $output );
+	}
+
+	public function test_unknown_page_size_falls_back_to_24(): void {
+		$this->store_approved_members( 30 );
+		$_GET = array(
+			'mac_members_status'   => 'approved',
+			'mac_members_per_page' => '50',
+		);
+
+		$output = $this->create_shortcode()->render();
+
+		self::assertSame( 24, substr_count( $output, '<tr class="mac-members-list__row"' ) );
+		self::assertStringContainsString( '<option value="24" selected>24</option>', $output );
+		self::assertStringNotContainsString( 'mac_members_per_page=', $output );
+	}
+
+	public function test_a_page_past_the_end_shows_the_last_page(): void {
+		$this->store_approved_members( 30 );
+		$_GET = array(
+			'mac_members_status' => 'approved',
+			'mac_members_page'   => '5',
+		);
+
+		$output = $this->create_shortcode()->render();
+
+		self::assertSame( 6, substr_count( $output, '<tr class="mac-members-list__row"' ) );
+		self::assertStringContainsString( '<span class="mac-members-page-link btn--neutral btn--s" aria-current="page">2</span>', $output );
+		self::assertStringContainsString( '>25-30 of 30</p>', $output );
+	}
+
+	public function test_range_uses_thousands_separators(): void {
+		$output = ( new MembersTableRenderer() )->render(
+			array(),
+			'all',
+			array(),
+			array(
+				'page'     => 1,
+				'pages'    => 99,
+				'per_page' => 24,
+				'total'    => 2353,
+				'first'    => 1,
+				'last'     => 24,
+				'links'    => array(),
+			)
+		);
+
+		self::assertStringContainsString( 'data-mac-members-range-total="2353">1-24 of 2,353</p>', $output );
+		// Without the role and search form there is no form for the page size select to belong to.
+		self::assertStringNotContainsString( 'mac-members-per-page', $output );
 	}
 
 	public function test_role_filter_offers_the_roles_members_hold_and_narrows_the_view_and_counts(): void {
@@ -272,7 +365,8 @@ final class MembersTableShortcodeTest extends TestCase {
 		$output = $this->create_shortcode()->render();
 
 		// Administrator is left out by default, and only a non-member holds Shop Steward.
-		self::assertSame( 3, preg_match_all( '/<option value="([^"]*)"[^>]*>([^<]*)<\/option>/', $output, $options ) );
+		self::assertSame( 1, preg_match( '/<select class="mac-members-search__role"[^>]*>(.*?)<\/select>/s', $output, $role_select ) );
+		self::assertSame( 3, preg_match_all( '/<option value="([^"]*)"[^>]*>([^<]*)<\/option>/', $role_select[1], $options ) );
 		self::assertSame( array( '', 'officer', 'trustee' ), $options[1] );
 		self::assertSame( array( 'All roles', 'Officer', 'Trustee' ), $options[2] );
 		self::assertStringContainsString( '<option value="officer" selected>Officer</option>', $output );
@@ -283,7 +377,7 @@ final class MembersTableShortcodeTest extends TestCase {
 		self::assertStringContainsString( 'data-mac-members-count-for="approved">1</span>', $output );
 		self::assertStringContainsString( 'data-mac-members-count-for="all">2</span>', $output );
 		// Choosing a role sends the form, so the dropdown needs no button next to it.
-		self::assertStringContainsString( '<select class="mac-members-search__role" name="mac_members_role" aria-label="Role" data-mac-members-role-filter>', $output );
+		self::assertStringContainsString( '<select class="mac-members-search__role" name="mac_members_role" aria-label="Role" data-mac-members-autosubmit>', $output );
 		self::assertStringNotContainsString( '<button type="submit"', $output );
 	}
 
@@ -302,7 +396,7 @@ final class MembersTableShortcodeTest extends TestCase {
 		self::assertStringContainsString( 'data-mac-members-user-id="1"', $output );
 		self::assertStringContainsString( 'data-mac-members-user-id="2"', $output );
 		// No member holds a role the filter offers, so only the search shows.
-		self::assertStringNotContainsString( '<select', $output );
+		self::assertStringNotContainsString( 'mac-members-search__role', $output );
 		self::assertStringContainsString( '<input class="mac-members-search__input" type="search" name="mac_members_search" value=""', $output );
 	}
 
@@ -364,7 +458,7 @@ final class MembersTableShortcodeTest extends TestCase {
 		$output = $this->create_shortcode()->render();
 
 		// Without a role to offer, the form is the hidden fields and the search. Enter sends it.
-		self::assertStringContainsString( '<form class="mac-members-search" method="get" action="/" role="search" aria-label="Filter members"><input type="hidden" name="page_id" value="5"><input type="hidden" name="mac_members_status" value="denied"><input class="mac-members-search__input" type="search"', $output );
+		self::assertStringContainsString( '<form class="mac-members-search" id="mac-members-search-1" method="get" action="/" role="search" aria-label="Filter members"><input type="hidden" name="page_id" value="5"><input type="hidden" name="mac_members_status" value="denied"><input class="mac-members-search__input" type="search"', $output );
 		self::assertStringContainsString( 'aria-label="Search members"></form>', $output );
 	}
 
@@ -394,15 +488,22 @@ final class MembersTableShortcodeTest extends TestCase {
 		);
 
 		self::assertStringContainsString(
-			'href="/?mac_members_status=approved&amp;mac_members_role=officer&amp;mac_members_search=ion&amp;mac_members_page=2">Next</a>',
+			'href="/?mac_members_status=approved&amp;mac_members_role=officer&amp;mac_members_search=ion&amp;mac_members_page=2" rel="next">Next</a>',
 			$this->create_shortcode()->render()
 		);
 	}
 
-	public function test_single_page_has_no_pagination(): void {
+	public function test_single_page_has_no_page_links_but_keeps_the_range(): void {
 		$this->store_members( array( 1 => 'mac_members_pending' ) );
 
-		self::assertStringNotContainsString( 'mac-members-pagination', $this->create_shortcode()->render() );
+		$output = $this->create_shortcode()->render();
+
+		self::assertStringNotContainsString( 'mac-members-pagination', $output );
+		self::assertStringContainsString( '>1-1 of 1</p>', $output );
+	}
+
+	public function test_empty_view_has_no_footer(): void {
+		self::assertStringNotContainsString( 'mac-members-footer', $this->create_shortcode()->render() );
 	}
 
 	#[DataProvider( 'provide_table_page_detection' )]
@@ -616,6 +717,26 @@ final class MembersTableShortcodeTest extends TestCase {
 				'capabilities' => array( 'read' => true ),
 			);
 		}
+	}
+
+	private function store_approved_members( int $count ): void {
+		$members = array();
+
+		for ( $id = 1; $id <= $count; $id++ ) {
+			$members[ $id ] = 'mac_members_approved';
+		}
+
+		$this->store_members( $members );
+	}
+
+	/**
+	 * @return array<int,string> The text of each link, page and gap in the pagination, in order.
+	 */
+	private function get_pagination_items( string $output ): array {
+		self::assertSame( 1, preg_match( '/<nav class="mac-members-pagination"[^>]*>(.*?)<\/nav>/s', $output, $nav ) );
+		preg_match_all( '/<(?:a|span)[^>]*>([^<]*)<\/(?:a|span)>/', $nav[1], $items );
+
+		return $items[1];
 	}
 
 	private function get_render_token( string $output ): string {

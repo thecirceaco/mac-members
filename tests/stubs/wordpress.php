@@ -565,6 +565,7 @@ function mac_members_tests_reset_wp_state(): void {
 	$GLOBALS['mac_members_test_last_user_query']   = null;
 	$GLOBALS['mac_members_test_user_queries']      = array();
 	$GLOBALS['mac_members_test_role_translations'] = array();
+	$GLOBALS['mac_members_test_unique_id']         = 0;
 	$GLOBALS['mac_members_test_registered_styles'] = array();
 	$GLOBALS['mac_members_test_registered_scripts'] = array();
 	$GLOBALS['mac_members_test_enqueued_styles']    = array();
@@ -795,6 +796,19 @@ function __( string $text, string $domain = 'default' ): string {
 	unset( $domain );
 
 	return $text;
+}
+
+function number_format_i18n( float|int $number, int $decimals = 0 ): string {
+	return number_format( $number, $decimals );
+}
+
+/**
+ * Like WordPress: the prefix and a number that grows with each call in the request.
+ */
+function wp_unique_id( string $prefix = '' ): string {
+	$GLOBALS['mac_members_test_unique_id'] = ( $GLOBALS['mac_members_test_unique_id'] ?? 0 ) + 1;
+
+	return $prefix . $GLOBALS['mac_members_test_unique_id'];
 }
 
 function esc_html( mixed $text ): string {
