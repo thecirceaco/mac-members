@@ -52,9 +52,11 @@ The table lists pending users by the configured pending role and shows the oldes
 
 ## Approval and Denial
 
-Approving a pending user removes the configured pending role and adds the configured approved role.
+Approving a pending user removes the configured pending and denied roles and adds the configured approved role.
 
-Denying a pending user removes the configured pending role and adds the configured denied role. Denied users are not deleted.
+Denying a pending user removes the configured pending and approved roles and adds the configured denied role. Denied users are not deleted.
+
+Approve and deny exclude each other, so a user who is moved back to pending never keeps the outcome role of an earlier review.
 
 Existing unrelated roles are preserved in both flows.
 

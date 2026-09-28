@@ -15,6 +15,7 @@ use MacMembers\Email\MemberNotificationService;
 use MacMembers\Settings\SettingsSchema;
 use MacMembers\Settings\WordPressSettingsRepository;
 use PHPUnit\Framework\Attributes\CoversClass;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 
 use function mac_members_tests_reset_wp_state;
@@ -163,6 +164,55 @@ final class MemberActionControllerTest extends TestCase {
 		self::assertSame( 200, $response['status'] );
 		self::assertSame( 'Member denied successfully.', $response['data']['message'] );
 		self::assertSame( array( 'subscriber', 'member-invalid' ), $user->roles );
+	}
+
+	/**
+	 * @param array<int,string> $roles_before Roles before the action.
+	 * @param array<int,string> $roles_after Expected roles after the action.
+	 */
+	#[DataProvider( 'provide_users_with_outcome_roles' )]
+	public function test_action_removes_the_other_outcome_role( string $action, array $roles_before, array $roles_after ): void {
+		$user = $this->store_user( 12, $roles_before );
+		$this->prepare_ajax_request( 'approve' === $action ? FrontendAssets::APPROVE_ACTION : FrontendAssets::DENY_ACTION, $user->ID );
+
+		$response = $this->capture_ajax_response(
+			fn (): mixed => 'approve' === $action ? $this->create_controller()->approve() : $this->create_controller()->deny()
+		);
+
+		self::assertTrue( $response['success'] );
+		self::assertSame( 200, $response['status'] );
+		self::assertSame( $roles_after, $user->roles );
+	}
+
+	/**
+	 * @return array<string,array{0:string,1:array<int,string>,2:array<int,string>}>
+	 */
+	public static function provide_users_with_outcome_roles(): array {
+		return array(
+			'approve a user denied earlier'           => array( 'approve', array( 'member-pending', 'member-invalid', 'subscriber' ), array( 'subscriber', 'member' ) ),
+			'approve a user holding both outcomes'    => array( 'approve', array( 'member-pending', 'member', 'member-invalid' ), array( 'member' ) ),
+			'approve a user already holding approved' => array( 'approve', array( 'member-pending', 'member' ), array( 'member' ) ),
+			'deny a user approved earlier'            => array( 'deny', array( 'member-pending', 'member', 'subscriber' ), array( 'subscriber', 'member-invalid' ) ),
+			'deny a user holding both outcomes'       => array( 'deny', array( 'member-pending', 'member', 'member-invalid' ), array( 'member-invalid' ) ),
+			'deny a user already holding denied'      => array( 'deny', array( 'member-pending', 'member-invalid' ), array( 'member-invalid' ) ),
+		);
+	}
+
+	public function test_same_approved_and_denied_role_is_not_removed_while_adding_it(): void {
+		$GLOBALS['mac_members_test_options'][ MAC_MEMBERS_SETTINGS_OPTION ] = array(
+			'approved_role' => 'member',
+			'denied_role'   => 'member',
+		);
+
+		$user = $this->store_user( 12, array( 'member-pending' ) );
+		$this->prepare_ajax_request( FrontendAssets::DENY_ACTION, $user->ID );
+
+		$response = $this->capture_ajax_response(
+			fn (): mixed => $this->create_controller()->deny()
+		);
+
+		self::assertTrue( $response['success'] );
+		self::assertSame( array( 'member' ), $user->roles );
 	}
 
 	public function test_role_update_failure_returns_error(): void {

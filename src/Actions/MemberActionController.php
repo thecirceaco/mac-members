@@ -38,15 +38,15 @@ final class MemberActionController implements Service
 
 	public function approve(): void
 	{
-		$this->handle( FrontendAssets::APPROVE_ACTION, 'approved_role', self::SUCCESS_APPROVED );
+		$this->handle( FrontendAssets::APPROVE_ACTION, 'approved_role', 'denied_role', self::SUCCESS_APPROVED );
 	}
 
 	public function deny(): void
 	{
-		$this->handle( FrontendAssets::DENY_ACTION, 'denied_role', self::SUCCESS_DENIED );
+		$this->handle( FrontendAssets::DENY_ACTION, 'denied_role', 'approved_role', self::SUCCESS_DENIED );
 	}
 
-	private function handle( string $expected_action, string $target_role_setting, string $success_code ): void
+	private function handle( string $expected_action, string $target_role_setting, string $other_role_setting, string $success_code ): void
 	{
 		if ( ! $this->is_valid_request( $expected_action ) ) {
 			$this->send_error( self::ERROR_INVALID_REQUEST, 400 );
@@ -74,15 +74,31 @@ final class MemberActionController implements Service
 
 		$pending_role = (string) $this->settings->get( 'pending_role', 'member-pending' );
 		$target_role  = (string) $this->settings->get( $target_role_setting, '' );
+		// Approve and deny exclude each other: a user who went back to pending must not keep an earlier outcome.
+		$other_role = (string) $this->settings->get( $other_role_setting, '' );
+
+		if ( $other_role === $target_role ) {
+			// Never remove the role that is being added.
+			$other_role = '';
+		}
 
 		if ( ! $this->user_has_role( $user, $pending_role ) ) {
 			$this->send_error( self::ERROR_NOT_PENDING, 409 );
 		}
 
 		$user->remove_role( $pending_role );
+
+		if ( '' !== $other_role ) {
+			$user->remove_role( $other_role );
+		}
+
 		$user->add_role( $target_role );
 
-		if ( $this->user_has_role( $user, $pending_role ) || ! $this->user_has_role( $user, $target_role ) ) {
+		if (
+			$this->user_has_role( $user, $pending_role )
+			|| $this->user_has_role( $user, $other_role )
+			|| ! $this->user_has_role( $user, $target_role )
+		) {
 			$this->send_error( self::ERROR_UPDATE_FAILED, 500 );
 		}
 
