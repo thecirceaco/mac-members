@@ -1,6 +1,6 @@
 <?php
 /**
- * Tests for the tested WordPress version of MAC Members updates.
+ * Tests for the WordPress compatibility shown for MAC Members updates.
  *
  * @package MacMembers\Tests\Unit
  */
@@ -18,6 +18,8 @@ use function mac_members_tests_reset_wp_state;
 
 #[CoversClass( UpdateCompatibility::class )]
 final class UpdateCompatibilityTest extends TestCase {
+	private const BASENAME = 'mac-members/mac-members.php';
+
 	protected function setUp(): void {
 		parent::setUp();
 
@@ -26,17 +28,16 @@ final class UpdateCompatibilityTest extends TestCase {
 		require_once dirname( __DIR__, 2 ) . '/inc/constants.php';
 	}
 
-	public function test_register_runs_after_the_surecart_sdk(): void {
-		$tested = new UpdateCompatibility();
+	public function test_register_adds_filters_after_the_sdk(): void {
+		$service = new UpdateCompatibility();
 
-		$tested->register();
+		$service->register();
 
-		$update      = $GLOBALS['mac_members_test_filters']['site_transient_update_plugins'][0];
+		$transient   = $GLOBALS['mac_members_test_filters']['site_transient_update_plugins'][0];
 		$information = $GLOBALS['mac_members_test_filters']['plugins_api'][0];
 
-		self::assertSame( array( $tested, 'filter_update_plugins' ), $update['callback'] );
-		self::assertSame( 20, $update['priority'] );
-		self::assertSame( array( $tested, 'filter_plugin_information' ), $information['callback'] );
+		self::assertSame( array( $service, 'filter_update_transient' ), $transient['callback'] );
+		self::assertSame( array( $service, 'filter_plugin_information' ), $information['callback'] );
 		self::assertSame( 20, $information['priority'] );
 		self::assertSame( 3, $information['accepted_args'] );
 	}
@@ -44,70 +45,60 @@ final class UpdateCompatibilityTest extends TestCase {
 	/**
 	 * @return array<string,array{string,string,string}>
 	 */
-	public static function versions(): array {
+	public static function version_pairs(): array {
 		return array(
-			'branch on a patch release'        => array( '7.1', '7.1.2', '7.1.2' ),
-			'older patch on a newer one'       => array( '7.1.2', '7.1.3', '7.1.3' ),
-			'branch on a release candidate'    => array( '7.1', '7.1.3-RC1', '7.1.3' ),
-			'the same version'                 => array( '7.1.2', '7.1.2', '7.1.2' ),
-			'a newer patch than WordPress'     => array( '7.1.3', '7.1.2', '7.1.3' ),
-			'an older branch stays untested'   => array( '7.0', '7.1.2', '7.0' ),
-			'an older branch with a patch'     => array( '7.0.4', '7.1.2', '7.0.4' ),
-			'a newer branch stays as it is'    => array( '7.2', '7.1.2', '7.2' ),
-			'the branch on its first release'  => array( '7.1', '7.1', '7.1' ),
+			'branch only, same branch' => array( '7.1', '7.1.2', '7.1.2' ),
+			'older patch, same branch' => array( '7.1.2', '7.1.3', '7.1.3' ),
+			'same version'             => array( '7.1.2', '7.1.2', '7.1.2' ),
+			'newer than running'       => array( '7.2', '7.1.2', '7.2' ),
+			'older branch'             => array( '7.0', '7.1.2', '7.0' ),
+			'older major'              => array( '6.9', '7.1.2', '6.9' ),
+			'patch release candidate'  => array( '7.1.2', '7.1.3-RC1', '7.1.3' ),
+			'next branch candidate'    => array( '7.1.2', '7.2-RC1', '7.1.2' ),
 		);
 	}
 
-	#[DataProvider( 'versions' )]
-	public function test_an_update_covers_its_whole_branch( string $tested, string $running, string $expected ): void {
+	#[DataProvider( 'version_pairs' )]
+	public function test_pending_update_is_tested_on_the_whole_running_branch( string $tested, string $running, string $expected ): void {
 		$GLOBALS['mac_members_test_bloginfo']['version'] = $running;
-		$transient = (object) array(
-			'response'  => array( 'mac-members/mac-members.php' => (object) array( 'new_version' => '0.5.1', 'tested' => $tested ) ),
-			'no_update' => array(),
-		);
+		$update    = (object) array( 'new_version' => '0.5.1', 'tested' => $tested );
+		$transient = (object) array( 'response' => array( self::BASENAME => $update ) );
 
-		$filtered = ( new UpdateCompatibility() )->filter_update_plugins( $transient );
+		( new UpdateCompatibility() )->filter_update_transient( $transient );
 
-		self::assertSame( $expected, $filtered->response['mac-members/mac-members.php']->tested );
+		self::assertSame( $expected, $transient->response[ self::BASENAME ]->tested );
+		// The SDK's own object keeps what SureCart sent.
+		self::assertSame( $tested, $update->tested );
 	}
 
-	public function test_the_no_update_entry_is_covered_too_and_other_plugins_are_left_alone(): void {
+	public function test_other_plugins_and_other_values_are_left_alone(): void {
 		$GLOBALS['mac_members_test_bloginfo']['version'] = '7.1.2';
+		$service   = new UpdateCompatibility();
 		$transient = (object) array(
 			'response'  => array( 'mac-core/mac-core.php' => (object) array( 'tested' => '7.1' ) ),
-			'no_update' => array( 'mac-members/mac-members.php' => (object) array( 'tested' => '7.1' ) ),
+			'no_update' => array( self::BASENAME => (object) array( 'tested' => '7.1' ) ),
 		);
 
-		$filtered = ( new UpdateCompatibility() )->filter_update_plugins( $transient );
+		$service->filter_update_transient( $transient );
 
-		self::assertSame( '7.1.2', $filtered->no_update['mac-members/mac-members.php']->tested );
-		self::assertSame( '7.1', $filtered->response['mac-core/mac-core.php']->tested );
+		self::assertSame( '7.1', $transient->response['mac-core/mac-core.php']->tested );
+		self::assertSame( '7.1', $transient->no_update[ self::BASENAME ]->tested );
+		self::assertFalse( $service->filter_update_transient( false ) );
+
+		$without_tested = (object) array( 'response' => array( self::BASENAME => (object) array( 'new_version' => '0.5.1' ) ) );
+
+		self::assertObjectNotHasProperty( 'tested', $service->filter_update_transient( $without_tested )->response[ self::BASENAME ] );
 	}
 
-	public function test_a_transient_without_mac_members_or_tested_passes_through(): void {
+	public function test_view_details_is_tested_on_the_whole_running_branch(): void {
 		$GLOBALS['mac_members_test_bloginfo']['version'] = '7.1.2';
-		$tested = new UpdateCompatibility();
+		$service = new UpdateCompatibility();
+		$info    = (object) array( 'slug' => 'mac-members', 'tested' => '7.1' );
 
-		self::assertFalse( $tested->filter_update_plugins( false ) );
-
-		$transient = (object) array( 'response' => array( 'mac-members/mac-members.php' => (object) array( 'new_version' => '0.5.1' ) ) );
-
-		self::assertObjectNotHasProperty( 'tested', $tested->filter_update_plugins( $transient )->response['mac-members/mac-members.php'] );
-	}
-
-	public function test_view_details_covers_the_branch_for_mac_members_only(): void {
-		$GLOBALS['mac_members_test_bloginfo']['version'] = '7.1.2';
-		$tested = new UpdateCompatibility();
-
-		$details = $tested->filter_plugin_information( (object) array( 'tested' => '7.1' ), 'plugin_information', (object) array( 'slug' => 'mac-members' ) );
-		self::assertSame( '7.1.2', $details->tested );
-
-		$other = $tested->filter_plugin_information( (object) array( 'tested' => '7.1' ), 'plugin_information', (object) array( 'slug' => 'mac-core' ) );
-		self::assertSame( '7.1', $other->tested );
-
-		$search = $tested->filter_plugin_information( (object) array( 'tested' => '7.1' ), 'query_plugins', (object) array( 'slug' => 'mac-members' ) );
-		self::assertSame( '7.1', $search->tested );
-
-		self::assertFalse( $tested->filter_plugin_information( false, 'plugin_information', (object) array( 'slug' => 'mac-members' ) ) );
+		self::assertSame( '7.1.2', $service->filter_plugin_information( $info, 'plugin_information', (object) array( 'slug' => 'mac-members' ) )->tested );
+		self::assertSame( '7.1', $info->tested );
+		self::assertSame( $info, $service->filter_plugin_information( $info, 'plugin_information', (object) array( 'slug' => 'mac-core' ) ) );
+		self::assertSame( $info, $service->filter_plugin_information( $info, 'query_plugins', (object) array( 'slug' => 'mac-members' ) ) );
+		self::assertFalse( $service->filter_plugin_information( false, 'plugin_information', (object) array( 'slug' => 'mac-members' ) ) );
 	}
 }
