@@ -16,6 +16,7 @@ use MacMembers\Assets\FrontendAssets;
 use MacMembers\Contracts\Service;
 use MacMembers\Email\MemberNotificationService;
 use MacMembers\Licensing\LicensingService;
+use MacMembers\Licensing\UpdateCompatibility;
 use MacMembers\Members\MembersQuery;
 use MacMembers\Members\MembersTableRenderer;
 use MacMembers\Members\MembersTableShortcode;
@@ -68,6 +69,7 @@ final class Kernel
 			new SettingsController( $settings_repository, $settings_schema, null, $menu_placement, $licensing ),
 			new PluginListingLinks( $menu_placement ),
 			$licensing,
+			new UpdateCompatibility(),
 			new MemberActionController( $settings_repository, $notifications ),
 			$frontend_assets,
 			new MembersTableShortcode(

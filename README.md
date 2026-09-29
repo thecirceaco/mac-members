@@ -173,6 +173,7 @@ MAC Members gets its updates from SureCart, like MAC Core. Enter the license key
 - `Update URI` is `https://updates.circea.co/mac-members/`, a Circea name WordPress never requests, so no other updater plugin can supply MAC Members.
 - "Delete plugin data" also removes the stored license and the cached update details.
 - Each release ZIP also goes to the MAC Members product in SureCart by hand; `release.json` carries the version and the changelog SureCart shows, and the release check requires its version to match the tag.
+- `tested` in `release.json` is the full WordPress version the release was tested on, such as `7.1.2`. WordPress compares it with the full running version, and the SDK passes it on as it is, so MAC Members treats it as tested for the whole branch, the way wordpress.org reads "Tested up to: 7.1": on 7.1.3 the Updates screen and "View details" don't show "Not tested". A new branch, like 7.2, still needs a release that says so.
 
 ## Development
 

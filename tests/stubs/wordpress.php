@@ -729,6 +729,10 @@ function get_bloginfo( string $show = '' ): string {
 	return (string) ( $GLOBALS['mac_members_test_bloginfo'][ $show ] ?? '' );
 }
 
+function wp_get_wp_version(): string {
+	return get_bloginfo( 'version' );
+}
+
 function wp_roles(): WP_Roles {
 	return new WP_Roles( $GLOBALS['mac_members_test_roles'] ?? array() );
 }
