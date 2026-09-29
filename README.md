@@ -33,7 +33,7 @@ MAC Members always uses these four roles. New registrations need `mac_members_pe
 
 The settings page is under `Settings > MAC Members`. Turn on "Top-level admin menu" to give it its own menu item with the MAC icon instead, at the end of the menu next to MAC Core, since both add their items at `admin_menu` priority 20; it's off by default. Saving sends you back to the page, at its new address when this setting changed.
 
-The page has three tabs: Settings, below; License (see License and Updates); and Support, with the support email and a link to the MAC Members documentation. Like MAC Core, the MAC Members row on the Plugins screen links to Settings and License next to Deactivate, and to Support and Documentation next to View details.
+The page has three tabs: Settings, below; License (see License and Updates); and Support, with the support email and a link to the documentation. Like MAC Core, the MAC Members row on the Plugins screen links to Settings and License next to Deactivate, and to Support and Documentation next to View details. Both documentation links open the home page of the Circea docs site, `https://docs.circea.co/`, so a change in the docs' structure can't break them.
 
 The Settings tab has three sections:
 

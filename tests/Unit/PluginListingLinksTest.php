@@ -71,7 +71,7 @@ final class PluginListingLinksTest extends TestCase {
 				'By Circea',
 				'View details',
 				'<a href="https://example.test/wp-admin/options-general.php?page=mac-members&amp;tab=support">Support</a>',
-				'<a href="https://docs.circea.co/doc/mac-members/" target="_blank" rel="noopener noreferrer">Documentation</a>',
+				'<a href="https://docs.circea.co/" target="_blank" rel="noopener noreferrer">Documentation</a>',
 			),
 			$links->row_meta( $meta, 'mac-members/mac-members.php' )
 		);

@@ -213,7 +213,7 @@ final class SettingsControllerTest extends TestCase {
 		self::assertStringContainsString( '<a href="https://example.test/wp-admin/options-general.php?page=mac-members&amp;tab=support" class="nav-tab nav-tab-active" aria-current="page">Support</a>', $output );
 		self::assertStringContainsString(
 			'<p>You can get support by sending an email to <a href="mailto:mihai@circea.co">mihai@circea.co</a>. Before you do, make sure to check out our '
-			. '<a href="https://docs.circea.co/doc/mac-members/" target="_blank" rel="noopener noreferrer">documentation</a>.</p>',
+			. '<a href="https://docs.circea.co/" target="_blank" rel="noopener noreferrer">documentation</a>.</p>',
 			$output
 		);
 		self::assertStringNotContainsString( 'save_settings', $output );

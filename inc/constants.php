@@ -24,9 +24,10 @@ if ( ! defined( 'MAC_MEMBERS_SURECART_PUBLIC_TOKEN' ) ) {
 	define( 'MAC_MEMBERS_SURECART_PUBLIC_TOKEN', 'pt_T7wtCcQ2DNPZvadkHjy1uXbw' );
 }
 
-// The MAC Members page on the Circea docs site, linked from the plugins screen and the Support tab.
+// The Circea docs site, linked from the plugins screen and the Support tab. Its home page, like MAC Core's, so a
+// change in the docs' structure can't break the link.
 if ( ! defined( 'MAC_MEMBERS_DOCS_URL' ) ) {
-	define( 'MAC_MEMBERS_DOCS_URL', 'https://docs.circea.co/doc/mac-members/' );
+	define( 'MAC_MEMBERS_DOCS_URL', 'https://docs.circea.co/' );
 }
 
 if ( ! defined( 'MAC_MEMBERS_ADMIN_SLUG' ) ) {
