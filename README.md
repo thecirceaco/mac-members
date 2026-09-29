@@ -29,6 +29,17 @@ Activation also creates the Member Reviewer role, `mac_members_reviewer`, for th
 
 MAC Members always uses these four roles. New registrations need `mac_members_pending`, for example from the registration form's user action, and membership rules, for example in SureMembers, use `mac_members_approved`. Earlier versions, up to 0.2.0, let a site choose other roles for the statuses; a site whose members hold other roles moves them to these once, for example with WP-CLI.
 
+## Registration
+
+MAC Members doesn't register users: the site's registration form does, and MAC Members reviews the accounts it creates. On MAC sites that's the WS Form "Create Account" form with a User Management action, checked against WS Form User 1.6.8 on 2026-09-30.
+
+- Set the action's Role to Member (Pending). When that Role is empty, WS Form uses "New User Default Role" from `Settings > General`, so set that to Member (Pending) too.
+- Leave "Anyone can register" off. WS Form creates users without it, and with it on, `wp-login.php?action=register` becomes a second way in.
+- The form sends the "request received" emails, so each site can word them; MAC Members sends only the status change emails.
+- An Edit Profile form with an Update action never changes roles, so members can safely edit their own profile.
+- The applicant picks a password in the form and can log in right away. A pending or denied account sees only what any logged-in user sees, so gate members-only content on the Member role, for example with SureMembers access groups that follow the roles, never on being logged in. SureMembers lets a role in only for users who hold no access group, and granting a group to a user adds or removes the group's roles, so don't grant those groups to users directly.
+- The email address isn't verified: the reviewer checks the applicant against the member list. To verify it, remove the password fields and turn on "Create password" and "Send user notification: User" in the action; WordPress then emails a link to set the password.
+
 ## Settings
 
 The settings page is under `Settings > MAC Members`. Turn on "Top-level admin menu" to give it its own menu item with the MAC icon instead, at the end of the menu next to MAC Core, since both add their items at `admin_menu` priority 20; it's off by default. Saving sends you back to the page, at its new address when this setting changed.
