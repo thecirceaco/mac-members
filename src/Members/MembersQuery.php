@@ -192,8 +192,8 @@ final class MembersQuery
 
 	/**
 	 * Roles whose users never show in the members table: the roles checked in the "Roles hidden from the members
-	 * table" setting, and every role with a sensitive capability, like Administrator, since status changes refuse
-	 * its users anyway. The status roles are never hidden.
+	 * table" setting, and every role with an administrative capability, like Administrator, since status changes
+	 * refuse its users anyway. The status roles are never hidden.
 	 *
 	 * @return array<int,string> Role slugs.
 	 */
@@ -210,7 +210,7 @@ final class MembersQuery
 		foreach ( array_keys( $this->get_site_roles() ) as $slug ) {
 			$slug = (string) $slug;
 
-			if ( ! in_array( $slug, $status_roles, true ) && ( in_array( $slug, $chosen, true ) || array() !== Capabilities::sensitive_capabilities_of_role( $slug ) ) ) {
+			if ( ! in_array( $slug, $status_roles, true ) && ( in_array( $slug, $chosen, true ) || array() !== Capabilities::administrative_capabilities_of_role( $slug ) ) ) {
 				$hidden[] = $slug;
 			}
 		}

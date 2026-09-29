@@ -243,14 +243,14 @@ final class MemberActionController implements Service
 	}
 
 	/**
-	 * The acting user may not change their own roles, those of a user who holds a sensitive capability, or those
-	 * of a user with a role the members table hides. The render token already leaves hidden users out; this
+	 * The acting user may not change their own roles, those of a user who holds an administrative capability, or
+	 * those of a user with a role the members table hides. The render token already leaves hidden users out; this
 	 * checks again, because the hidden roles can change after the table was rendered.
 	 */
 	private function can_act_on( \WP_User $user ): bool
 	{
 		return $user->ID !== \get_current_user_id()
-			&& ! Capabilities::user_has_sensitive_capability( $user )
+			&& ! Capabilities::user_has_administrative_capability( $user )
 			&& array() === array_intersect( ( new MembersQuery( $this->settings ) )->get_hidden_roles(), (array) $user->roles );
 	}
 

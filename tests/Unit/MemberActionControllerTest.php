@@ -603,7 +603,20 @@ final class MemberActionControllerTest extends TestCase {
 		self::assertTrue( $response['success'] );
 	}
 
-	public function test_target_holding_any_sensitive_capability_is_blocked(): void {
+	public function test_editor_who_is_a_member_can_be_approved(): void {
+		// Editors hold unfiltered_html, which a member role must never grant, but which does not protect a user.
+		$user = $this->store_user( 12, array( 'mac_members_pending' ), array( 'unfiltered_html' => true ) );
+		$this->prepare_ajax_request( FrontendAssets::APPROVE_ACTION, $user->ID );
+
+		$response = $this->capture_ajax_response(
+			fn (): mixed => $this->create_controller()->approve()
+		);
+
+		self::assertTrue( $response['success'] );
+		self::assertSame( array( 'mac_members_approved' ), $user->roles );
+	}
+
+	public function test_target_holding_an_administrative_capability_is_blocked(): void {
 		$user = $this->store_user( 12, array( 'mac_members_pending' ), array( 'edit_users' => true ) );
 		$this->prepare_ajax_request( FrontendAssets::DENY_ACTION, $user->ID );
 

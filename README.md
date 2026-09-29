@@ -31,20 +31,11 @@ MAC Members always uses these four roles. New registrations need `mac_members_pe
 
 The settings page is under `Settings > MAC Members`. Turn on "Show MAC Members as a top-level admin menu item" to give it its own menu item with the MAC icon instead; it's off by default. Saving sends you back to the page, at its new address when this setting changed.
 
-The settings page includes:
+The settings page has three sections:
 
-- roles hidden from the members table, none checked by default (see Members Table below)
-- admin notification email
-- from email
-- member and admin approval email toggles
-- member and admin denial email toggles
-- member and admin deactivation email toggles
-- members table size: Medium by default, or Small (see Members Table below)
-- dates in the members table: Relative by default, or Date (see Members Table below)
-- member details fields, empty by default (see Members Table below)
-- delete plugin data on uninstall, off by default (see Review capability below)
-
-All email notification toggles are enabled by default.
+- **Members table**: the roles hidden from the members table, none checked by default; the member details fields, empty by default; the dates, Relative by default, or Date; and the table size, Medium by default, or Small (see Members Table below).
+- **Emails**: the from email; the member emails, one row with Approval, Denial and Deactivation checkboxes; the admin notification email; and the admin emails, a row with the same three checkboxes. Every email is on by default, and the approval emails also go out on reactivation.
+- **Plugin**: the top-level menu item, off by default, and deleting the plugin data on uninstall, off by default (see Review capability below).
 
 ## Members Table
 
@@ -97,7 +88,7 @@ When the table fits its frame, the header sticks to the page, under the admin ba
 
 The "Members table size" setting sets the text and button size: Medium, the default, puts the table, its controls and its buttons in `--text-m`, and Small in `--text-s`. The buttons keep ACSS's `btn--s` class, and Medium sets ACSS's `--btn-font-size`.
 
-Users who hold a hidden role never show in the members table: not in its rows, its counts, its search or its role filter, so nobody can change their status there. The "Roles hidden from the members table" setting has a checkbox for each role except the four status roles, which cannot be hidden; none is checked by default. Roles with any of the sensitive capabilities listed under Security, like Administrator and Editor (which has `unfiltered_html`), are always hidden, because status changes refuse their users anyway; their checkboxes show checked and disabled. The table leaves those users out with `role__not_in` in every user query. Development builds kept this setting as comma-separated text; its role slugs and names carry over, and its capabilities are dropped.
+Users who hold a hidden role never show in the members table: not in its rows, its counts, its search or its role filter, so nobody can change their status there. The "Roles hidden from the members table" setting has a checkbox for each role except the four member roles, which cannot be hidden; none is checked by default. Roles with any of the administrative capabilities listed under Security, like Administrator, are always hidden, because status changes refuse their users anyway; their checkboxes show checked and disabled. Editors show, since `unfiltered_html` alone doesn't hide a role. The table leaves those users out with `role__not_in` in every user query. Development builds kept this setting as comma-separated text; its role slugs and names carry over, and its capabilities are dropped.
 
 The table and the dialog use only ACSS tokens and button classes, and ACSS 4 defines its colors with `light-dark()`, so they follow the color scheme of the page or section around them: the site's scheme, a `scheme--dark` or `scheme--light` section, or the visitor's device when ACSS's scheme is auto. The dialog's backdrop stays black in both. How ACSS's main colors look in the dark scheme, for example the neutral buttons, comes from the site's ACSS settings.
 
@@ -149,9 +140,9 @@ Values the applicant controls (first name, last name, display name, username and
 
 ## Security
 
-MAC Members uses authenticated WordPress AJAX actions for the four status changes (`mac_members_approve_user`, `mac_members_deny_user`, `mac_members_deactivate_user` and `mac_members_reactivate_user`). It checks the nonce with `check_ajax_referer()` and requires the acting user to have the `mac_members_review` capability. For each target user it checks that every role the change adds or removes is in `get_editable_roles()`, so a site's role editor can still narrow them. It verifies that the target user still has a status the change applies to, and blocks self-actions, actions against target users who hold any of the sensitive capabilities, and actions against users with a hidden role.
+MAC Members uses authenticated WordPress AJAX actions for the four status changes (`mac_members_approve_user`, `mac_members_deny_user`, `mac_members_deactivate_user` and `mac_members_reactivate_user`). It checks the nonce with `check_ajax_referer()` and requires the acting user to have the `mac_members_review` capability. For each target user it checks that every role the change adds or removes is in `get_editable_roles()`, so a site's role editor can still narrow them. It verifies that the target user still has a status the change applies to, and blocks self-actions, actions against target users who hold any of the administrative capabilities, and actions against users with a hidden role.
 
-The sensitive capabilities are the ones that can change the site, its code or other users, such as `manage_options`, `edit_users`, `promote_users`, `delete_users`, `unfiltered_html`, `edit_plugins`, `edit_themes`, `install_plugins` and `activate_plugins`; the full list is in `src/Security/Capabilities.php`. The member roles start with only `read`, and a status change also refuses to add a member role that has gained a sensitive capability, for example through a role editor.
+The administrative capabilities are the ones that can change the site, its code or other users, such as `manage_options`, `edit_users`, `promote_users`, `delete_users`, `edit_plugins`, `edit_themes`, `install_plugins` and `activate_plugins`; the full list is `Capabilities::ADMINISTRATIVE` in `src/Security/Capabilities.php`. The sensitive capabilities are those plus `unfiltered_html` and `unfiltered_upload`, which let a user add scripts to the site. The member roles start with only `read`, and a status change refuses to add a member role that has gained a sensitive capability, for example through a role editor, since approving a member would hand it out. A user who holds `unfiltered_html`, like an editor, is not protected by it: an editor who is also a member shows in the members table, and their member status changes like anyone's.
 
 Every check that fails sends an error and ends the request, and so does the success response, so a failed check can never reach the role change, even when a `wp_die` handler does not exit.
 

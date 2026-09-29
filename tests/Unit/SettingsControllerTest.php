@@ -163,6 +163,50 @@ final class SettingsControllerTest extends TestCase {
 		self::assertStringContainsString( '>Save Settings</button>', $top_level );
 	}
 
+	public function test_settings_page_has_its_sections_and_settings_in_order(): void {
+		$output    = $this->render_page( false );
+		$positions = array_map(
+			static fn ( string $needle ): int|false => strpos( $output, $needle ),
+			array(
+				'<h2 class="title">Members table</h2>',
+				'id="mac-members-hidden_roles"',
+				'id="mac-members-detail_fields"',
+				'id="mac-members-date_display"',
+				'id="mac-members-table_size"',
+				'<h2 class="title">Emails</h2><p>The approval emails also go out when an inactive member is reactivated.</p>',
+				'id="mac-members-from_email"',
+				'id="mac-members-send_member_approval_email"',
+				'id="mac-members-admin_notification_email"',
+				'id="mac-members-send_admin_approval_email"',
+				'<h2 class="title">Plugin</h2>',
+				'id="mac-members-top_level_menu"',
+				'id="mac-members-delete_data_on_uninstall"',
+			)
+		);
+
+		self::assertNotContains( false, $positions );
+
+		$sorted = $positions;
+		sort( $sorted );
+
+		self::assertSame( $sorted, $positions );
+	}
+
+	public function test_email_toggles_share_one_row_for_the_member_and_one_for_the_admin(): void {
+		$output = $this->render_page( false, array( 'send_member_denial_email' => false ) );
+
+		self::assertStringContainsString(
+			'<tr><th scope="row">Member emails</th><td><fieldset><legend class="screen-reader-text">Member emails</legend>'
+			. '<label><input type="checkbox" id="mac-members-send_member_approval_email" name="mac_members_settings[send_member_approval_email]" value="1" checked="checked"> Approval</label><br>'
+			. '<label><input type="checkbox" id="mac-members-send_member_denial_email" name="mac_members_settings[send_member_denial_email]" value="1"> Denial</label><br>'
+			. '<label><input type="checkbox" id="mac-members-send_member_deactivation_email" name="mac_members_settings[send_member_deactivation_email]" value="1" checked="checked"> Deactivation</label><br>'
+			. '</fieldset></td></tr>',
+			$output
+		);
+		self::assertSame( 1, substr_count( $output, '<th scope="row">Member emails</th>' ) );
+		self::assertSame( 1, substr_count( $output, '<th scope="row">Admin emails</th>' ) );
+	}
+
 	public function test_settings_page_has_a_checkbox_for_each_role_that_can_be_hidden(): void {
 		$output = $this->render_page( false, array( 'hidden_roles' => array( 'subscriber' ) ) );
 

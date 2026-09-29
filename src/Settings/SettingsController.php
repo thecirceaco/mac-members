@@ -151,20 +151,18 @@ final class SettingsController implements Service
 		echo '<form method="post" action="">';
 		echo '<input type="hidden" name="mac_members_action" value="' . esc_attr( self::ACTION_SAVE_SETTINGS ) . '">';
 		\wp_nonce_field( self::NONCE_ACTION, self::NONCE_NAME );
-		echo '<table class="form-table" role="presentation"><tbody>';
 
-		foreach ( $this->schema->get_fields() as $key => $field ) {
-			echo '<tr>';
-			// A group of checkboxes has its own legend instead of a label.
-			echo SettingsSchema::TYPE_ROLES === $field['type']
-				? '<th scope="row">' . esc_html( $field['label'] ) . '</th>'
-				: '<th scope="row"><label for="mac-members-' . esc_attr( $key ) . '">' . esc_html( $field['label'] ) . '</label></th>';
-			// phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- render_field() returns escaped admin form controls.
-			echo '<td>' . $this->render_field( $key, $field, $settings[ $key ] ?? null ) . $this->render_description( $key, $field ) . ( self::DELETE_DATA_SETTING === $key ? $this->render_member_role_usage() : '' ) . '</td>';
-			echo '</tr>';
+		foreach ( $this->schema->get_sections() as $section => $info ) {
+			echo '<h2 class="title">' . esc_html( $info['title'] ) . '</h2>';
+
+			if ( isset( $info['description'] ) ) {
+				echo '<p>' . esc_html( $info['description'] ) . '</p>';
+			}
+
+			// phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- render_rows() returns escaped admin form controls.
+			echo '<table class="form-table" role="presentation"><tbody>' . $this->render_rows( $section, $settings ) . '</tbody></table>';
 		}
 
-		echo '</tbody></table>';
 		\submit_button( __( 'Save Settings', 'mac-members' ) );
 		echo '</form>';
 		echo '</div>';
@@ -212,6 +210,59 @@ final class SettingsController implements Service
 	private function is_top_level(): bool
 	{
 		return $this->top_level ?? $this->wants_top_level();
+	}
+
+	/**
+	 * The rows of one section, in the order of the schema. Toggles of a group share the row of the first one.
+	 *
+	 * @param array<string,mixed> $settings The saved settings.
+	 */
+	private function render_rows( string $section, array $settings ): string
+	{
+		$output = '';
+		$groups = array();
+
+		foreach ( $this->schema->get_fields() as $key => $field ) {
+			if ( $section !== $field['section'] ) {
+				continue;
+			}
+
+			if ( isset( $field['group'] ) ) {
+				if ( ! isset( $groups[ $field['group'] ] ) ) {
+					$groups[ $field['group'] ] = true;
+					$output                   .= $this->render_toggle_group( $field['group'], $settings );
+				}
+
+				continue;
+			}
+
+			// A group of checkboxes has its own legend instead of a label.
+			$output .= SettingsSchema::TYPE_ROLES === $field['type']
+				? '<tr><th scope="row">' . esc_html( $field['label'] ) . '</th>'
+				: '<tr><th scope="row"><label for="mac-members-' . esc_attr( $key ) . '">' . esc_html( $field['label'] ) . '</label></th>';
+			$output .= '<td>' . $this->render_field( $key, $field, $settings[ $key ] ?? null ) . $this->render_description( $key, $field ) . ( self::DELETE_DATA_SETTING === $key ? $this->render_member_role_usage() : '' ) . '</td></tr>';
+		}
+
+		return $output;
+	}
+
+	/**
+	 * One row for the toggles of a group, each checkbox with its option label, like Approval.
+	 *
+	 * @param array<string,mixed> $settings The saved settings.
+	 */
+	private function render_toggle_group( string $group, array $settings ): string
+	{
+		$label  = $this->schema->get_groups()[ $group ] ?? $group;
+		$output = '<tr><th scope="row">' . esc_html( $label ) . '</th><td><fieldset><legend class="screen-reader-text">' . esc_html( $label ) . '</legend>';
+
+		foreach ( $this->schema->get_fields() as $key => $field ) {
+			if ( $group === ( $field['group'] ?? '' ) ) {
+				$output .= '<label><input type="checkbox" id="mac-members-' . esc_attr( $key ) . '" name="mac_members_settings[' . esc_attr( $key ) . ']" value="1"' . $this->checked_attr( true === ( $settings[ $key ] ?? false ) ) . '> ' . esc_html( (string) ( $field['option'] ?? $field['label'] ) ) . '</label><br>';
+			}
+		}
+
+		return $output . '</fieldset></td></tr>';
 	}
 
 	private function render_field( string $key, array $field, mixed $value ): string
@@ -304,7 +355,7 @@ final class SettingsController implements Service
 				continue;
 			}
 
-			$always  = array() !== Capabilities::sensitive_capabilities_of_role( $slug );
+			$always  = array() !== Capabilities::administrative_capabilities_of_role( $slug );
 			$output .= '<label><input type="checkbox" name="mac_members_settings[' . esc_attr( $key ) . '][]" value="' . esc_attr( $slug ) . '"' . $this->checked_attr( $always || in_array( $slug, $value, true ) ) . ( $always ? ' disabled' : '' ) . '> ' . esc_html( \translate_user_role( $name ) ) . '</label>';
 			$output .= $always ? ' <span class="description">' . esc_html__( '(always hidden)', 'mac-members' ) . '</span>' : '';
 			$output .= '<br>';

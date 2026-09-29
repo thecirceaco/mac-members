@@ -41,6 +41,11 @@ final class CapabilitiesTest extends TestCase {
 		}
 	}
 
+	public function test_administrative_capabilities_are_the_sensitive_ones_without_unfiltered_html_and_upload(): void {
+		self::assertSame( array( 'unfiltered_html', 'unfiltered_upload' ), array_values( array_diff( Capabilities::SENSITIVE, Capabilities::ADMINISTRATIVE ) ) );
+		self::assertSame( array(), array_diff( Capabilities::ADMINISTRATIVE, Capabilities::SENSITIVE ) );
+	}
+
 	public function test_sensitive_capabilities_of_role_lists_only_granted_sensitive_capabilities(): void {
 		$GLOBALS['mac_members_test_roles']['mac_members_approved']['capabilities']['delete_users'] = false;
 		$GLOBALS['mac_members_test_roles']['mac_members_approved']['capabilities']['edit_plugins'] = true;
@@ -52,9 +57,10 @@ final class CapabilitiesTest extends TestCase {
 		self::assertSame( array( 'edit_plugins' ), Capabilities::sensitive_capabilities_of_role( 'mac_members_approved' ) );
 		self::assertSame( array(), Capabilities::sensitive_capabilities_of_role( 'subscriber' ) );
 		self::assertSame( array(), Capabilities::sensitive_capabilities_of_role( 'not-a-role' ) );
+		self::assertSame( array( 'manage_options', 'edit_users', 'promote_users' ), Capabilities::administrative_capabilities_of_role( 'administrator' ) );
 	}
 
-	public function test_user_has_sensitive_capability(): void {
+	public function test_user_has_administrative_capability(): void {
 		$member = new \WP_User(
 			array(
 				'ID'   => 12,
@@ -67,9 +73,16 @@ final class CapabilitiesTest extends TestCase {
 				'caps' => array( 'unfiltered_html' => true ),
 			)
 		);
+		$manager = new \WP_User(
+			array(
+				'ID'   => 14,
+				'caps' => array( 'edit_users' => true ),
+			)
+		);
 
-		self::assertFalse( Capabilities::user_has_sensitive_capability( $member ) );
-		self::assertTrue( Capabilities::user_has_sensitive_capability( $editor ) );
+		self::assertFalse( Capabilities::user_has_administrative_capability( $member ) );
+		self::assertFalse( Capabilities::user_has_administrative_capability( $editor ) );
+		self::assertTrue( Capabilities::user_has_administrative_capability( $manager ) );
 	}
 
 	public function test_current_user_can_review_needs_login_and_the_review_capability_only(): void {

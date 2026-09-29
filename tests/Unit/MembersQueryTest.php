@@ -133,16 +133,17 @@ final class MembersQueryTest extends TestCase {
 		);
 	}
 
-	public function test_hidden_roles_are_the_checked_roles_and_every_role_with_a_sensitive_capability(): void {
+	public function test_hidden_roles_are_the_checked_roles_and_every_role_with_an_administrative_capability(): void {
 		$this->add_test_roles();
 		$GLOBALS['mac_members_test_roles']['moderator'] = array( 'name' => 'Moderator', 'capabilities' => array( 'read' => true, 'unfiltered_html' => true ) );
 		$repository = $this->create_settings_repository();
 		$repository->save( array( 'hidden_roles' => array( 'officer', 'mac_members_approved' ) ) );
 
-		// Officer is checked. Administrator and Site Manager grant manage_options, and Moderator unfiltered_html.
-		// The approved status role cannot be hidden, and Author does not grant manage_options.
+		// Officer is checked, and Administrator and Site Manager grant manage_options. Moderator's unfiltered_html,
+		// which editors have too, does not hide it. The approved status role cannot be hidden, and Author does not
+		// grant manage_options.
 		self::assertSame(
-			array( 'administrator', 'officer', 'site_manager', 'moderator' ),
+			array( 'administrator', 'officer', 'site_manager' ),
 			( new MembersQuery( $repository ) )->get_hidden_roles()
 		);
 	}
