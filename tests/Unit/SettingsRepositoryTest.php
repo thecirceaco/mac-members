@@ -69,6 +69,16 @@ final class SettingsRepositoryTest extends TestCase {
 		self::assertSame( 'relative', $repository->save( array( 'date_display' => 'ago' ) )['date_display'] );
 	}
 
+	public function test_detail_fields_are_saved_one_per_line_with_clean_keys_and_labels(): void {
+		$repository = $this->create_repository();
+
+		self::assertSame( '', $repository->all()['detail_fields'] );
+		self::assertSame(
+			"phone : Phone\nlocal_number\nshop-name : Shop name",
+			$repository->save( array( 'detail_fields' => " phone: Phone ,local_number!\r\n\nshop-name : <b>Shop</b> name\nphone : Again" ) )['detail_fields']
+		);
+	}
+
 	public function test_hidden_roles_default_to_administrator(): void {
 		self::assertSame( 'administrator', $this->create_repository()->all()['hidden_roles'] );
 	}

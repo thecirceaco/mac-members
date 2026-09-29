@@ -47,7 +47,8 @@ The settings page also includes:
 - member and admin denial email toggles
 - member and admin deactivation email toggles
 - members table size: Medium by default, or Small (see Members Table below)
-- dates in the members table: Date by default, or Relative (see Members Table below)
+- dates in the members table: Relative by default, or Date (see Members Table below)
+- member details fields, empty by default (see Members Table below)
 - delete plugin data on uninstall, off by default (see Review capability below)
 
 All email notification toggles are enabled by default.
@@ -68,7 +69,19 @@ The table has a filter for each status (Pending, Approved, Inactive, Denied) and
 [mac_members_table status="pending"]
 ```
 
-Every view lists the newest registrations first. The columns are User ID, Email, First Name, Last Name, Username, Registered, Last Login, Profile, Status, Roles and Actions. Roles lists the member's roles other than the status roles, for example Officer or Trustee, and the Actions column has only the status changes the member's status allows.
+Every view lists the newest registrations first. The columns are User ID, Email, First Name, Last Name, Username, Registered, Last Login, Details, Status, Roles and Actions. Roles lists the member's roles other than the status roles, for example Officer or Trustee, and the Actions column has only the status changes the member's status allows.
+
+"View details" in the Details column opens a dialog with the row's fields, in the table's order, followed by the fields the "Member details fields" setting lists. Admins use the same dialog; the table doesn't link to the WordPress profile screen. Close, Escape or a click outside the dialog closes it. Each row carries its details in a `<template>`, escaped on the server, and the script only copies that template into the dialog, so opening it sends no request and a value can't add markup.
+
+The "Member details fields" setting lists the extra fields, one per line or comma-separated, each a user meta key, a colon and a label:
+
+```text
+phone : Phone
+local_number : Local #
+user_url : Website
+```
+
+The dialog shows them in that order. Without a label, a field shows its ACF field label when ACF knows the key, or else the key made readable, so `local_number` reads "Local number". A label can't contain a comma, because a comma starts the next field. A key can also be one of the user's own fields: `user_url`, `user_login`, `user_email`, `user_registered`, `display_name` or `user_nicename`. When ACF is active, the values are read with `get_field()`, so dates, choices, posts, terms and users come out formatted; otherwise with `get_user_meta()`. An empty value shows "Not set". Keys that start with an underscore, passwords, activation keys, sessions, capabilities and user levels never show, even when listed. Saving keeps up to 50 fields, drops repeated keys and cuts labels to 100 characters.
 
 Right above the table, under the role and search form, a checkbox for each column shows or hides it. All start checked except Last Login. While User ID is hidden, the first visible column is the one that stays at the left. The stylesheet hides a column while its checkbox is unchecked, and the script keeps the viewer's changes in the `mac_members_hidden_columns` cookie for a year: the columns they hid, and, with a `+`, the columns that start hidden and that they showed. The next pages and later visits in the same browser keep them.
 

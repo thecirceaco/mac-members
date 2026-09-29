@@ -874,6 +874,10 @@ function esc_html( mixed $text ): string {
 	return htmlspecialchars( (string) $text, ENT_QUOTES, 'UTF-8' );
 }
 
+function esc_textarea( mixed $text ): string {
+	return htmlspecialchars( (string) $text, ENT_QUOTES, 'UTF-8' );
+}
+
 function esc_attr( mixed $text ): string {
 	return htmlspecialchars( (string) $text, ENT_QUOTES, 'UTF-8' );
 }

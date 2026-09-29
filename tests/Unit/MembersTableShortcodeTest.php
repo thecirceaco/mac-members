@@ -32,7 +32,7 @@ final class MembersTableShortcodeTest extends TestCase {
 	/**
 	 * The columns without Last Login, which shows only while MAC Core records last logins.
 	 */
-	private const SHOWN_COLUMNS = array( 'user_id', 'email', 'first_name', 'last_name', 'username', 'registered', 'profile', 'status', 'roles', 'actions' );
+	private const SHOWN_COLUMNS = array( 'user_id', 'email', 'first_name', 'last_name', 'username', 'registered', 'details', 'status', 'roles', 'actions' );
 
 	protected function setUp(): void {
 		parent::setUp();
@@ -192,7 +192,7 @@ final class MembersTableShortcodeTest extends TestCase {
 
 		self::assertSame( 10, preg_match_all( '/<th scope="col" data-mac-members-column="([^"]+)">([^<]+)<\/th>/', $output, $headers ) );
 		self::assertSame(
-			array( 'User ID', 'Email', 'First Name', 'Last Name', 'Username', 'Registered', 'Profile', 'Status', 'Roles', 'Actions' ),
+			array( 'User ID', 'Email', 'First Name', 'Last Name', 'Username', 'Registered', 'Details', 'Status', 'Roles', 'Actions' ),
 			$headers[2]
 		);
 		self::assertSame( self::SHOWN_COLUMNS, $headers[1] );
@@ -355,6 +355,43 @@ final class MembersTableShortcodeTest extends TestCase {
 		$this->create_shortcode()->render();
 
 		self::assertSame( array( array( 'user', array( 3, 5 ) ) ), $GLOBALS['mac_members_test_meta_cache_loads'] );
+	}
+
+	public function test_member_details_list_the_table_fields_then_the_extra_fields_in_order(): void {
+		$GLOBALS['mac_members_test_options'][ MAC_MEMBERS_SETTINGS_OPTION ] = array(
+			'date_display'  => 'date',
+			'detail_fields' => "local_number : Local #\nphone\nuser_pass : Password\n_private",
+		);
+		$this->add_union_roles();
+		$this->store_people(
+			array(
+				7 => array(
+					'roles'           => array( 'mac_members_approved', 'officer' ),
+					'first_name'      => 'Ana',
+					'last_name'       => 'Pop',
+					'user_registered' => '2026-05-01 12:00:00',
+					'local_number'    => '350',
+				),
+			)
+		);
+		$_GET['mac_members_status'] = 'approved';
+
+		$output = $this->create_shortcode()->render();
+
+		self::assertSame( 1, preg_match( '/<template data-mac-members-details data-mac-members-details-title="Ana Pop"><dl class="mac-members-details__list">(.*?)<\/dl><\/template>/s', $output, $details ) );
+		self::assertSame( 10, preg_match_all( '/<dt>([^<]*)<\/dt>/', $details[1], $labels ) );
+		self::assertSame(
+			array( 'User ID', 'Email', 'First Name', 'Last Name', 'Username', 'Registered', 'Status', 'Roles', 'Local #', 'Phone' ),
+			$labels[1]
+		);
+		self::assertStringContainsString( '<dt>Registered</dt><dd><time datetime="2026-05-01T12:00:00+00:00" title="May 1, 2026 12:00 pm">May 1, 2026</time></dd>', $details[1] );
+		self::assertStringContainsString( '<dt>Status</dt><dd><span class="mac-members-status__label mac-members-status__label--approved">Approved</span></dd>', $details[1] );
+		self::assertStringContainsString( '<dt>Roles</dt><dd>Officer</dd>', $details[1] );
+		self::assertStringContainsString( '<dt>Local #</dt><dd>350</dd>', $details[1] );
+		self::assertStringContainsString( '<dt>Phone</dt><dd><span class="mac-members-details__empty">Not set</span></dd>', $details[1] );
+		// Passwords and private meta never show.
+		self::assertStringNotContainsString( 'Password', $details[1] );
+		self::assertStringNotContainsString( '_private', $details[1] );
 	}
 
 	public function test_empty_view_has_no_column_checkboxes(): void {
@@ -796,9 +833,11 @@ final class MembersTableShortcodeTest extends TestCase {
 		self::assertStringContainsString( 'Mia &lt;Admin&gt;', $output );
 		self::assertStringNotContainsString( 'Mia <Admin>', $output );
 		self::assertStringContainsString( 'pending&lt;script&gt;', $output );
-		self::assertStringContainsString( 'user-edit.php?user_id=123', $output );
-		self::assertStringContainsString( 'target="_blank"', $output );
-		self::assertStringContainsString( 'rel="noopener noreferrer"', $output );
+		// No link to wp-admin: the member details open in the table's dialog.
+		self::assertStringNotContainsString( 'user-edit.php', $output );
+		self::assertStringContainsString( '<button type="button" class="mac-members-details-button" data-mac-members-details-open>View details</button>', $output );
+		self::assertStringContainsString( '<template data-mac-members-details data-mac-members-details-title="Mia &lt;Admin&gt; O&#039;Connor">', $output );
+		self::assertSame( 1, substr_count( $output, '<dialog class="mac-members-details" data-mac-members-details-dialog' ) );
 		self::assertStringContainsString( 'data-mac-members-action="approve"', $output );
 		self::assertStringContainsString( 'data-mac-members-action="deny"', $output );
 		self::assertStringContainsString( '<p class="mac-members-empty" hidden>There are no pending members.</p>', $output );

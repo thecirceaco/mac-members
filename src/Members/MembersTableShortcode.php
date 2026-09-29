@@ -58,7 +58,8 @@ final class MembersTableShortcode implements Service
 		private readonly FrontendAssets $assets,
 		private readonly SettingsRepositoryInterface $settings,
 		private readonly RenderToken $render_token = new RenderToken(),
-		private readonly MacCoreLastLogin $last_login = new MacCoreLastLogin()
+		private readonly MacCoreLastLogin $last_login = new MacCoreLastLogin(),
+		private readonly ?MemberDetails $details = null
 	) {}
 
 	public function register(): void
@@ -215,11 +216,12 @@ final class MembersTableShortcode implements Service
 	 * @param array<int,object> $users           Members on this page.
 	 * @param bool              $show_last_login Whether the table shows MAC Core's last login.
 	 *
-	 * @return array<int,array{user:object,status:?MemberStatus,roles:array<string,string>,last_login:int|null}>
+	 * @return array<int,array{user:object,status:?MemberStatus,roles:array<string,string>,last_login:int|null,details:array<int,array{label:string,value:string}>}>
 	 */
 	private function get_rows( array $users, bool $show_last_login ): array
 	{
-		$rows = array();
+		$rows    = array();
+		$details = $this->details ?? new MemberDetails( $this->settings );
 
 		foreach ( $users as $user ) {
 			$user_id = isset( $user->ID ) ? \absint( $user->ID ) : 0;
@@ -228,6 +230,7 @@ final class MembersTableShortcode implements Service
 				'status'     => $this->query->get_status( $user ),
 				'roles'      => $this->query->get_other_roles( $user ),
 				'last_login' => $show_last_login && 0 < $user_id ? $this->last_login->get( $user_id ) : null,
+				'details'    => $details->get_values( $user ),
 			);
 		}
 

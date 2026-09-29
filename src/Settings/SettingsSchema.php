@@ -22,6 +22,7 @@ final class SettingsSchema
 	public const TYPE_TOGGLE = 'toggle';
 	public const TYPE_LIST   = 'list';
 	public const TYPE_CHOICE = 'choice';
+	public const TYPE_FIELDS = 'fields';
 
 	/**
 	 * Sizes of the members table: see the "Members table size" setting.
@@ -34,7 +35,7 @@ final class SettingsSchema
 	public const DATE_DISPLAYS = array( 'relative', 'date' );
 
 	/**
-	 * @return array<string,array{label:string,type:string,default:mixed,description?:string,choices?:array<string,string>}>
+	 * @return array<string,array{label:string,type:string,default:mixed,description?:string,choices?:array<string,string>,rows?:int}>
 	 */
 	public function get_fields(): array
 	{
@@ -84,6 +85,13 @@ final class SettingsSchema
 					array( __( 'Relative', 'mac-members' ), __( 'Date', 'mac-members' ) )
 				),
 				'description' => __( 'For Registered and Last Login. Relative shows the time since, like 3 days ago. Date shows the day in the site\'s date format, and Last Login the time too. Both show the full date and time on hover.', 'mac-members' ),
+			),
+			'detail_fields' => array(
+				'label'       => __( 'Member details fields', 'mac-members' ),
+				'type'        => self::TYPE_FIELDS,
+				'default'     => '',
+				'rows'        => 12,
+				'description' => __( 'One field per line or comma-separated: the user meta key, a colon and the label, for example phone : Phone. Without a label, the ACF field label shows, or else the key made readable. The member details show these fields after the account fields, in this order. Private keys that start with an underscore, passwords, sessions and capabilities never show.', 'mac-members' ),
 			),
 			'admin_notification_email' => array(
 				'label'   => __( 'Admin notification email', 'mac-members' ),
@@ -175,6 +183,33 @@ final class SettingsSchema
 	public function get_toggle_fields(): array
 	{
 		return $this->get_fields_by_type( self::TYPE_TOGGLE );
+	}
+
+	/**
+	 * Reads the member details fields: one "key : label" per line or comma-separated, the label optional.
+	 *
+	 * @return array<int,array{key:string,label:string}>
+	 */
+	public static function parse_fields( string $value ): array
+	{
+		$fields  = array();
+		$entries = preg_split( '/[\r\n,]+/', $value );
+
+		foreach ( false === $entries ? array() : $entries as $entry ) {
+			$parts = explode( ':', $entry, 2 );
+			$key   = (string) preg_replace( '/[^A-Za-z0-9_\-]/', '', trim( $parts[0] ) );
+
+			if ( '' === $key ) {
+				continue;
+			}
+
+			$fields[] = array(
+				'key'   => $key,
+				'label' => trim( $parts[1] ?? '' ),
+			);
+		}
+
+		return $fields;
 	}
 
 	/**

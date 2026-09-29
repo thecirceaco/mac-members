@@ -214,6 +214,7 @@ final class WordPressSettingsRepository implements SettingsRepositoryInterface
 				SettingsSchema::TYPE_TOGGLE => $this->sanitize_toggle( $value ),
 				SettingsSchema::TYPE_LIST   => $this->sanitize_list( $value, (string) $field['default'] ),
 				SettingsSchema::TYPE_CHOICE => $this->sanitize_choice( $value, array_keys( $field['choices'] ?? array() ), (string) $field['default'] ),
+				SettingsSchema::TYPE_FIELDS => $this->sanitize_fields( $value, (string) $field['default'] ),
 				default                     => $field['default'],
 			};
 		}
@@ -272,6 +273,31 @@ final class WordPressSettingsRepository implements SettingsRepositoryInterface
 		$normalized = filter_var( $value, FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE );
 
 		return \is_bool( $normalized ) ? $normalized : false;
+	}
+
+	/**
+	 * The member details fields as "key : label" lines, or "key" alone without a label: keys keep only
+	 * letters, digits, underscores and hyphens, labels are cleaned and cut to 100 characters, each key is
+	 * listed once and at most 50 fields are kept. A value that is not text falls back to the default.
+	 */
+	private function sanitize_fields( mixed $value, string $default ): string
+	{
+		if ( ! \is_scalar( $value ) ) {
+			return $default;
+		}
+
+		$lines = array();
+
+		foreach ( SettingsSchema::parse_fields( (string) $value ) as $field ) {
+			if ( isset( $lines[ $field['key'] ] ) ) {
+				continue;
+			}
+
+			$label                  = mb_substr( \sanitize_text_field( $field['label'] ), 0, 100 );
+			$lines[ $field['key'] ] = '' === $label ? $field['key'] : $field['key'] . ' : ' . $label;
+		}
+
+		return implode( "\n", array_slice( array_values( $lines ), 0, 50 ) );
 	}
 
 	/**

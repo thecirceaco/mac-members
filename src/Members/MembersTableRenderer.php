@@ -19,7 +19,7 @@ final class MembersTableRenderer
 	 * The table's columns, in order. The column checkboxes can hide any of them. Last Login shows only while MAC
 	 * Core records last logins.
 	 */
-	public const COLUMN_KEYS = array( 'user_id', 'email', 'first_name', 'last_name', 'username', 'registered', 'last_login', 'profile', 'status', 'roles', 'actions' );
+	public const COLUMN_KEYS = array( 'user_id', 'email', 'first_name', 'last_name', 'username', 'registered', 'last_login', 'details', 'status', 'roles', 'actions' );
 
 	/**
 	 * Columns that start hidden until the viewer checks them.
@@ -45,7 +45,7 @@ final class MembersTableRenderer
 	private array $display = self::DISPLAY_DEFAULTS;
 
 	/**
-	 * @param array<int,array{user:object,status:?MemberStatus,roles?:array<string,string>,last_login?:int|null}> $rows Members on this page, their status, their other roles and their last login.
+	 * @param array<int,array{user:object,status:?MemberStatus,roles?:array<string,string>,last_login?:int|null,details?:array<int,array{label:string,value:string}>}> $rows Members on this page, their status, their other roles, their last login and their extra details.
 	 * @param string                                                 $view Shown view: a status value or "all".
 	 * @param array<int,array{view:string,label:string,count:int,url:string,current:bool}> $filters Status filters; empty hides them.
 	 * @param array{page?:int,pages?:int,per_page?:int,total?:int,first?:int,last?:int,links?:array<int,array{page:int,url:string,current:bool}|null>,previous_url?:string,next_url?:string} $pagination Pagination.
@@ -92,6 +92,7 @@ final class MembersTableRenderer
 			$output .= '<tbody>' . $body . '</tbody>';
 			$output .= '</table>';
 			$output .= '</div>';
+			$output .= $this->render_details_dialog();
 		}
 
 		$output .= $this->render_footer( $pagination, $form_id );
@@ -125,7 +126,7 @@ final class MembersTableRenderer
 				__( 'Username', 'mac-members' ),
 				__( 'Registered', 'mac-members' ),
 				__( 'Last Login', 'mac-members' ),
-				__( 'Profile', 'mac-members' ),
+				__( 'Details', 'mac-members' ),
 				__( 'Status', 'mac-members' ),
 				__( 'Roles', 'mac-members' ),
 				__( 'Actions', 'mac-members' ),
@@ -160,7 +161,7 @@ final class MembersTableRenderer
 	}
 
 	/**
-	 * @param array<int,array{user:object,status:?MemberStatus,roles?:array<string,string>,last_login?:int|null}> $rows Members, their status, their other roles and their last login.
+	 * @param array<int,array{user:object,status:?MemberStatus,roles?:array<string,string>,last_login?:int|null,details?:array<int,array{label:string,value:string}>}> $rows Members, their status, their other roles, their last login and their extra details.
 	 */
 	private function render_rows( array $rows ): string
 	{
@@ -190,7 +191,7 @@ final class MembersTableRenderer
 				'username'   => esc_html( $this->get_user_value( $user, 'user_login' ) ),
 				'registered' => $this->render_date( $this->get_registered_time( $user ), false ),
 				'last_login' => $this->render_date( $row['last_login'] ?? null, true ),
-				'profile'    => '<a class="mac-members-profile-link" href="' . esc_url( $this->get_profile_url( $id ) ) . '" target="_blank" rel="noopener noreferrer">' . esc_html__( 'View profile', 'mac-members' ) . '</a>',
+				'details'    => $this->render_details_cell( $row, $id ),
 				'status'     => '<span class="mac-members-status__label mac-members-status__label--' . esc_attr( $status->value ) . '">' . esc_html( $status->label() ) . '</span>',
 				'roles'      => esc_html( implode( ', ', $row['roles'] ?? array() ) ),
 				'actions'    => $actions,
@@ -441,9 +442,76 @@ final class MembersTableRenderer
 		return isset( $user->{$key} ) ? (string) $user->{$key} : '';
 	}
 
-	private function get_profile_url( int $user_id ): string
+	/**
+	 * "View details" and, in a template the script copies into the dialog, the member's details: the table's
+	 * fields, then the extra fields of the "Member details fields" setting in its order.
+	 *
+	 * @param array{user:object,status:?MemberStatus,roles?:array<string,string>,last_login?:int|null,details?:array<int,array{label:string,value:string}>} $row The member's row.
+	 */
+	private function render_details_cell( array $row, int $id ): string
 	{
-		return \admin_url( 'user-edit.php?user_id=' . $user_id );
+		$user   = $row['user'];
+		$status = $row['status'];
+		$first  = $this->get_user_value( $user, 'first_name' );
+		$last   = $this->get_user_value( $user, 'last_name' );
+		$login  = $this->get_user_value( $user, 'user_login' );
+		$title  = trim( $first . ' ' . $last );
+
+		// Each item's label and its value as HTML, escaped.
+		$items = array(
+			array( __( 'User ID', 'mac-members' ), esc_html( (string) $id ) ),
+			array( __( 'Email', 'mac-members' ), esc_html( $this->get_user_value( $user, 'user_email' ) ) ),
+			array( __( 'First Name', 'mac-members' ), esc_html( $first ) ),
+			array( __( 'Last Name', 'mac-members' ), esc_html( $last ) ),
+			array( __( 'Username', 'mac-members' ), esc_html( $login ) ),
+			array( __( 'Registered', 'mac-members' ), $this->render_date( $this->get_registered_time( $user ), false ) ),
+		);
+
+		if ( true === $this->display['last_login'] ) {
+			$items[] = array( __( 'Last Login', 'mac-members' ), $this->render_date( $row['last_login'] ?? null, true ) );
+		}
+
+		if ( $status instanceof MemberStatus ) {
+			$items[] = array( __( 'Status', 'mac-members' ), '<span class="mac-members-status__label mac-members-status__label--' . esc_attr( $status->value ) . '">' . esc_html( $status->label() ) . '</span>' );
+		}
+
+		$items[] = array( __( 'Roles', 'mac-members' ), esc_html( implode( ', ', $row['roles'] ?? array() ) ) );
+
+		foreach ( $row['details'] ?? array() as $detail ) {
+			$items[] = array( $detail['label'], esc_html( $detail['value'] ) );
+		}
+
+		$list = '';
+
+		foreach ( $items as $item ) {
+			$value = '' === $item[1] ? '<span class="mac-members-details__empty">' . esc_html__( 'Not set', 'mac-members' ) . '</span>' : $item[1];
+			$list .= '<dt>' . esc_html( $item[0] ) . '</dt><dd>' . $value . '</dd>';
+		}
+
+		$output  = '<button type="button" class="mac-members-details-button" data-mac-members-details-open>' . esc_html__( 'View details', 'mac-members' ) . '</button>';
+		$output .= '<template data-mac-members-details data-mac-members-details-title="' . esc_attr( '' !== $title ? $title : $login ) . '">';
+		$output .= '<dl class="mac-members-details__list">' . $list . '</dl>';
+		$output .= '</template>';
+
+		return $output;
+	}
+
+	/**
+	 * The member details dialog, one per table. The script fills it from the row's template and opens it.
+	 */
+	private function render_details_dialog(): string
+	{
+		$title_id = \wp_unique_id( 'mac-members-details-title-' );
+
+		$output  = '<dialog class="mac-members-details" data-mac-members-details-dialog aria-labelledby="' . esc_attr( $title_id ) . '">';
+		$output .= '<div class="mac-members-details__header">';
+		$output .= '<h2 class="mac-members-details__title" id="' . esc_attr( $title_id ) . '"></h2>';
+		$output .= '<button type="button" class="mac-members-button btn--neutral btn--outline btn--s" data-mac-members-details-close>' . esc_html__( 'Close', 'mac-members' ) . '</button>';
+		$output .= '</div>';
+		$output .= '<div class="mac-members-details__body" data-mac-members-details-body></div>';
+		$output .= '</dialog>';
+
+		return $output;
 	}
 
 	/**

@@ -227,6 +227,7 @@ final class SettingsController implements Service
 			SettingsSchema::TYPE_TOGGLE => $this->render_toggle( $key, (bool) $value, (string) $field['label'], isset( $field['description'] ) ),
 			SettingsSchema::TYPE_LIST   => $this->render_list_input( $key, (string) $value, isset( $field['description'] ) ),
 			SettingsSchema::TYPE_CHOICE => $this->render_choice_select( $key, (string) $value, $field['choices'] ?? array(), isset( $field['description'] ) ),
+			SettingsSchema::TYPE_FIELDS => $this->render_textarea( $key, (string) $value, (int) ( $field['rows'] ?? 6 ), isset( $field['description'] ) ),
 			default                     => '',
 		};
 	}
@@ -283,6 +284,13 @@ final class SettingsController implements Service
 		}
 
 		return $output . '</select>';
+	}
+
+	private function render_textarea( string $key, string $value, int $rows, bool $described ): string
+	{
+		$describedby = $described ? ' aria-describedby="mac-members-' . esc_attr( $key ) . '-description"' : '';
+
+		return '<textarea class="large-text code" id="mac-members-' . esc_attr( $key ) . '" name="mac_members_settings[' . esc_attr( $key ) . ']" rows="' . esc_attr( (string) $rows ) . '"' . $describedby . '>' . esc_textarea( $value ) . '</textarea>';
 	}
 
 	private function render_list_input( string $key, string $value, bool $described ): string

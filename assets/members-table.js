@@ -111,12 +111,18 @@
 	const updateRowStatus = (row, status, statusLabel) => {
 		row.dataset.macMembersStatus = status;
 
-		const label = row.querySelector('.mac-members-status__label');
+		const template = row.querySelector('template[data-mac-members-details]');
+		const labels = [
+			row.querySelector('td .mac-members-status__label'),
+			template ? template.content.querySelector('.mac-members-status__label') : null,
+		];
 
-		if (label) {
-			label.className = `mac-members-status__label mac-members-status__label--${status}`;
-			label.textContent = statusLabel;
-		}
+		labels.forEach((label) => {
+			if (label) {
+				label.className = `mac-members-status__label mac-members-status__label--${status}`;
+				label.textContent = statusLabel;
+			}
+		});
 
 		const actions = row.querySelector('.mac-members-actions');
 
@@ -280,6 +286,47 @@
 			console.warn('MAC Members: AJAX action failed', error);
 			showNotice(root, 'error', genericError);
 			setRowProcessing(row, false);
+		}
+	});
+
+	// Member details: "View details" copies the row's template into the table's dialog and opens it. Close, Escape
+	// and a click outside the dialog close it.
+	document.addEventListener('click', (event) => {
+		const opener = event.target.closest('[data-mac-members-details-open]');
+
+		if (opener) {
+			const root = opener.closest(rootSelector);
+			const template = opener.parentElement ? opener.parentElement.querySelector('template[data-mac-members-details]') : null;
+			const dialog = root ? root.querySelector('[data-mac-members-details-dialog]') : null;
+
+			if (!template || !dialog || typeof dialog.showModal !== 'function') {
+				return;
+			}
+
+			dialog.querySelector('[data-mac-members-details-body]').replaceChildren(template.content.cloneNode(true));
+			dialog.querySelector('.mac-members-details__title').textContent = template.dataset.macMembersDetailsTitle || '';
+			dialog.showModal();
+			return;
+		}
+
+		const closer = event.target.closest('[data-mac-members-details-close]');
+
+		if (closer) {
+			closer.closest('dialog').close();
+			return;
+		}
+
+		const dialog = event.target;
+
+		if (!(dialog instanceof HTMLDialogElement) || !dialog.matches('[data-mac-members-details-dialog]')) {
+			return;
+		}
+
+		const box = dialog.getBoundingClientRect();
+		const inside = event.clientX >= box.left && event.clientX <= box.right && event.clientY >= box.top && event.clientY <= box.bottom;
+
+		if (!inside) {
+			dialog.close();
 		}
 	});
 

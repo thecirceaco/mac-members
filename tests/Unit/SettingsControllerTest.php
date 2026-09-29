@@ -268,6 +268,19 @@ final class SettingsControllerTest extends TestCase {
 		self::assertStringContainsString( '<p class="description" id="mac-members-delete_data_on_uninstall-description">When the plugin is deleted, remove its settings, the review capability and the member roles that no user holds.', $output );
 	}
 
+	public function test_settings_page_has_the_detail_fields_textarea(): void {
+		$GLOBALS['mac_members_test_options'][ MAC_MEMBERS_SETTINGS_OPTION ] = array( 'detail_fields' => "phone : Phone\nlocal_number" );
+
+		$controller = $this->create_controller();
+		$controller->register_settings_page();
+		ob_start();
+		$controller->render_settings_page();
+		$output = (string) ob_get_clean();
+
+		self::assertStringContainsString( '<textarea class="large-text code" id="mac-members-detail_fields" name="mac_members_settings[detail_fields]" rows="12" aria-describedby="mac-members-detail_fields-description">phone : Phone' . "\n" . 'local_number</textarea>', $output );
+		self::assertStringContainsString( '<p class="description" id="mac-members-detail_fields-description">One field per line or comma-separated', $output );
+	}
+
 	public function test_settings_page_has_the_date_display_choice(): void {
 		$output = $this->render_page( false );
 
