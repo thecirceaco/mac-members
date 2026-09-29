@@ -419,6 +419,12 @@ if ( ! class_exists( 'WP_User_Query' ) ) {
 				return false;
 			}
 
+			$none = array_filter( array_map( 'strval', (array) ( $this->args['role__not_in'] ?? array() ) ) );
+
+			if ( array() !== array_intersect( $none, $user->roles ) ) {
+				return false;
+			}
+
 			if ( ! empty( $this->args['include'] ) && ! in_array( $user->ID, array_map( 'intval', (array) $this->args['include'] ), true ) ) {
 				return false;
 			}

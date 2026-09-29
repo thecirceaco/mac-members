@@ -54,6 +54,13 @@ final class MembersQuery
 	 */
 	private ?array $site_roles = null;
 
+	/**
+	 * The hidden roles, worked out once per request.
+	 *
+	 * @var array<int,string>|null
+	 */
+	private ?array $hidden_roles = null;
+
 	public function __construct(
 		private readonly SettingsRepositoryInterface $settings
 	) {}
@@ -89,7 +96,7 @@ final class MembersQuery
 			$args['include'] = $include;
 		}
 
-		return $args;
+		return $this->without_hidden_roles( $args );
 	}
 
 	/**
@@ -148,22 +155,22 @@ final class MembersQuery
 				$args['include'] = $include;
 			}
 
-			$counts[ $status->value ] = (int) ( new \WP_User_Query( $args ) )->get_total();
+			$counts[ $status->value ] = (int) ( new \WP_User_Query( $this->without_hidden_roles( $args ) ) )->get_total();
 		}
 
 		return $counts;
 	}
 
 	/**
-	 * Roles the role filter offers: every role at least one member holds, except the status roles and the
-	 * roles that the role filter exclusions setting names by slug or name, or that have a capability it names.
+	 * Roles the role filter offers: every role at least one shown member holds, except the status roles and
+	 * the hidden roles.
 	 *
 	 * @return array<string,string> Role names keyed by slug, sorted by name.
 	 */
 	public function get_filter_roles(): array
 	{
 		$status_roles = array_values( array_filter( $this->get_status_roles() ) );
-		$exclusions   = array_map( 'strtolower', SettingsSchema::parse_list( (string) $this->settings->get( 'role_filter_exclusions', '' ) ) );
+		$hidden_roles = $this->get_hidden_roles();
 		$roles        = array();
 
 		if ( array() === $status_roles ) {
@@ -171,22 +178,52 @@ final class MembersQuery
 		}
 
 		foreach ( $this->get_site_roles() as $slug => $role ) {
-			$name = isset( $role['name'] ) ? (string) $role['name'] : $slug;
-
 			if (
 				in_array( $slug, $status_roles, true )
-				|| $this->is_excluded( $slug, $name, $role['capabilities'] ?? array(), $exclusions )
+				|| in_array( $slug, $hidden_roles, true )
 				|| ! $this->is_held_by_a_member( $slug, $status_roles )
 			) {
 				continue;
 			}
 
-			$roles[ $slug ] = \translate_user_role( $name );
+			$roles[ $slug ] = \translate_user_role( isset( $role['name'] ) ? (string) $role['name'] : $slug );
 		}
 
 		asort( $roles, SORT_NATURAL | SORT_FLAG_CASE );
 
 		return $roles;
+	}
+
+	/**
+	 * Roles whose users never show in the members table: the roles that the "Roles hidden from the members
+	 * table" setting names by slug or name, or that have a capability it names. The status roles are never
+	 * hidden, so a name like "Member" cannot empty a whole view.
+	 *
+	 * @return array<int,string> Role slugs.
+	 */
+	public function get_hidden_roles(): array
+	{
+		if ( null !== $this->hidden_roles ) {
+			return $this->hidden_roles;
+		}
+
+		$status_roles = array_values( $this->get_status_roles() );
+		$names        = array_map( 'strtolower', SettingsSchema::parse_list( (string) $this->settings->get( 'hidden_roles', '' ) ) );
+		$hidden       = array();
+
+		if ( array() !== $names ) {
+			foreach ( $this->get_site_roles() as $slug => $role ) {
+				$name = isset( $role['name'] ) ? (string) $role['name'] : $slug;
+
+				if ( ! in_array( $slug, $status_roles, true ) && $this->is_excluded( $slug, $name, $role['capabilities'] ?? array(), $names ) ) {
+					$hidden[] = $slug;
+				}
+			}
+		}
+
+		$this->hidden_roles = $hidden;
+
+		return $hidden;
 	}
 
 	/**
@@ -260,6 +297,8 @@ final class MembersQuery
 		if ( '' !== $role ) {
 			$base['role'] = array( $role );
 		}
+
+		$base = $this->without_hidden_roles( $base );
 
 		$matches = null;
 
@@ -342,16 +381,34 @@ final class MembersQuery
 	private function is_held_by_a_member( string $role, array $status_roles ): bool
 	{
 		$query = new \WP_User_Query(
-			array(
-				'role'        => array( $role ),
-				'role__in'    => $status_roles,
-				'number'      => 1,
-				'fields'      => 'ID',
-				'count_total' => false,
+			$this->without_hidden_roles(
+				array(
+					'role'        => array( $role ),
+					'role__in'    => $status_roles,
+					'number'      => 1,
+					'fields'      => 'ID',
+					'count_total' => false,
+				)
 			)
 		);
 
 		return array() !== (array) $query->get_results();
+	}
+
+	/**
+	 * @param array<string,mixed> $args User query arguments.
+	 *
+	 * @return array<string,mixed> The arguments, leaving out the users who hold a hidden role.
+	 */
+	private function without_hidden_roles( array $args ): array
+	{
+		$hidden_roles = $this->get_hidden_roles();
+
+		if ( array() !== $hidden_roles ) {
+			$args['role__not_in'] = $hidden_roles;
+		}
+
+		return $args;
 	}
 
 	/**

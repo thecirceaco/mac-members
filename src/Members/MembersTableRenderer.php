@@ -22,6 +22,11 @@ final class MembersTableRenderer
 	public const COLUMN_KEYS = array( 'user_id', 'email', 'first_name', 'last_name', 'username', 'registered', 'last_login', 'profile', 'status', 'roles', 'actions' );
 
 	/**
+	 * Columns that start hidden until the viewer checks them.
+	 */
+	public const DEFAULT_HIDDEN_COLUMNS = array( 'last_login' );
+
+	/**
 	 * Display options: the columns the viewer hid, the size (medium or small), how dates show (date or relative)
 	 * and whether the Last Login column shows.
 	 */
@@ -222,7 +227,8 @@ final class MembersTableRenderer
 
 		foreach ( $this->get_columns() as $key => $label ) {
 			$checked = in_array( $key, $hidden_columns, true ) ? '' : ' checked';
-			$output .= '<label class="mac-members-columns__option"><input type="checkbox" value="' . esc_attr( $key ) . '" data-mac-members-column-toggle' . $checked . '>' . esc_html( $label ) . '</label>';
+			$default = in_array( $key, self::DEFAULT_HIDDEN_COLUMNS, true ) ? ' data-mac-members-column-default="hidden"' : '';
+			$output .= '<label class="mac-members-columns__option"><input type="checkbox" value="' . esc_attr( $key ) . '" data-mac-members-column-toggle' . $default . $checked . '>' . esc_html( $label ) . '</label>';
 		}
 
 		$output .= '</div>';

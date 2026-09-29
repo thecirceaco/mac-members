@@ -263,6 +263,7 @@ final class MembersTableShortcodeTest extends TestCase {
 	}
 
 	public function test_registered_shows_the_date_with_the_full_date_and_time_on_hover(): void {
+		$GLOBALS['mac_members_test_options'][ MAC_MEMBERS_SETTINGS_OPTION ] = array( 'date_display' => 'date' );
 		$this->store_people(
 			array(
 				1 => array(
@@ -278,8 +279,7 @@ final class MembersTableShortcodeTest extends TestCase {
 		);
 	}
 
-	public function test_relative_dates_show_the_time_since(): void {
-		$GLOBALS['mac_members_test_options'][ MAC_MEMBERS_SETTINGS_OPTION ] = array( 'date_display' => 'relative' );
+	public function test_relative_dates_show_the_time_since_by_default(): void {
 		$this->store_people(
 			array(
 				1 => array(
@@ -305,20 +305,33 @@ final class MembersTableShortcodeTest extends TestCase {
 				2 => array( 'roles' => array( 'mac_members_approved' ) ),
 			)
 		);
-		$_GET['mac_members_status'] = 'approved';
+		$_GET['mac_members_status']                                         = 'approved';
+		$GLOBALS['mac_members_test_options'][ MAC_MEMBERS_SETTINGS_OPTION ] = array( 'date_display' => 'date' );
 
 		$output = $this->create_shortcode( $this->mac_core_last_login( true ) )->render();
 
 		self::assertSame( 11, preg_match_all( '/<th scope="col" data-mac-members-column="([^"]+)">/', $output, $headers ) );
 		self::assertSame( MembersTableRenderer::COLUMN_KEYS, $headers[1] );
 		self::assertStringContainsString( '<th scope="col" data-mac-members-column="last_login">Last Login</th>', $output );
-		self::assertStringContainsString( '<input type="checkbox" value="last_login" data-mac-members-column-toggle checked>Last Login</label>', $output );
+		// The column starts unchecked, so the stylesheet hides it until the viewer checks it.
+		self::assertStringContainsString( '<input type="checkbox" value="last_login" data-mac-members-column-toggle data-mac-members-column-default="hidden">Last Login</label>', $output );
 		// Last Login shows the time too, and stays empty for a member without a recorded login.
 		self::assertStringContainsString(
 			'<td data-mac-members-column="last_login"><time datetime="' . gmdate( 'c', 1790000000 ) . '" title="' . gmdate( 'F j, Y g:i a', 1790000000 ) . '">' . gmdate( 'F j, Y g:i a', 1790000000 ) . '</time></td>',
 			$output
 		);
 		self::assertStringContainsString( '<td data-mac-members-column="last_login"></td>', $output );
+	}
+
+	public function test_the_cookie_shows_a_column_that_starts_hidden_and_keeps_the_others_as_they_are(): void {
+		$this->store_members( array( 1 => 'mac_members_pending' ) );
+		$_COOKIE['mac_members_hidden_columns'] = 'email,+last_login';
+
+		$output = $this->create_shortcode( $this->mac_core_last_login( true ) )->render();
+
+		self::assertStringContainsString( '<input type="checkbox" value="last_login" data-mac-members-column-toggle data-mac-members-column-default="hidden" checked>Last Login</label>', $output );
+		self::assertStringContainsString( '<input type="checkbox" value="email" data-mac-members-column-toggle>Email</label>', $output );
+		self::assertStringContainsString( '<input type="checkbox" value="username" data-mac-members-column-toggle checked>Username</label>', $output );
 	}
 
 	public function test_last_login_column_is_missing_while_mac_core_does_not_record_last_logins(): void {
@@ -538,7 +551,7 @@ final class MembersTableShortcodeTest extends TestCase {
 		self::assertStringNotContainsString( '<button type="submit"', $output );
 	}
 
-	public function test_role_that_is_not_offered_is_ignored(): void {
+	public function test_a_hidden_role_is_ignored_and_its_members_never_show(): void {
 		$this->store_people(
 			array(
 				1 => array( 'roles' => array( 'mac_members_approved', 'administrator' ) ),
@@ -550,8 +563,10 @@ final class MembersTableShortcodeTest extends TestCase {
 
 		$output = $this->create_shortcode()->render();
 
-		self::assertStringContainsString( 'data-mac-members-user-id="1"', $output );
+		// Administrators are hidden by default, even when they hold a member role.
+		self::assertStringNotContainsString( 'data-mac-members-user-id="1"', $output );
 		self::assertStringContainsString( 'data-mac-members-user-id="2"', $output );
+		self::assertStringContainsString( 'data-mac-members-count-for="approved">1</span>', $output );
 		// No member holds a role the filter offers, so only the search shows.
 		self::assertStringNotContainsString( 'mac-members-search__role', $output );
 		self::assertStringContainsString( '<input class="mac-members-search__input" type="search" name="mac_members_search" value=""', $output );

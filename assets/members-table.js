@@ -283,8 +283,9 @@
 		}
 	});
 
-	// The column checkboxes show and hide columns through the stylesheet. The hidden ones go in a cookie for a
-	// year, so the next page, which the server renders from that cookie, keeps them hidden.
+	// The column checkboxes show and hide columns through the stylesheet. The cookie keeps the changes to the
+	// defaults for a year, for the next page, which the server renders from it: the columns the viewer hid, and
+	// with a + the columns that start hidden, like Last Login, that the viewer showed.
 	document.addEventListener('change', (event) => {
 		const toggle = event.target;
 
@@ -298,12 +299,20 @@
 			return;
 		}
 
-		const hidden = [...root.querySelectorAll('[data-mac-members-column-toggle]')]
-			.filter((box) => !box.checked)
-			.map((box) => box.value);
+		const changes = [...root.querySelectorAll('[data-mac-members-column-toggle]')]
+			.map((box) => {
+				const startsHidden = box.dataset.macMembersColumnDefault === 'hidden';
+
+				if (startsHidden) {
+					return box.checked ? `+${box.value}` : '';
+				}
+
+				return box.checked ? '' : box.value;
+			})
+			.filter((change) => change !== '');
 		const secure = window.location.protocol === 'https:' ? '; Secure' : '';
 
-		document.cookie = `${columnsCookie}=${encodeURIComponent(hidden.join(','))}; path=/; max-age=31536000; SameSite=Lax${secure}`;
+		document.cookie = `${columnsCookie}=${encodeURIComponent(changes.join(','))}; path=/; max-age=31536000; SameSite=Lax${secure}`;
 	});
 
 	// When the table fits its frame, the frame stops scrolling and the header sticks to the page instead. The check

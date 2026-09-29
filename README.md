@@ -36,11 +36,11 @@ The settings page is under `Settings > MAC Members`. Turn on "Show MAC Members a
 | Inactive role | `mac_members_inactive` |
 | Denied role | `mac_members_denied` |
 
-The four roles must be different roles, and the approved, inactive and denied roles must not grant administrative capabilities such as `manage_options`, `edit_users`, `promote_users`, `delete_users`, `unfiltered_html`, `edit_plugins`, `edit_themes`, `install_plugins` or `activate_plugins` (the full list is in `src/Security/Capabilities.php`). Settings that break these rules are not saved, and the settings page shows why. Every status change checks the same rules again before it changes a user, because a role can gain capabilities after the settings are saved.
+The four roles must be different roles, and none of them may grant administrative capabilities such as `manage_options`, `edit_users`, `promote_users`, `delete_users`, `unfiltered_html`, `edit_plugins`, `edit_themes`, `install_plugins` or `activate_plugins` (the full list is in `src/Security/Capabilities.php`). The role dropdowns only offer roles without them; a saved role that has them still shows, selected, and settings that break these rules are not saved, with the reason on the settings page. Every status change checks the same rules again before it changes a user, because a role can gain capabilities after the settings are saved.
 
 The settings page also includes:
 
-- roles left out of the role filter, `administrator` by default
+- roles hidden from the members table, `administrator` by default (see Members Table below)
 - admin notification email
 - from email
 - member and admin approval email toggles
@@ -70,13 +70,13 @@ The table has a filter for each status (Pending, Approved, Inactive, Denied) and
 
 Every view lists the newest registrations first. The columns are User ID, Email, First Name, Last Name, Username, Registered, Last Login, Profile, Status, Roles and Actions. Roles lists the member's roles other than the status roles, for example Officer or Trustee, and the Actions column has only the status changes the member's status allows.
 
-Right above the table, under the role and search form, a checkbox for each column shows or hides it, and all are checked at first. While User ID is hidden, the first visible column is the one that stays at the left. The stylesheet hides a column while its checkbox is unchecked, and the script keeps the hidden columns in the `mac_members_hidden_columns` cookie for a year, so the next pages and later visits in the same browser keep them hidden.
+Right above the table, under the role and search form, a checkbox for each column shows or hides it. All start checked except Last Login. While User ID is hidden, the first visible column is the one that stays at the left. The stylesheet hides a column while its checkbox is unchecked, and the script keeps the viewer's changes in the `mac_members_hidden_columns` cookie for a year: the columns they hid, and, with a `+`, the columns that start hidden and that they showed. The next pages and later visits in the same browser keep them.
 
 Under the table, the page links sit on the left: Previous, the first and last page, the current page with one page on each side, gaps for the pages in between, and Next. On the right, "Per page" chooses 24, 48, 96 or 192 members per page, 24 by default, and the range shows which members the page lists, such as "1-24 of 2,353". The page and the page size are kept in the `mac_members_page` and `mac_members_per_page` query arguments. A page past the end, for example after a larger page size, shows the last page. The page size select belongs to the role and search form, so choosing a size keeps the role and the search and starts again at page 1.
 
 A form above the table narrows any view. It has no buttons:
 
-- **Role** lists the other roles members hold, for example Officer or Trustee. It leaves out the four status roles, and the roles that "Roles left out of the role filter" names by slug or name, or that have a capability it names. It shows only when members hold such a role, and choosing a role reloads the table.
+- **Role** lists the other roles the shown members hold, for example Officer or Trustee, without the four status roles and the hidden roles. It shows only when members hold such a role, and choosing a role reloads the table.
 - **Search** fills the rest of the row and matches members whose first name, last name, email, username or display name contains every word. A number also matches the user ID. Enter runs the search, and an empty search shows everyone again.
 
 The role and the search are kept in the `mac_members_role` and `mac_members_search` query arguments. The status filters, their counts and the page links keep them.
@@ -89,9 +89,11 @@ When the table fits its frame, the header sticks to the page, under the admin ba
 
 The "Members table size" setting sets the text and button size: Medium, the default, puts the table, its controls and its buttons in `--text-m`, and Small in `--text-s`. The buttons keep ACSS's `btn--s` class, and Medium sets ACSS's `--btn-font-size`.
 
-Last Login shows only while MAC Core is active and its "Show last login column" setting is on. MAC Core then records the time of each login through a login form in the `mac_core_last_login` user meta, and MAC Members only reads it; the cell is empty for a member without a recorded login. MAC Members detects MAC Core by its `MAC_CORE_VERSION` constant and reads the setting from the `mac_core_settings` option, so if that option changes shape, the column stops showing rather than failing. The table loads the user meta of every member on the page in one query.
+Users who hold a hidden role never show in the members table: not in its rows, its counts, its search or its role filter, so nobody can change their status there. The "Roles hidden from the members table" setting names the hidden roles by slug or name, or by a capability they have, for example `administrator, manage_options, officer`; it is `administrator` by default. The four status roles cannot be hidden, so a name like "Member" cannot empty a whole view. The table leaves those users out with `role__not_in` in every user query.
 
-The "Dates in the members table" setting applies to Registered and Last Login. Date, the default, shows the day in the site's date format, and Last Login also the time; Relative shows the time since, like "3 days ago". Both show the full date and time on hover, in a `<time>` element.
+Last Login shows only while MAC Core is active and its "Show last login column" setting is on. MAC Core then records the time of each login through a login form in the `mac_core_last_login` user meta, and MAC Members only reads it; the cell is empty for a member without a recorded login. The column starts hidden, and its checkbox shows it. MAC Members detects MAC Core by its `MAC_CORE_VERSION` constant and reads the setting from the `mac_core_settings` option, so if that option changes shape, the column stops showing rather than failing. The table loads the user meta of every member on the page in one query.
+
+The "Dates in the members table" setting applies to Registered and Last Login. Relative, the default, shows the time since, like "3 days ago"; Date shows the day in the site's date format, and Last Login also the time. Both show the full date and time on hover, in a `<time>` element.
 
 The stylesheet and the script are versioned with the plugin version and the file's modification time, so a new build reaches browsers and CDNs that keep the old files for a year.
 

@@ -30,9 +30,15 @@ final class WordPressSettingsRepository implements SettingsRepositoryInterface
 		}
 
 		$stored = \get_option( MAC_MEMBERS_SETTINGS_OPTION, null );
+		$stored = \is_array( $stored ) ? $stored : array();
+
+		// Development builds called the hidden roles "role_filter_exclusions".
+		if ( ! array_key_exists( 'hidden_roles', $stored ) && array_key_exists( 'role_filter_exclusions', $stored ) ) {
+			$stored['hidden_roles'] = $stored['role_filter_exclusions'];
+		}
 
 		$this->settings = $this->normalize(
-			\is_array( $stored ) ? $stored : array(),
+			$stored,
 			$this->schema->get_defaults(),
 			false
 		);
@@ -160,8 +166,10 @@ final class WordPressSettingsRepository implements SettingsRepositoryInterface
 			$errors['roles_not_distinct'] = __( 'The pending, approved, inactive and denied roles must be four different roles. The settings were not saved.', 'mac-members' );
 		}
 
-		// The roles that approve, reactivate, deactivate and deny add to a member.
+		// The pending role comes from the registration form, and approve, reactivate, deactivate and deny add the others.
 		$messages = array(
+			/* translators: 1: role name, 2: comma-separated capability names. */
+			'pending_role'  => __( 'The pending role "%1$s" grants administrative capabilities (%2$s). Choose a role without them. The settings were not saved.', 'mac-members' ),
 			/* translators: 1: role name, 2: comma-separated capability names. */
 			'approved_role' => __( 'The approved role "%1$s" grants administrative capabilities (%2$s). Choose a role without them. The settings were not saved.', 'mac-members' ),
 			/* translators: 1: role name, 2: comma-separated capability names. */

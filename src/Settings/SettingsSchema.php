@@ -31,7 +31,7 @@ final class SettingsSchema
 	/**
 	 * How the members table shows dates: see the "Dates in the members table" setting.
 	 */
-	public const DATE_DISPLAYS = array( 'date', 'relative' );
+	public const DATE_DISPLAYS = array( 'relative', 'date' );
 
 	/**
 	 * @return array<string,array{label:string,type:string,default:mixed,description?:string,choices?:array<string,string>}>
@@ -59,11 +59,11 @@ final class SettingsSchema
 				'type'    => self::TYPE_ROLE,
 				'default' => Roles::DENIED,
 			),
-			'role_filter_exclusions' => array(
-				'label'       => __( 'Roles left out of the role filter', 'mac-members' ),
+			'hidden_roles' => array(
+				'label'       => __( 'Roles hidden from the members table', 'mac-members' ),
 				'type'        => self::TYPE_LIST,
 				'default'     => 'administrator',
-				'description' => __( 'Comma-separated role slugs, role names or capabilities, for example administrator, manage_options. The members table offers every role its members hold, except the status roles and the roles that match this list or have one of these capabilities.', 'mac-members' ),
+				'description' => __( 'Comma-separated role slugs, role names or capabilities, for example administrator, manage_options. Users who hold a matching role, or a role with one of these capabilities, never show in the members table, its counts, its search or its role filter, so nobody can change their status there. The four status roles cannot be hidden.', 'mac-members' ),
 			),
 			'table_size' => array(
 				'label'       => __( 'Members table size', 'mac-members' ),
@@ -78,12 +78,12 @@ final class SettingsSchema
 			'date_display' => array(
 				'label'       => __( 'Dates in the members table', 'mac-members' ),
 				'type'        => self::TYPE_CHOICE,
-				'default'     => 'date',
+				'default'     => 'relative',
 				'choices'     => array_combine(
 					self::DATE_DISPLAYS,
-					array( __( 'Date', 'mac-members' ), __( 'Relative', 'mac-members' ) )
+					array( __( 'Relative', 'mac-members' ), __( 'Date', 'mac-members' ) )
 				),
-				'description' => __( 'For Registered and Last Login. Date shows the day in the site\'s date format, and Last Login the time too. Relative shows the time since, like 3 days ago. Both show the full date and time on hover.', 'mac-members' ),
+				'description' => __( 'For Registered and Last Login. Relative shows the time since, like 3 days ago. Date shows the day in the site\'s date format, and Last Login the time too. Both show the full date and time on hover.', 'mac-members' ),
 			),
 			'admin_notification_email' => array(
 				'label'   => __( 'Admin notification email', 'mac-members' ),

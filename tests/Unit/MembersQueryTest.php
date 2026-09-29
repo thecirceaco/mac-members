@@ -35,13 +35,14 @@ final class MembersQueryTest extends TestCase {
 
 		self::assertSame(
 			array(
-				'role__in'    => array( 'subscriber' ),
-				'number'      => 24,
-				'paged'       => 1,
-				'orderby'     => 'registered',
-				'order'       => 'DESC',
-				'fields'      => 'all',
-				'count_total' => true,
+				'role__in'     => array( 'subscriber' ),
+				'number'       => 24,
+				'paged'        => 1,
+				'orderby'      => 'registered',
+				'order'        => 'DESC',
+				'fields'       => 'all',
+				'count_total'  => true,
+				'role__not_in' => array( 'administrator' ),
 			),
 			( new MembersQuery( $repository ) )->get_query_args( MemberStatus::Pending )
 		);
@@ -133,26 +134,50 @@ final class MembersQueryTest extends TestCase {
 		);
 	}
 
-	public function test_filter_roles_are_the_roles_members_hold_without_status_roles_or_exclusions(): void {
-		$GLOBALS['mac_members_test_roles'] += array(
-			'officer'      => array( 'name' => 'Officer', 'capabilities' => array( 'read' => true ) ),
-			'trustee'      => array( 'name' => 'Trustee', 'capabilities' => array( 'read' => true ) ),
-			'shop_steward' => array( 'name' => 'Shop Steward', 'capabilities' => array( 'read' => true ) ),
-			'editor'       => array( 'name' => 'Editor', 'capabilities' => array( 'read' => true ) ),
-			'site_manager' => array( 'name' => 'Site Manager', 'capabilities' => array( 'read' => true, 'manage_options' => true ) ),
-			'author'       => array( 'name' => 'Author', 'capabilities' => array( 'read' => true, 'manage_options' => false ) ),
+	public function test_hidden_roles_match_by_slug_name_or_capability_and_never_hide_a_status_role(): void {
+		$this->add_test_roles();
+		$repository = $this->create_settings_repository();
+		$repository->save( array( 'hidden_roles' => 'administrator, EDITOR, manage_options, Member' ) );
+
+		// Administrator by slug, Editor by name, Site Manager by capability. "Member" names the approved status
+		// role, which cannot be hidden, and Author does not grant manage_options.
+		self::assertSame(
+			array( 'administrator', 'editor', 'site_manager' ),
+			( new MembersQuery( $repository ) )->get_hidden_roles()
 		);
+	}
+
+	public function test_users_with_a_hidden_role_never_show_in_the_list_the_counts_or_the_search(): void {
+		$this->add_test_roles();
 		$GLOBALS['mac_members_test_users'] = array(
-			new \WP_User( array( 'ID' => 1, 'roles' => array( 'mac_members_pending', 'trustee', 'administrator' ) ) ),
-			new \WP_User( array( 'ID' => 2, 'roles' => array( 'mac_members_approved', 'shop_steward', 'editor' ) ) ),
-			new \WP_User( array( 'ID' => 3, 'roles' => array( 'mac_members_denied', 'officer', 'site_manager', 'author' ) ) ),
-			new \WP_User( array( 'ID' => 4, 'roles' => array( 'subscriber' ) ) ),
+			new \WP_User( array( 'ID' => 1, 'user_login' => 'ana-officer', 'roles' => array( 'mac_members_approved', 'officer' ) ) ),
+			new \WP_User( array( 'ID' => 2, 'user_login' => 'ana-admin', 'roles' => array( 'mac_members_approved', 'administrator' ) ) ),
+			new \WP_User( array( 'ID' => 3, 'user_login' => 'ana-manager', 'roles' => array( 'mac_members_pending', 'site_manager' ) ) ),
 		);
 		$repository = $this->create_settings_repository();
-		$repository->save( array( 'role_filter_exclusions' => 'administrator, EDITOR, manage_options' ) );
+		$repository->save( array( 'hidden_roles' => 'administrator, manage_options' ) );
+		$query = new MembersQuery( $repository );
 
-		// Left out: Administrator by slug, Editor by name, Site Manager by capability. Author does not grant
-		// manage_options, and only a non-member holds Subscriber.
+		self::assertSame( array( 1 ), array_map( static fn ( \WP_User $user ): int => $user->ID, $query->get_members( null )['users'] ) );
+		self::assertSame( array( 'pending' => 0, 'approved' => 1, 'inactive' => 0, 'denied' => 0 ), $query->count_by_status() );
+		self::assertSame( array( 1 ), array_map( static fn ( \WP_User $user ): int => $user->ID, $query->get_members( null, 1, '', 'ana' )['users'] ) );
+	}
+
+	public function test_filter_roles_are_the_roles_shown_members_hold(): void {
+		$this->add_test_roles();
+		$GLOBALS['mac_members_test_users'] = array(
+			new \WP_User( array( 'ID' => 1, 'roles' => array( 'mac_members_pending', 'trustee' ) ) ),
+			new \WP_User( array( 'ID' => 2, 'roles' => array( 'mac_members_approved', 'shop_steward' ) ) ),
+			new \WP_User( array( 'ID' => 3, 'roles' => array( 'mac_members_denied', 'officer', 'author' ) ) ),
+			new \WP_User( array( 'ID' => 4, 'roles' => array( 'mac_members_approved', 'administrator', 'editor' ) ) ),
+			new \WP_User( array( 'ID' => 5, 'roles' => array( 'mac_members_inactive', 'site_manager' ) ) ),
+			new \WP_User( array( 'ID' => 6, 'roles' => array( 'subscriber' ) ) ),
+		);
+		$repository = $this->create_settings_repository();
+		$repository->save( array( 'hidden_roles' => 'administrator, manage_options' ) );
+
+		// Not offered: the hidden Administrator and Site Manager, Editor, which only a hidden member holds, and
+		// Subscriber, which only a non-member holds.
 		self::assertSame(
 			array(
 				'author'       => 'Author',
@@ -164,14 +189,18 @@ final class MembersQueryTest extends TestCase {
 		);
 	}
 
-	public function test_filter_roles_leave_out_administrator_by_default_and_show_translated_names(): void {
+	public function test_administrators_are_hidden_by_default_and_role_names_are_translated(): void {
 		$GLOBALS['mac_members_test_roles']['officer']  = array( 'name' => 'Officer', 'capabilities' => array( 'read' => true ) );
 		$GLOBALS['mac_members_test_role_translations'] = array( 'Officer' => 'Responsabil' );
 		$GLOBALS['mac_members_test_users']             = array(
-			new \WP_User( array( 'ID' => 1, 'roles' => array( 'mac_members_approved', 'officer', 'administrator' ) ) ),
+			new \WP_User( array( 'ID' => 1, 'roles' => array( 'mac_members_approved', 'officer' ) ) ),
+			new \WP_User( array( 'ID' => 2, 'roles' => array( 'mac_members_approved', 'administrator' ) ) ),
 		);
+		$query = new MembersQuery( $this->create_settings_repository() );
 
-		self::assertSame( array( 'officer' => 'Responsabil' ), ( new MembersQuery( $this->create_settings_repository() ) )->get_filter_roles() );
+		self::assertSame( array( 'administrator' ), $query->get_hidden_roles() );
+		self::assertSame( array( 'officer' => 'Responsabil' ), $query->get_filter_roles() );
+		self::assertSame( 1, $query->get_members( null )['total'] );
 	}
 
 	/**
@@ -241,6 +270,17 @@ final class MembersQueryTest extends TestCase {
 		// A user who holds two status roles shows the first status, in the order pending, approved, inactive, denied.
 		self::assertSame( MemberStatus::Pending, $query->get_status( new \WP_User( array( 'ID' => 3, 'roles' => array( 'mac_members_approved', 'mac_members_pending' ) ) ) ) );
 		self::assertNull( $query->get_status( new \WP_User( array( 'ID' => 4, 'roles' => array( 'subscriber' ) ) ) ) );
+	}
+
+	private function add_test_roles(): void {
+		$GLOBALS['mac_members_test_roles'] += array(
+			'officer'      => array( 'name' => 'Officer', 'capabilities' => array( 'read' => true ) ),
+			'trustee'      => array( 'name' => 'Trustee', 'capabilities' => array( 'read' => true ) ),
+			'shop_steward' => array( 'name' => 'Shop Steward', 'capabilities' => array( 'read' => true ) ),
+			'editor'       => array( 'name' => 'Editor', 'capabilities' => array( 'read' => true ) ),
+			'site_manager' => array( 'name' => 'Site Manager', 'capabilities' => array( 'read' => true, 'manage_options' => true ) ),
+			'author'       => array( 'name' => 'Author', 'capabilities' => array( 'read' => true, 'manage_options' => false ) ),
+		);
 	}
 
 	private function store_named_members(): void {

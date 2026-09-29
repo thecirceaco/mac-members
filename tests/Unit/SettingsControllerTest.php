@@ -228,12 +228,37 @@ final class SettingsControllerTest extends TestCase {
 		self::assertStringContainsString( '>Save Settings</button>', $top_level );
 	}
 
-	public function test_settings_page_has_the_role_filter_exclusions_field_and_its_description(): void {
+	public function test_settings_page_has_the_hidden_roles_field_and_its_description(): void {
 		$output = $this->render_page( false );
 
-		self::assertStringContainsString( '<label for="mac-members-role_filter_exclusions">Roles left out of the role filter</label>', $output );
-		self::assertStringContainsString( '<input type="text" class="regular-text" id="mac-members-role_filter_exclusions" name="mac_members_settings[role_filter_exclusions]" value="administrator" aria-describedby="mac-members-role_filter_exclusions-description">', $output );
-		self::assertStringContainsString( '<p class="description" id="mac-members-role_filter_exclusions-description">Comma-separated role slugs, role names or capabilities, for example administrator, manage_options.', $output );
+		self::assertStringContainsString( '<label for="mac-members-hidden_roles">Roles hidden from the members table</label>', $output );
+		self::assertStringContainsString( '<input type="text" class="regular-text" id="mac-members-hidden_roles" name="mac_members_settings[hidden_roles]" value="administrator" aria-describedby="mac-members-hidden_roles-description">', $output );
+		self::assertStringContainsString( '<p class="description" id="mac-members-hidden_roles-description">Comma-separated role slugs, role names or capabilities, for example administrator, manage_options. Users who hold a matching role', $output );
+	}
+
+	public function test_status_role_dropdowns_leave_out_roles_with_administrative_capabilities(): void {
+		$GLOBALS['mac_members_test_roles']['site_manager'] = array( 'name' => 'Site Manager', 'capabilities' => array( 'read' => true, 'promote_users' => true ) );
+
+		$output = $this->render_page( false );
+
+		self::assertSame( 1, preg_match( '/<select id="mac-members-approved_role"[^>]*>(.*?)<\/select>/s', $output, $select ) );
+		self::assertStringContainsString( '<option value="mac_members_approved" selected="selected">Member</option>', $select[1] );
+		self::assertStringContainsString( '<option value="subscriber">Subscriber</option>', $select[1] );
+		self::assertStringNotContainsString( 'value="administrator"', $select[1] );
+		self::assertStringNotContainsString( 'value="site_manager"', $select[1] );
+	}
+
+	public function test_a_saved_status_role_with_administrative_capabilities_still_shows_selected(): void {
+		$GLOBALS['mac_members_test_options'][ MAC_MEMBERS_SETTINGS_OPTION ] = array( 'pending_role' => 'administrator' );
+
+		$controller = $this->create_controller();
+		$controller->register_settings_page();
+		ob_start();
+		$controller->render_settings_page();
+		$output = (string) ob_get_clean();
+
+		self::assertSame( 1, preg_match( '/<select id="mac-members-pending_role"[^>]*>(.*?)<\/select>/s', $output, $select ) );
+		self::assertStringContainsString( '<option value="administrator" selected>Administrator</option>', $select[1] );
 	}
 
 	public function test_settings_page_has_the_uninstall_checkbox_off_with_its_description(): void {
@@ -246,7 +271,7 @@ final class SettingsControllerTest extends TestCase {
 	public function test_settings_page_has_the_date_display_choice(): void {
 		$output = $this->render_page( false );
 
-		self::assertStringContainsString( '<select id="mac-members-date_display" name="mac_members_settings[date_display]" aria-describedby="mac-members-date_display-description"><option value="date" selected="selected">Date</option><option value="relative">Relative</option></select>', $output );
+		self::assertStringContainsString( '<select id="mac-members-date_display" name="mac_members_settings[date_display]" aria-describedby="mac-members-date_display-description"><option value="relative" selected="selected">Relative</option><option value="date">Date</option></select>', $output );
 		self::assertStringContainsString( '<p class="description" id="mac-members-date_display-description">For Registered and Last Login.', $output );
 	}
 

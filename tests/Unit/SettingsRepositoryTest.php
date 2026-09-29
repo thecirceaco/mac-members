@@ -50,7 +50,7 @@ final class SettingsRepositoryTest extends TestCase {
 		self::assertTrue( $settings['send_admin_deactivation_email'] );
 		self::assertFalse( $settings['delete_data_on_uninstall'] );
 		self::assertSame( 'medium', $settings['table_size'] );
-		self::assertSame( 'date', $settings['date_display'] );
+		self::assertSame( 'relative', $settings['date_display'] );
 		self::assertSame( 'Example Site', $repository->get_from_name() );
 	}
 
@@ -65,23 +65,33 @@ final class SettingsRepositoryTest extends TestCase {
 	public function test_date_display_accepts_only_its_choices(): void {
 		$repository = $this->create_repository();
 
-		self::assertSame( 'relative', $repository->save( array( 'date_display' => 'Relative' ) )['date_display'] );
-		self::assertSame( 'date', $repository->save( array( 'date_display' => 'ago' ) )['date_display'] );
+		self::assertSame( 'date', $repository->save( array( 'date_display' => 'Date' ) )['date_display'] );
+		self::assertSame( 'relative', $repository->save( array( 'date_display' => 'ago' ) )['date_display'] );
 	}
 
-	public function test_role_filter_exclusions_default_to_administrator(): void {
-		self::assertSame( 'administrator', $this->create_repository()->all()['role_filter_exclusions'] );
+	public function test_hidden_roles_default_to_administrator(): void {
+		self::assertSame( 'administrator', $this->create_repository()->all()['hidden_roles'] );
 	}
 
-	public function test_role_filter_exclusions_are_saved_as_a_clean_comma_separated_list(): void {
+	public function test_hidden_roles_carry_over_from_the_development_setting_name(): void {
+		$GLOBALS['mac_members_test_options'][ MAC_MEMBERS_SETTINGS_OPTION ] = array( 'role_filter_exclusions' => 'administrator, officer' );
+
+		self::assertSame( 'administrator, officer', $this->create_repository()->all()['hidden_roles'] );
+	}
+
+	public function test_validate_roles_rejects_a_pending_role_with_sensitive_capabilities(): void {
+		self::assertArrayHasKey( 'pending_role_sensitive', $this->create_repository()->validate_roles( array( 'pending_role' => 'administrator' ) ) );
+	}
+
+	public function test_hidden_roles_are_saved_as_a_clean_comma_separated_list(): void {
 		$repository = $this->create_repository();
 
 		self::assertSame(
 			'administrator, manage_options, Shop Steward',
-			$repository->save( array( 'role_filter_exclusions' => ' administrator,, manage_options , <b>Shop Steward</b>, ADMINISTRATOR ' ) )['role_filter_exclusions']
+			$repository->save( array( 'hidden_roles' => ' administrator,, manage_options , <b>Shop Steward</b>, ADMINISTRATOR ' ) )['hidden_roles']
 		);
-		self::assertSame( '', $repository->save( array( 'role_filter_exclusions' => '' ) )['role_filter_exclusions'] );
-		self::assertSame( 'administrator', $repository->save( array( 'role_filter_exclusions' => array( 'editor' ) ) )['role_filter_exclusions'] );
+		self::assertSame( '', $repository->save( array( 'hidden_roles' => '' ) )['hidden_roles'] );
+		self::assertSame( 'administrator', $repository->save( array( 'hidden_roles' => array( 'editor' ) ) )['hidden_roles'] );
 	}
 
 	public function test_save_accepts_existing_role_slugs_only(): void {

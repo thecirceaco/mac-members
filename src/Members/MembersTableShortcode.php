@@ -247,17 +247,29 @@ final class MembersTableShortcode implements Service
 	}
 
 	/**
-	 * @return array<int,string> Keys of the columns the viewer hid, from the cookie the script writes.
+	 * The hidden columns: the ones that start hidden, changed by the cookie the script writes. The cookie lists
+	 * the columns the viewer hid, and a column that starts hidden with a + when the viewer showed it.
+	 *
+	 * @return array<int,string> Keys of the hidden columns.
 	 */
 	private function get_hidden_columns(): array
 	{
-		if ( ! isset( $_COOKIE[ self::COLUMNS_COOKIE ] ) || ! \is_string( $_COOKIE[ self::COLUMNS_COOKIE ] ) ) {
-			return array();
+		$hidden = MembersTableRenderer::DEFAULT_HIDDEN_COLUMNS;
+
+		if ( isset( $_COOKIE[ self::COLUMNS_COOKIE ] ) && \is_string( $_COOKIE[ self::COLUMNS_COOKIE ] ) ) {
+			foreach ( explode( ',', \sanitize_text_field( \wp_unslash( $_COOKIE[ self::COLUMNS_COOKIE ] ) ) ) as $token ) {
+				$token = trim( $token );
+				$key   = \sanitize_key( ltrim( $token, '+' ) );
+
+				if ( str_starts_with( $token, '+' ) ) {
+					$hidden = array_diff( $hidden, array( $key ) );
+				} else {
+					$hidden[] = $key;
+				}
+			}
 		}
 
-		$keys = array_map( 'sanitize_key', explode( ',', \sanitize_text_field( \wp_unslash( $_COOKIE[ self::COLUMNS_COOKIE ] ) ) ) );
-
-		return array_values( array_intersect( MembersTableRenderer::COLUMN_KEYS, $keys ) );
+		return array_values( array_intersect( MembersTableRenderer::COLUMN_KEYS, $hidden ) );
 	}
 
 	/**

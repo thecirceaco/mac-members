@@ -11,6 +11,7 @@ namespace MacMembers\Settings;
 
 use MacMembers\Admin\MenuIcon;
 use MacMembers\Contracts\Service;
+use MacMembers\Security\Capabilities;
 use MacMembers\Security\Roles;
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -291,17 +292,28 @@ final class SettingsController implements Service
 		return '<input type="text" class="regular-text" id="mac-members-' . esc_attr( $key ) . '" name="mac_members_settings[' . esc_attr( $key ) . ']" value="' . esc_attr( $value ) . '"' . $describedby . '>';
 	}
 
+	/**
+	 * A status role dropdown. It offers only roles without administrative capabilities, such as manage_options
+	 * or promote_users, because a member status must never grant them. A saved role that is missing or has them
+	 * still shows, selected, so the page tells the truth; saving refuses it.
+	 */
 	private function render_role_select( string $key, string $value ): string
 	{
-		$output = '<select id="mac-members-' . esc_attr( $key ) . '" name="mac_members_settings[' . esc_attr( $key ) . ']">';
+		$output  = '<select id="mac-members-' . esc_attr( $key ) . '" name="mac_members_settings[' . esc_attr( $key ) . ']">';
+		$offered = array_filter(
+			$this->settings->get_available_roles(),
+			static fn ( mixed $label, mixed $slug ): bool => array() === Capabilities::sensitive_capabilities_of_role( (string) $slug ),
+			ARRAY_FILTER_USE_BOTH
+		);
 
-		foreach ( $this->settings->get_available_roles() as $slug => $label ) {
+		foreach ( $offered as $slug => $label ) {
 			$output .= '<option value="' . esc_attr( $slug ) . '"' . $this->selected_attr( $slug === $value ) . '>';
 			$output .= esc_html( $label ) . '</option>';
 		}
 
-		if ( '' !== $value && ! array_key_exists( $value, $this->settings->get_available_roles() ) ) {
-			$output .= '<option value="' . esc_attr( $value ) . '" selected>' . esc_html( $value ) . '</option>';
+		if ( '' !== $value && ! array_key_exists( $value, $offered ) ) {
+			$label   = $this->settings->get_available_roles()[ $value ] ?? $value;
+			$output .= '<option value="' . esc_attr( $value ) . '" selected>' . esc_html( $label ) . '</option>';
 		}
 
 		$output .= '</select>';
