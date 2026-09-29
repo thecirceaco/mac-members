@@ -32,6 +32,47 @@ final class BundledSureCartSdkTest extends TestCase {
 		}
 	}
 
+	/**
+	 * Every hook the SDK fires and every constant it reads carries the MAC Members prefix, like MAC Core's copy
+	 * with its own, so a value set for another plugin's copy can't change MAC Members' licensing. An SDK update
+	 * that brings the upstream names back, or adds a new unprefixed one, fails here.
+	 */
+	public function test_the_sdk_reads_only_mac_members_prefixed_global_names(): void {
+		$names = array();
+		$files = glob( self::SDK_DIR . '/*.php' );
+
+		foreach ( false === $files ? array() : $files as $file ) {
+			$contents = (string) file_get_contents( $file );
+
+			preg_match_all( '/\b(?:apply_filters|apply_filters_ref_array|do_action|do_action_ref_array)\(\s*[\'"]([^\'"]+)[\'"]/', $contents, $hooks );
+			preg_match_all( '/\b(?:defined|constant)\(\s*[\'"]([^\'"]+)[\'"]/', $contents, $constants );
+
+			foreach ( $hooks[1] as $hook ) {
+				self::assertStringStartsWith( 'mac_members_', $hook, basename( $file ) );
+			}
+
+			foreach ( $constants[1] as $constant ) {
+				self::assertStringStartsWith( 'MAC_MEMBERS_', $constant, basename( $file ) );
+			}
+
+			self::assertDoesNotMatchRegularExpression( '/(?<![A-Za-z0-9_])(SURECART_LICENSING_ENDPOINT|surecart_licensing_endpoint|surecart_client_license_form_action|surecart_licensing_is_local)(?![A-Za-z0-9_])/', $contents, basename( $file ) );
+
+			$names = array_merge( $names, $hooks[1], $constants[1] );
+		}
+
+		sort( $names );
+
+		self::assertSame(
+			array(
+				'MAC_MEMBERS_SURECART_LICENSING_ENDPOINT',
+				'mac_members_surecart_client_license_form_action',
+				'mac_members_surecart_licensing_endpoint',
+				'mac_members_surecart_licensing_is_local',
+			),
+			$names
+		);
+	}
+
 	public function test_the_settings_page_can_skip_its_menu(): void {
 		$settings = (string) file_get_contents( self::SDK_DIR . '/Settings.php' );
 
@@ -45,5 +86,6 @@ final class BundledSureCartSdkTest extends TestCase {
 		self::assertStringContainsString( 'Version: `v1.2.1`', $readme );
 		self::assertStringContainsString( 'c24515df17bc184686ca3c86761ce0541f60d7b5', $readme );
 		self::assertStringContainsString( '## Local changes', $readme );
+		self::assertStringContainsString( '3. **Prefixed global names.**', $readme );
 	}
 }
