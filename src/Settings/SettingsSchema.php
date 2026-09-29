@@ -9,15 +9,12 @@ declare(strict_types=1);
 
 namespace MacMembers\Settings;
 
-use MacMembers\Security\Roles;
-
 if ( ! defined( 'ABSPATH' ) ) {
 	exit; // Exit if accessed directly.
 }
 
 final class SettingsSchema
 {
-	public const TYPE_ROLE   = 'role';
 	public const TYPE_EMAIL  = 'email';
 	public const TYPE_TOGGLE = 'toggle';
 	public const TYPE_ROLES  = 'roles';
@@ -40,26 +37,6 @@ final class SettingsSchema
 	public function get_fields(): array
 	{
 		return array(
-			'pending_role' => array(
-				'label'   => __( 'Pending role', 'mac-members' ),
-				'type'    => self::TYPE_ROLE,
-				'default' => Roles::PENDING,
-			),
-			'approved_role' => array(
-				'label'   => __( 'Approved role', 'mac-members' ),
-				'type'    => self::TYPE_ROLE,
-				'default' => Roles::APPROVED,
-			),
-			'inactive_role' => array(
-				'label'   => __( 'Inactive role', 'mac-members' ),
-				'type'    => self::TYPE_ROLE,
-				'default' => Roles::INACTIVE,
-			),
-			'denied_role' => array(
-				'label'   => __( 'Denied role', 'mac-members' ),
-				'type'    => self::TYPE_ROLE,
-				'default' => Roles::DENIED,
-			),
 			'hidden_roles' => array(
 				'label'       => __( 'Roles hidden from the members table', 'mac-members' ),
 				'type'        => self::TYPE_ROLES,
@@ -159,14 +136,6 @@ final class SettingsSchema
 		}
 
 		return $defaults;
-	}
-
-	/**
-	 * @return array<int,string>
-	 */
-	public function get_role_fields(): array
-	{
-		return $this->get_fields_by_type( self::TYPE_ROLE );
 	}
 
 	/**

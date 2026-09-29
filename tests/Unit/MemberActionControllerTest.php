@@ -97,7 +97,7 @@ final class MemberActionControllerTest extends TestCase {
 			'not pending'     => array( 'not pending', 'status_changed' ),
 			'no review cap'   => array( 'no review cap', 'permission_denied' ),
 			'hidden target'   => array( 'hidden target', 'permission_denied' ),
-			'unsafe roles'    => array( 'unsafe roles', 'invalid_role_settings' ),
+			'unsafe role'     => array( 'unsafe role', 'unsafe_role' ),
 			'not editable'    => array( 'not editable', 'permission_denied' ),
 			'stale table'     => array( 'stale table', 'stale_table' ),
 			'busy'            => array( 'busy', 'busy' ),
@@ -340,7 +340,7 @@ final class MemberActionControllerTest extends TestCase {
 			fn (): mixed => $this->create_controller()->deactivate()
 		);
 
-		self::assertSame( 'invalid_role_settings', $response['data']['code'] );
+		self::assertSame( 'unsafe_role', $response['data']['code'] );
 		self::assertSame( array( 'mac_members_approved' ), $user->roles );
 	}
 
@@ -549,58 +549,7 @@ final class MemberActionControllerTest extends TestCase {
 		);
 	}
 
-	/**
-	 * @param array<string,string> $stored_settings Stored role settings.
-	 */
-	#[DataProvider( 'provide_role_settings_that_are_not_allowed' )]
-	public function test_role_settings_that_are_not_allowed_are_refused_before_any_write( array $stored_settings, string $action ): void {
-		$GLOBALS['mac_members_test_options'][ MAC_MEMBERS_SETTINGS_OPTION ] = $stored_settings;
-
-		$user = $this->store_user( 12, array( 'mac_members_pending' ) );
-		$this->prepare_ajax_request( 'approve' === $action ? FrontendAssets::APPROVE_ACTION : FrontendAssets::DENY_ACTION, $user->ID );
-
-		$response = $this->capture_ajax_response(
-			fn (): mixed => 'approve' === $action ? $this->create_controller()->approve() : $this->create_controller()->deny()
-		);
-
-		self::assertFalse( $response['success'] );
-		self::assertSame( 500, $response['status'] );
-		self::assertSame( 'invalid_role_settings', $response['data']['code'] );
-		self::assertSame( array( 'mac_members_pending' ), $user->roles );
-		self::assertSame( array(), $GLOBALS['mac_members_test_role_changes'] );
-	}
-
-	/**
-	 * @return array<string,array{0:array<string,string>,1:string}>
-	 */
-	public static function provide_role_settings_that_are_not_allowed(): array {
-		return array(
-			'approved and denied are the same role' => array(
-				array(
-					'approved_role' => 'mac_members_approved',
-					'denied_role'   => 'mac_members_approved',
-				),
-				'deny',
-			),
-			'pending and approved are the same role' => array(
-				array(
-					'pending_role'  => 'mac_members_pending',
-					'approved_role' => 'mac_members_pending',
-				),
-				'approve',
-			),
-			'approved role is an administrator role' => array(
-				array( 'approved_role' => 'administrator' ),
-				'approve',
-			),
-			'denied role is an administrator role' => array(
-				array( 'denied_role' => 'administrator' ),
-				'deny',
-			),
-		);
-	}
-
-	public function test_target_role_that_gained_a_sensitive_capability_after_saving_is_refused(): void {
+	public function test_target_role_that_gained_a_sensitive_capability_is_refused(): void {
 		$GLOBALS['mac_members_test_roles']['mac_members_approved']['capabilities']['edit_users'] = true;
 
 		$user = $this->store_user( 12, array( 'mac_members_pending' ) );
@@ -610,7 +559,7 @@ final class MemberActionControllerTest extends TestCase {
 			fn (): mixed => $this->create_controller()->approve()
 		);
 
-		self::assertSame( 'invalid_role_settings', $response['data']['code'] );
+		self::assertSame( 'unsafe_role', $response['data']['code'] );
 		self::assertSame( array( 'mac_members_pending' ), $user->roles );
 	}
 
@@ -721,7 +670,7 @@ final class MemberActionControllerTest extends TestCase {
 		self::assertFalse( $response['success'] );
 		self::assertSame( 500, $response['status'] );
 		self::assertSame( 'missing_role', $response['data']['code'] );
-		self::assertSame( 'A role needed for this action does not exist. Please review the MAC Members settings.', $response['data']['message'] );
+		self::assertSame( 'A member role this change needs does not exist. Deactivate and activate MAC Members to create it again.', $response['data']['message'] );
 		self::assertSame( array( 'mac_members_pending', 'subscriber' ), $user->roles );
 		self::assertSame( array(), $GLOBALS['mac_members_test_cleaned_user_cache'] );
 	}
@@ -937,8 +886,8 @@ final class MemberActionControllerTest extends TestCase {
 				$GLOBALS['mac_members_test_options'][ MAC_MEMBERS_SETTINGS_OPTION ] = array( 'hidden_roles' => array( 'officer' ) );
 				$this->store_user( 12, array( 'mac_members_pending', 'officer' ) );
 				break;
-			case 'unsafe roles':
-				$GLOBALS['mac_members_test_options'][ MAC_MEMBERS_SETTINGS_OPTION ] = array( 'approved_role' => 'administrator' );
+			case 'unsafe role':
+				$GLOBALS['mac_members_test_roles']['mac_members_approved']['capabilities']['edit_users'] = true;
 				break;
 			case 'not editable':
 				$this->remove_editable_role( 'mac_members_approved' );

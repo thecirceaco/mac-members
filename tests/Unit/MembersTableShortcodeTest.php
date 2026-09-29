@@ -879,7 +879,7 @@ final class MembersTableShortcodeTest extends TestCase {
 
 		self::assertStringContainsString( 'mac-members-notice--warning', $output );
 		self::assertStringContainsString(
-			'MAC Members: One or more configured roles do not exist (mac_members_pending, mac_members_denied). Status changes that need a missing role are blocked. Please review the MAC Members settings.',
+			'MAC Members: One or more member roles do not exist (mac_members_pending, mac_members_denied). Status changes that need a missing role are blocked. Deactivate and activate MAC Members to create them again.',
 			$output
 		);
 	}

@@ -49,7 +49,7 @@ final class MembersTableRenderer
 	 * @param string                                                 $view Shown view: a status value or "all".
 	 * @param array<int,array{view:string,label:string,count:int,url:string,current:bool}> $filters Status filters; empty hides them.
 	 * @param array{page?:int,pages?:int,per_page?:int,total?:int,first?:int,last?:int,links?:array<int,array{page:int,url:string,current:bool}|null>,previous_url?:string,next_url?:string} $pagination Pagination.
-	 * @param array<int,string>                                      $missing_roles Configured role slugs that do not exist.
+	 * @param array<int,string>                                      $missing_roles Slugs of the member roles that do not exist.
 	 * @param string                                                 $render_token Token that status changes from this table must send.
 	 * @param array{action?:string,hidden?:array<string,string>,roles?:array<string,string>,role?:string,search?:string} $search_form Role and search form; empty hides it.
 	 * @param array{hidden_columns?:array<int,string>,size?:string,dates?:string,last_login?:bool} $display Display options.
@@ -402,7 +402,7 @@ final class MembersTableRenderer
 	}
 
 	/**
-	 * @param array<int,string> $missing_roles Configured role slugs that do not exist.
+	 * @param array<int,string> $missing_roles Slugs of the member roles that do not exist.
 	 */
 	private function render_missing_roles_warning( array $missing_roles ): string
 	{
@@ -412,7 +412,7 @@ final class MembersTableRenderer
 
 		$message = sprintf(
 			/* translators: %s: comma-separated list of role slugs. */
-			__( 'MAC Members: One or more configured roles do not exist (%s). Status changes that need a missing role are blocked. Please review the MAC Members settings.', 'mac-members' ),
+			__( 'MAC Members: One or more member roles do not exist (%s). Status changes that need a missing role are blocked. Deactivate and activate MAC Members to create them again.', 'mac-members' ),
 			implode( ', ', $missing_roles )
 		);
 

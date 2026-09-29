@@ -9,8 +9,6 @@ declare(strict_types=1);
 
 namespace MacMembers\Settings;
 
-use MacMembers\Security\Capabilities;
-
 if ( ! defined( 'ABSPATH' ) ) {
 	exit; // Exit if accessed directly.
 }
@@ -57,23 +55,11 @@ final class WordPressSettingsRepository implements SettingsRepositoryInterface
 	{
 		$normalized = $this->normalize( $settings, $this->all(), true );
 
-		if ( array() !== $this->get_role_errors( $normalized ) ) {
-			// Roles that break the role rules are never stored; the saved roles stay.
-			foreach ( $this->schema->get_role_fields() as $key ) {
-				$normalized[ $key ] = $this->all()[ $key ];
-			}
-		}
-
 		\update_option( MAC_MEMBERS_SETTINGS_OPTION, $normalized );
 
 		$this->settings = $normalized;
 
 		return $normalized;
-	}
-
-	public function validate_roles( array $settings ): array
-	{
-		return $this->get_role_errors( $this->normalize( $settings, $this->all(), true ) );
 	}
 
 	public function ensure_defaults(): array
@@ -122,78 +108,6 @@ final class WordPressSettingsRepository implements SettingsRepositoryInterface
 		return \sanitize_text_field( \get_bloginfo( 'name' ) );
 	}
 
-	public function role_exists( string $role ): bool
-	{
-		return '' !== $role && \wp_roles()->is_role( $role );
-	}
-
-	public function get_missing_role_slugs(): array
-	{
-		$settings = $this->all();
-		$missing  = array();
-
-		foreach ( $this->schema->get_role_fields() as $field_key ) {
-			$role = isset( $settings[ $field_key ] ) ? \sanitize_key( (string) $settings[ $field_key ] ) : '';
-
-			if ( '' !== $role && ! $this->role_exists( $role ) ) {
-				$missing[] = $role;
-			}
-		}
-
-		return array_values( array_unique( $missing ) );
-	}
-
-	public function has_missing_roles(): bool
-	{
-		return array() !== $this->get_missing_role_slugs();
-	}
-
-	/**
-	 * @param array<string,mixed> $settings Normalized settings.
-	 *
-	 * @return array<string,string> Error messages keyed by error code.
-	 */
-	private function get_role_errors( array $settings ): array
-	{
-		$roles  = array();
-		$errors = array();
-
-		foreach ( $this->schema->get_role_fields() as $key ) {
-			$roles[ $key ] = (string) ( $settings[ $key ] ?? '' );
-		}
-
-		if ( count( array_unique( $roles ) ) !== count( $roles ) ) {
-			$errors['roles_not_distinct'] = __( 'The pending, approved, inactive and denied roles must be four different roles. The settings were not saved.', 'mac-members' );
-		}
-
-		// The pending role comes from the registration form, and approve, reactivate, deactivate and deny add the others.
-		$messages = array(
-			/* translators: 1: role name, 2: comma-separated capability names. */
-			'pending_role'  => __( 'The pending role "%1$s" grants administrative capabilities (%2$s). Choose a role without them. The settings were not saved.', 'mac-members' ),
-			/* translators: 1: role name, 2: comma-separated capability names. */
-			'approved_role' => __( 'The approved role "%1$s" grants administrative capabilities (%2$s). Choose a role without them. The settings were not saved.', 'mac-members' ),
-			/* translators: 1: role name, 2: comma-separated capability names. */
-			'inactive_role' => __( 'The inactive role "%1$s" grants administrative capabilities (%2$s). Choose a role without them. The settings were not saved.', 'mac-members' ),
-			/* translators: 1: role name, 2: comma-separated capability names. */
-			'denied_role'   => __( 'The denied role "%1$s" grants administrative capabilities (%2$s). Choose a role without them. The settings were not saved.', 'mac-members' ),
-		);
-		$role_names = $this->get_available_roles();
-
-		foreach ( $messages as $key => $message ) {
-			$capabilities = Capabilities::sensitive_capabilities_of_role( $roles[ $key ] ?? '' );
-
-			if ( array() !== $capabilities ) {
-				$errors[ $key . '_sensitive' ] = sprintf(
-					$message,
-					$role_names[ $roles[ $key ] ] ?? $roles[ $key ],
-					implode( ', ', $capabilities )
-				);
-			}
-		}
-
-		return $errors;
-	}
-
 	/**
 	 * @param array<string,mixed> $input Input settings.
 	 * @param array<string,mixed> $fallback Fallback settings.
@@ -209,7 +123,6 @@ final class WordPressSettingsRepository implements SettingsRepositoryInterface
 			$value = $this->resolve_input_value( $key, $input, $fallback, $for_save );
 
 			$normalized[ $key ] = match ( $field['type'] ) {
-				SettingsSchema::TYPE_ROLE   => $this->sanitize_role( $value, $fallback[ $key ] ?? $field['default'] ),
 				SettingsSchema::TYPE_EMAIL  => $this->sanitize_email( $value ),
 				SettingsSchema::TYPE_TOGGLE => $this->sanitize_toggle( $value ),
 				SettingsSchema::TYPE_ROLES  => $this->sanitize_roles( $value ),
@@ -242,18 +155,6 @@ final class WordPressSettingsRepository implements SettingsRepositoryInterface
 		}
 
 		return $fallback[ $key ] ?? null;
-	}
-
-	private function sanitize_role( mixed $value, mixed $fallback ): string
-	{
-		$role      = \sanitize_key( (string) $value );
-		$available = $this->get_available_roles();
-
-		if ( '' !== $role && array_key_exists( $role, $available ) ) {
-			return $role;
-		}
-
-		return \sanitize_key( (string) $fallback );
 	}
 
 	private function sanitize_email( mixed $value ): string

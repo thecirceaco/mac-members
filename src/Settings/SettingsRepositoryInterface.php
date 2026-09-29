@@ -30,17 +30,6 @@ interface SettingsRepositoryInterface
 	public function save( array $settings ): array;
 
 	/**
-	 * Checks the roles that saving these settings would store: the pending, approved, inactive and denied
-	 * roles must be four different roles, and the approved, inactive and denied roles must not grant
-	 * sensitive capabilities.
-	 *
-	 * @param array<string,mixed> $settings Submitted settings.
-	 *
-	 * @return array<string,string> Error messages keyed by error code, empty when the roles are allowed.
-	 */
-	public function validate_roles( array $settings ): array;
-
-	/**
 	 * @return array<string,mixed>
 	 */
 	public function ensure_defaults(): array;
@@ -51,16 +40,4 @@ interface SettingsRepositoryInterface
 	public function get_available_roles(): array;
 
 	public function get_from_name(): string;
-
-	/**
-	 * Whether the role is registered on the site.
-	 */
-	public function role_exists( string $role ): bool;
-
-	/**
-	 * @return array<int,string>
-	 */
-	public function get_missing_role_slugs(): array;
-
-	public function has_missing_roles(): bool;
 }

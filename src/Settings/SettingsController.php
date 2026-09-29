@@ -120,22 +120,14 @@ final class SettingsController implements Service
 			? \wp_unslash( $_POST['mac_members_settings'] )
 			: array();
 
-		$role_errors = $this->settings->validate_roles( $submitted );
+		$this->settings->save( $submitted );
 
-		if ( array() === $role_errors ) {
-			$this->settings->save( $submitted );
-
-			\add_settings_error(
-				MAC_MEMBERS_SETTINGS_OPTION,
-				'settings_saved',
-				__( 'MAC Members settings saved.', 'mac-members' ),
-				'success'
-			);
-		}
-
-		foreach ( $role_errors as $code => $message ) {
-			$this->add_settings_error( $code, $message );
-		}
+		\add_settings_error(
+			MAC_MEMBERS_SETTINGS_OPTION,
+			'settings_saved',
+			__( 'MAC Members settings saved.', 'mac-members' ),
+			'success'
+		);
 
 		$this->redirect_to_settings_page();
 	}
@@ -180,12 +172,12 @@ final class SettingsController implements Service
 
 	public function render_missing_roles_warning(): void
 	{
-		if ( ! $this->is_settings_page() || ! \current_user_can( 'manage_options' ) || ! $this->settings->has_missing_roles() ) {
+		if ( ! $this->is_settings_page() || ! \current_user_can( 'manage_options' ) || array() === Roles::missing() ) {
 			return;
 		}
 
 		echo '<div class="notice notice-warning"><p>';
-		echo esc_html__( 'MAC Members: One or more configured roles do not exist. Please review the MAC Members settings.', 'mac-members' );
+		echo esc_html__( 'MAC Members: One or more member roles do not exist. Deactivate and activate MAC Members to create them again.', 'mac-members' );
 		echo '</p></div>';
 	}
 
@@ -225,7 +217,6 @@ final class SettingsController implements Service
 	private function render_field( string $key, array $field, mixed $value ): string
 	{
 		return match ( $field['type'] ) {
-			SettingsSchema::TYPE_ROLE   => $this->render_role_select( $key, (string) $value ),
 			SettingsSchema::TYPE_EMAIL  => $this->render_email_input( $key, (string) $value ),
 			SettingsSchema::TYPE_TOGGLE => $this->render_toggle( $key, (bool) $value, (string) $field['label'], isset( $field['description'] ) ),
 			SettingsSchema::TYPE_ROLES  => $this->render_role_checkboxes( $key, (array) $value, (string) $field['label'], isset( $field['description'] ) ),
@@ -305,7 +296,7 @@ final class SettingsController implements Service
 	private function render_role_checkboxes( string $key, array $value, string $label, bool $described ): string
 	{
 		$describedby  = $described ? ' aria-describedby="mac-members-' . esc_attr( $key ) . '-description"' : '';
-		$status_roles = array_map( fn ( string $field ): string => (string) $this->settings->get( $field, '' ), $this->schema->get_role_fields() );
+		$status_roles = array_keys( Roles::defaults() );
 		$output       = '<fieldset id="mac-members-' . esc_attr( $key ) . '"' . $describedby . '><legend class="screen-reader-text">' . esc_html( $label ) . '</legend>';
 
 		foreach ( $this->settings->get_available_roles() as $slug => $name ) {
@@ -320,35 +311,6 @@ final class SettingsController implements Service
 		}
 
 		return $output . '</fieldset>';
-	}
-
-	/**
-	 * A status role dropdown. It offers only roles without administrative capabilities, such as manage_options
-	 * or promote_users, because a member status must never grant them. A saved role that is missing or has them
-	 * still shows, selected, so the page tells the truth; saving refuses it.
-	 */
-	private function render_role_select( string $key, string $value ): string
-	{
-		$output  = '<select id="mac-members-' . esc_attr( $key ) . '" name="mac_members_settings[' . esc_attr( $key ) . ']">';
-		$offered = array_filter(
-			$this->settings->get_available_roles(),
-			static fn ( mixed $label, mixed $slug ): bool => array() === Capabilities::sensitive_capabilities_of_role( (string) $slug ),
-			ARRAY_FILTER_USE_BOTH
-		);
-
-		foreach ( $offered as $slug => $label ) {
-			$output .= '<option value="' . esc_attr( $slug ) . '"' . $this->selected_attr( $slug === $value ) . '>';
-			$output .= esc_html( $label ) . '</option>';
-		}
-
-		if ( '' !== $value && ! array_key_exists( $value, $offered ) ) {
-			$label   = $this->settings->get_available_roles()[ $value ] ?? $value;
-			$output .= '<option value="' . esc_attr( $value ) . '" selected>' . esc_html( $label ) . '</option>';
-		}
-
-		$output .= '</select>';
-
-		return $output;
 	}
 
 	private function render_email_input( string $key, string $value ): string

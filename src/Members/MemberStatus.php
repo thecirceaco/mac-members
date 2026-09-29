@@ -1,6 +1,6 @@
 <?php
 /**
- * Member statuses. Each status is marked by one configurable role.
+ * Member statuses. Each status is marked by one of the roles MAC Members creates.
  *
  * @package mac-members
  */
@@ -8,6 +8,8 @@
 declare(strict_types=1);
 
 namespace MacMembers\Members;
+
+use MacMembers\Security\Roles;
 
 if ( ! defined( 'ABSPATH' ) ) {
 	exit; // Exit if accessed directly.
@@ -21,11 +23,16 @@ enum MemberStatus: string
 	case Denied   = 'denied';
 
 	/**
-	 * Settings key of the role that marks this status.
+	 * The role that marks this status.
 	 */
-	public function role_setting(): string
+	public function role(): string
 	{
-		return $this->value . '_role';
+		return match ( $this ) {
+			self::Pending  => Roles::PENDING,
+			self::Approved => Roles::APPROVED,
+			self::Inactive => Roles::INACTIVE,
+			self::Denied   => Roles::DENIED,
+		};
 	}
 
 	public function label(): string

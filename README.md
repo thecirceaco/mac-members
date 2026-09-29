@@ -23,22 +23,15 @@ Activation creates the four member roles if they don't exist yet, each with only
 | `mac_members_inactive` | Member (Inactive) |
 | `mac_members_denied` | Member (Denied) |
 
-A role that already exists keeps its name and capabilities. A site that updates the plugin without reactivating it gets the missing roles once, on the next request. New registrations need the pending role, for example from the registration form's user action.
+A role that already exists keeps its name and capabilities. A site that updates the plugin without reactivating it gets the missing roles once, on the next request.
+
+MAC Members always uses these four roles. New registrations need `mac_members_pending`, for example from the registration form's user action, and membership rules, for example in SureMembers, use `mac_members_approved`. Earlier versions, up to 0.2.0, let a site choose other roles for the statuses; a site whose members hold other roles moves them to these once, for example with WP-CLI.
 
 ## Settings
 
 The settings page is under `Settings > MAC Members`. Turn on "Show MAC Members as a top-level admin menu item" to give it its own menu item with the MAC icon instead; it's off by default. Saving sends you back to the page, at its new address when this setting changed.
 
-| Setting | Default role |
-| --- | --- |
-| Pending role | `mac_members_pending` |
-| Approved role | `mac_members_approved` |
-| Inactive role | `mac_members_inactive` |
-| Denied role | `mac_members_denied` |
-
-The four roles must be different roles, and none of them may grant administrative capabilities such as `manage_options`, `edit_users`, `promote_users`, `delete_users`, `unfiltered_html`, `edit_plugins`, `edit_themes`, `install_plugins` or `activate_plugins` (the full list is in `src/Security/Capabilities.php`). The role dropdowns only offer roles without them; a saved role that has them still shows, selected, and settings that break these rules are not saved, with the reason on the settings page. Every status change checks the same rules again before it changes a user, because a role can gain capabilities after the settings are saved.
-
-The settings page also includes:
+The settings page includes:
 
 - roles hidden from the members table, none checked by default (see Members Table below)
 - admin notification email
@@ -104,7 +97,7 @@ When the table fits its frame, the header sticks to the page, under the admin ba
 
 The "Members table size" setting sets the text and button size: Medium, the default, puts the table, its controls and its buttons in `--text-m`, and Small in `--text-s`. The buttons keep ACSS's `btn--s` class, and Medium sets ACSS's `--btn-font-size`.
 
-Users who hold a hidden role never show in the members table: not in its rows, its counts, its search or its role filter, so nobody can change their status there. The "Roles hidden from the members table" setting has a checkbox for each role except the four status roles, which cannot be hidden; none is checked by default. Roles with any of the sensitive capabilities listed under Settings, like Administrator and Editor (which has `unfiltered_html`), are always hidden, because status changes refuse their users anyway; their checkboxes show checked and disabled. The table leaves those users out with `role__not_in` in every user query. Development builds kept this setting as comma-separated text; its role slugs and names carry over, and its capabilities are dropped.
+Users who hold a hidden role never show in the members table: not in its rows, its counts, its search or its role filter, so nobody can change their status there. The "Roles hidden from the members table" setting has a checkbox for each role except the four status roles, which cannot be hidden; none is checked by default. Roles with any of the sensitive capabilities listed under Security, like Administrator and Editor (which has `unfiltered_html`), are always hidden, because status changes refuse their users anyway; their checkboxes show checked and disabled. The table leaves those users out with `role__not_in` in every user query. Development builds kept this setting as comma-separated text; its role slugs and names carry over, and its capabilities are dropped.
 
 The table and the dialog use only ACSS tokens and button classes, and ACSS 4 defines its colors with `light-dark()`, so they follow the color scheme of the page or section around them: the site's scheme, a `scheme--dark` or `scheme--light` section, or the visitor's device when ACSS's scheme is auto. The dialog's backdrop stays black in both. How ACSS's main colors look in the dark scheme, for example the neutral buttons, comes from the site's ACSS settings.
 
@@ -131,7 +124,7 @@ Denied means a request that was refused; inactive means someone who was a member
 
 The statuses exclude each other: each change adds the role of the new status and removes every other status role the user holds, so a user who goes back to pending never keeps the outcome of an earlier review. Existing unrelated roles, such as Subscriber, are preserved. WordPress's user edit screen has a single Role dropdown that replaces all of a user's roles, so change member statuses from the members table.
 
-Before any change, the plugin checks that the role being added exists, and that the user still has a status the change applies to. After the change it reads the user's roles again, and if they are not what was expected it restores the roles the user had before and returns an error. When a configured role is missing, the members table shows a warning as well as the settings page.
+Before any change, the plugin checks that the role being added exists, and that the user still has a status the change applies to. After the change it reads the user's roles again, and if they are not what was expected it restores the roles the user had before and returns an error. When a member role is missing, for example after a role editor deleted it, the members table and the settings page show a warning, and deactivating and activating the plugin creates it again.
 
 Only one status change can change a user at a time. The plugin takes a per-user lock, a `mac_members_lock_<user ID>` row in the options table created with an atomic `INSERT IGNORE`, reads the user's roles again, and releases the lock when the change is done. A second request for the same user gets a "being updated" error while the lock is held, and "status has changed" after that. A lock left behind by a request that died expires after 30 seconds.
 
@@ -156,7 +149,9 @@ Values the applicant controls (first name, last name, display name, username and
 
 ## Security
 
-MAC Members uses authenticated WordPress AJAX actions for the four status changes (`mac_members_approve_user`, `mac_members_deny_user`, `mac_members_deactivate_user` and `mac_members_reactivate_user`). It checks the nonce with `check_ajax_referer()` and requires the acting user to have the `mac_members_review` capability. For each target user it checks that every role the change adds or removes is in `get_editable_roles()`, so a site's role editor can still narrow them. It verifies that the target user still has a status the change applies to, and blocks self-actions, actions against target users who hold any of the sensitive capabilities listed under Settings, and actions against users with a hidden role.
+MAC Members uses authenticated WordPress AJAX actions for the four status changes (`mac_members_approve_user`, `mac_members_deny_user`, `mac_members_deactivate_user` and `mac_members_reactivate_user`). It checks the nonce with `check_ajax_referer()` and requires the acting user to have the `mac_members_review` capability. For each target user it checks that every role the change adds or removes is in `get_editable_roles()`, so a site's role editor can still narrow them. It verifies that the target user still has a status the change applies to, and blocks self-actions, actions against target users who hold any of the sensitive capabilities, and actions against users with a hidden role.
+
+The sensitive capabilities are the ones that can change the site, its code or other users, such as `manage_options`, `edit_users`, `promote_users`, `delete_users`, `unfiltered_html`, `edit_plugins`, `edit_themes`, `install_plugins` and `activate_plugins`; the full list is in `src/Security/Capabilities.php`. The member roles start with only `read`, and a status change also refuses to add a member role that has gained a sensitive capability, for example through a role editor.
 
 Every check that fails sends an error and ends the request, and so does the success response, so a failed check can never reach the role change, even when a `wp_die` handler does not exit.
 
@@ -171,7 +166,7 @@ wp role create membership_manager "Membership Manager" --clone=subscriber
 wp cap add membership_manager mac_members_review
 ```
 
-`mac_members_review` works as a narrow `promote_users`: the plugin changes the roles itself, and only moves members between the four status roles, which cannot grant administrative capabilities. A reviewer does not need `promote_users`, which in wp-admin would let them give any user any role, or `edit_users`, which would let them edit any user, administrators included.
+`mac_members_review` works as a narrow `promote_users`: the plugin changes the roles itself, and only moves members between its four roles, and never adds one that grants a sensitive capability. A reviewer does not need `promote_users`, which in wp-admin would let them give any user any role, or `edit_users`, which would let them edit any user, administrators included.
 
 Deleting the plugin from the Plugins screen keeps its data, like MAC Core, unless "Delete plugin data on uninstall" is on in the settings; it is off by default. With it on, deleting the plugin removes the settings, `mac_members_review` from every role, and the four member roles that no user holds. Roles that users still hold stay, so nobody is left without a role; the settings page shows how many users hold each member role next to the setting. The per-user lock rows always go, because they only exist while a status change runs.
 

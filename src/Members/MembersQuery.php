@@ -169,13 +169,9 @@ final class MembersQuery
 	 */
 	public function get_filter_roles(): array
 	{
-		$status_roles = array_values( array_filter( $this->get_status_roles() ) );
+		$status_roles = array_values( $this->get_status_roles() );
 		$hidden_roles = $this->get_hidden_roles();
 		$roles        = array();
-
-		if ( array() === $status_roles ) {
-			return array();
-		}
 
 		foreach ( $this->get_site_roles() as $slug => $role ) {
 			if (
@@ -413,14 +409,14 @@ final class MembersQuery
 	}
 
 	/**
-	 * @return array<string,string> The configured role of each status, keyed by status value.
+	 * @return array<string,string> The role of each status, keyed by status value.
 	 */
 	private function get_status_roles(): array
 	{
 		$roles = array();
 
 		foreach ( MemberStatus::cases() as $status ) {
-			$roles[ $status->value ] = $this->get_role( $status );
+			$roles[ $status->value ] = $status->role();
 		}
 
 		return $roles;
@@ -428,6 +424,6 @@ final class MembersQuery
 
 	private function get_role( MemberStatus $status ): string
 	{
-		return (string) $this->settings->get( $status->role_setting(), '' );
+		return $status->role();
 	}
 }

@@ -29,13 +29,12 @@ final class MembersQueryTest extends TestCase {
 		require_once dirname( __DIR__, 2 ) . '/inc/constants.php';
 	}
 
-	public function test_pending_view_lists_the_configured_pending_role_newest_first(): void {
+	public function test_pending_view_lists_the_pending_role_newest_first(): void {
 		$repository = $this->create_settings_repository();
-		$repository->save( array( 'pending_role' => 'subscriber' ) );
 
 		self::assertSame(
 			array(
-				'role__in'     => array( 'subscriber' ),
+				'role__in'     => array( 'mac_members_pending' ),
 				'number'       => 24,
 				'paged'        => 1,
 				'orderby'      => 'registered',

@@ -13,7 +13,6 @@ use MacMembers\Settings\SettingsController;
 use MacMembers\Settings\SettingsSchema;
 use MacMembers\Settings\WordPressSettingsRepository;
 use PHPUnit\Framework\Attributes\CoversClass;
-use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 
 use function mac_members_tests_reset_wp_state;
@@ -67,9 +66,6 @@ final class SettingsControllerTest extends TestCase {
 			'mac_members_action'         => 'save_settings',
 			'mac_members_settings_nonce' => $nonce,
 			'mac_members_settings'       => array(
-				'pending_role'                => 'subscriber',
-				'approved_role'               => 'mac_members_approved',
-				'denied_role'                 => 'mac_members_denied',
 				'admin_notification_email'    => 'notifications@example.test',
 				'from_email'                  => 'from@example.test',
 				'send_member_approval_email' => '1',
@@ -81,7 +77,6 @@ final class SettingsControllerTest extends TestCase {
 
 		$settings = $GLOBALS['mac_members_test_options'][ MAC_MEMBERS_SETTINGS_OPTION ];
 
-		self::assertSame( 'subscriber', $settings['pending_role'] );
 		self::assertSame( 'notifications@example.test', $settings['admin_notification_email'] );
 		self::assertSame( 'from@example.test', $settings['from_email'] );
 		self::assertTrue( $settings['send_member_approval_email'] );
@@ -89,66 +84,6 @@ final class SettingsControllerTest extends TestCase {
 		self::assertFalse( $settings['send_admin_approval_email'] );
 		self::assertTrue( $settings['send_admin_denial_email'] );
 		self::assertSame( 'settings_saved', $GLOBALS['mac_members_test_settings_errors'][0]['code'] );
-	}
-
-	/**
-	 * @param array<string,string> $roles Submitted roles.
-	 */
-	#[DataProvider( 'provide_role_submissions_that_are_not_allowed' )]
-	public function test_handle_save_shows_a_settings_error_and_saves_nothing_for_roles_that_are_not_allowed( array $roles, string $code, string $message ): void {
-		$_GET['page']              = MAC_MEMBERS_ADMIN_SLUG;
-		$_SERVER['REQUEST_METHOD'] = 'POST';
-		$_POST                     = array(
-			'mac_members_action'         => 'save_settings',
-			'mac_members_settings_nonce' => wp_create_nonce( SettingsController::NONCE_ACTION ),
-			'mac_members_settings'       => array_merge(
-				array(
-					'pending_role'  => 'mac_members_pending',
-					'approved_role' => 'mac_members_approved',
-					'denied_role'   => 'mac_members_denied',
-					'from_email'    => 'from@example.test',
-				),
-				$roles
-			),
-		);
-
-		$this->run_save( $this->create_controller() );
-
-		self::assertArrayNotHasKey( MAC_MEMBERS_SETTINGS_OPTION, $GLOBALS['mac_members_test_options'] );
-		self::assertSame(
-			array(
-				array(
-					'setting' => MAC_MEMBERS_SETTINGS_OPTION,
-					'code'    => $code,
-					'message' => $message,
-					'type'    => 'error',
-				),
-			),
-			$GLOBALS['mac_members_test_settings_errors']
-		);
-	}
-
-	/**
-	 * @return array<string,array{0:array<string,string>,1:string,2:string}>
-	 */
-	public static function provide_role_submissions_that_are_not_allowed(): array {
-		return array(
-			'same role twice'         => array(
-				array( 'denied_role' => 'mac_members_approved' ),
-				'roles_not_distinct',
-				'The pending, approved, inactive and denied roles must be four different roles. The settings were not saved.',
-			),
-			'sensitive approved role' => array(
-				array( 'approved_role' => 'administrator' ),
-				'approved_role_sensitive',
-				'The approved role "Administrator" grants administrative capabilities (manage_options, edit_users, promote_users, unfiltered_html). Choose a role without them. The settings were not saved.',
-			),
-			'sensitive denied role'   => array(
-				array( 'denied_role' => 'administrator' ),
-				'denied_role_sensitive',
-				'The denied role "Administrator" grants administrative capabilities (manage_options, edit_users, promote_users, unfiltered_html). Choose a role without them. The settings were not saved.',
-			),
-		);
 	}
 
 	public function test_handle_save_rejects_invalid_nonce(): void {
@@ -160,7 +95,7 @@ final class SettingsControllerTest extends TestCase {
 			'mac_members_action'         => 'save_settings',
 			'mac_members_settings_nonce' => 'invalid',
 			'mac_members_settings'       => array(
-				'pending_role' => 'subscriber',
+				'from_email' => 'from@example.test',
 			),
 		);
 
@@ -185,7 +120,7 @@ final class SettingsControllerTest extends TestCase {
 		$output = (string) ob_get_clean();
 
 		self::assertStringContainsString(
-			'MAC Members: One or more configured roles do not exist. Please review the MAC Members settings.',
+			'MAC Members: One or more member roles do not exist. Deactivate and activate MAC Members to create them again.',
 			$output
 		);
 		self::assertStringContainsString( 'notice notice-warning', $output );
@@ -231,7 +166,8 @@ final class SettingsControllerTest extends TestCase {
 	public function test_settings_page_has_a_checkbox_for_each_role_that_can_be_hidden(): void {
 		$output = $this->render_page( false, array( 'hidden_roles' => array( 'subscriber' ) ) );
 
-		// No status roles; Administrator is always hidden, so its checkbox is checked and disabled.
+		// No status roles, which are fixed; Administrator is always hidden, so its checkbox is checked and disabled.
+		self::assertStringNotContainsString( '_role]', $output );
 		self::assertStringContainsString(
 			'<th scope="row">Roles hidden from the members table</th><td><fieldset id="mac-members-hidden_roles" aria-describedby="mac-members-hidden_roles-description"><legend class="screen-reader-text">Roles hidden from the members table</legend>'
 			. '<label><input type="checkbox" name="mac_members_settings[hidden_roles][]" value="administrator" checked="checked" disabled> Administrator</label> <span class="description">(always hidden)</span><br>'
@@ -239,31 +175,6 @@ final class SettingsControllerTest extends TestCase {
 			. '<p class="description" id="mac-members-hidden_roles-description">Users who hold a checked role never show in the members table',
 			$output
 		);
-	}
-
-	public function test_status_role_dropdowns_leave_out_roles_with_administrative_capabilities(): void {
-		$GLOBALS['mac_members_test_roles']['site_manager'] = array( 'name' => 'Site Manager', 'capabilities' => array( 'read' => true, 'promote_users' => true ) );
-
-		$output = $this->render_page( false );
-
-		self::assertSame( 1, preg_match( '/<select id="mac-members-approved_role"[^>]*>(.*?)<\/select>/s', $output, $select ) );
-		self::assertStringContainsString( '<option value="mac_members_approved" selected="selected">Member</option>', $select[1] );
-		self::assertStringContainsString( '<option value="subscriber">Subscriber</option>', $select[1] );
-		self::assertStringNotContainsString( 'value="administrator"', $select[1] );
-		self::assertStringNotContainsString( 'value="site_manager"', $select[1] );
-	}
-
-	public function test_a_saved_status_role_with_administrative_capabilities_still_shows_selected(): void {
-		$GLOBALS['mac_members_test_options'][ MAC_MEMBERS_SETTINGS_OPTION ] = array( 'pending_role' => 'administrator' );
-
-		$controller = $this->create_controller();
-		$controller->register_settings_page();
-		ob_start();
-		$controller->render_settings_page();
-		$output = (string) ob_get_clean();
-
-		self::assertSame( 1, preg_match( '/<select id="mac-members-pending_role"[^>]*>(.*?)<\/select>/s', $output, $select ) );
-		self::assertStringContainsString( '<option value="administrator" selected>Administrator</option>', $select[1] );
 	}
 
 	public function test_settings_page_has_the_uninstall_checkbox_off_with_its_description(): void {

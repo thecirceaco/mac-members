@@ -55,10 +55,10 @@ final class MemberTransitionTest extends TestCase {
 		self::assertSame( MemberStatus::Approved, MemberTransition::Reactivate->to_status() );
 	}
 
-	public function test_status_role_settings_match_the_settings_schema_keys(): void {
+	public function test_each_status_is_marked_by_its_member_role(): void {
 		self::assertSame(
-			array( 'pending_role', 'approved_role', 'inactive_role', 'denied_role' ),
-			array_map( static fn ( MemberStatus $status ): string => $status->role_setting(), MemberStatus::cases() )
+			array( 'mac_members_pending', 'mac_members_approved', 'mac_members_inactive', 'mac_members_denied' ),
+			array_map( static fn ( MemberStatus $status ): string => $status->role(), MemberStatus::cases() )
 		);
 	}
 }

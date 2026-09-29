@@ -47,9 +47,16 @@ final class Roles
 	}
 
 	/**
-	 * Removes the member roles that no user holds. A role that a user still holds stays, so uninstalling the
-	 * plugin never leaves a user without the role they had.
+	 * The member roles that do not exist, for example after a role editor deleted one. Activating the plugin
+	 * creates them again.
+	 *
+	 * @return array<int,string> Role slugs.
 	 */
+	public static function missing(): array
+	{
+		return array_values( array_filter( array_keys( self::defaults() ), static fn ( string $slug ): bool => ! \wp_roles()->is_role( $slug ) ) );
+	}
+
 	/**
 	 * How many users hold each member role that exists, in the order pending, approved, inactive, denied.
 	 *
@@ -82,6 +89,10 @@ final class Roles
 		return $usage;
 	}
 
+	/**
+	 * Removes the member roles that no user holds. A role that a user still holds stays, so uninstalling the
+	 * plugin never leaves a user without the role they had.
+	 */
 	public static function remove_unused(): void
 	{
 		foreach ( array_keys( self::defaults() ) as $slug ) {

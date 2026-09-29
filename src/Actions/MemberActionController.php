@@ -32,7 +32,7 @@ final class MemberActionController implements Service
 	private const ERROR_STATUS_CHANGED = 'status_changed';
 	private const ERROR_UPDATE_FAILED = 'role_update_failed';
 	private const ERROR_MISSING_ROLE = 'missing_role';
-	private const ERROR_ROLE_SETTINGS = 'invalid_role_settings';
+	private const ERROR_UNSAFE_ROLE = 'unsafe_role';
 	private const ERROR_STALE_TABLE = 'stale_table';
 	private const ERROR_BUSY = 'busy';
 
@@ -122,13 +122,14 @@ final class MemberActionController implements Service
 		$from_roles   = $this->get_from_roles( $transition, $status_roles );
 
 		// Check the roles before any write, so a missing role cannot leave the user half-changed.
-		if ( ! $this->settings->role_exists( $target_role ) || ! $this->any_role_exists( $from_roles ) ) {
+		if ( ! $this->role_exists( $target_role ) || ! $this->any_role_exists( $from_roles ) ) {
 			$this->send_error( self::ERROR_MISSING_ROLE, 500 );
 			return;
 		}
 
-		if ( ! $this->roles_are_allowed( $status_roles, $target_role ) ) {
-			$this->send_error( self::ERROR_ROLE_SETTINGS, 500 );
+		// A role editor can give the member roles more capabilities after the plugin created them.
+		if ( array() !== Capabilities::sensitive_capabilities_of_role( $target_role ) ) {
+			$this->send_error( self::ERROR_UNSAFE_ROLE, 500 );
 			return;
 		}
 
@@ -196,21 +197,21 @@ final class MemberActionController implements Service
 	}
 
 	/**
-	 * @return array<string,string> The configured role of each status, keyed by status value.
+	 * @return array<string,string> The role of each status, keyed by status value.
 	 */
 	private function get_status_roles(): array
 	{
 		$roles = array();
 
 		foreach ( MemberStatus::cases() as $status ) {
-			$roles[ $status->value ] = (string) $this->settings->get( $status->role_setting(), '' );
+			$roles[ $status->value ] = $status->role();
 		}
 
 		return $roles;
 	}
 
 	/**
-	 * @param array<string,string> $status_roles Configured role of each status.
+	 * @param array<string,string> $status_roles The role of each status.
 	 *
 	 * @return array<int,string> Roles of the statuses a member must have for this change.
 	 */
@@ -222,13 +223,18 @@ final class MemberActionController implements Service
 		);
 	}
 
+	private function role_exists( string $role ): bool
+	{
+		return '' !== $role && \wp_roles()->is_role( $role );
+	}
+
 	/**
 	 * @param array<int,string> $roles Roles.
 	 */
 	private function any_role_exists( array $roles ): bool
 	{
 		foreach ( $roles as $role ) {
-			if ( $this->settings->role_exists( $role ) ) {
+			if ( $this->role_exists( $role ) ) {
 				return true;
 			}
 		}
@@ -249,21 +255,9 @@ final class MemberActionController implements Service
 	}
 
 	/**
-	 * The four status roles must differ, and the role being added must not grant sensitive capabilities. This
-	 * is checked here as well as on save, because a role's capabilities can change after the settings are saved.
-	 *
-	 * @param array<string,string> $status_roles Configured role of each status.
-	 */
-	private function roles_are_allowed( array $status_roles, string $target_role ): bool
-	{
-		return count( $status_roles ) === count( array_unique( $status_roles ) )
-			&& array() === Capabilities::sensitive_capabilities_of_role( $target_role );
-	}
-
-	/**
 	 * The acting user must be allowed to assign every role this change adds or removes, as in wp-admin.
 	 *
-	 * @param array<string,string> $status_roles Configured role of each status.
+	 * @param array<string,string> $status_roles The role of each status.
 	 */
 	private function can_assign_roles( \WP_User $user, array $status_roles, string $target_role ): bool
 	{
@@ -287,7 +281,7 @@ final class MemberActionController implements Service
 	 * The statuses exclude each other, so every other status role the user holds is removed. A user who went
 	 * back to pending must not keep the outcome of an earlier review.
 	 *
-	 * @param array<string,string> $status_roles Configured role of each status.
+	 * @param array<string,string> $status_roles The role of each status.
 	 *
 	 * @return array<int,string>
 	 */
@@ -327,7 +321,7 @@ final class MemberActionController implements Service
 	 * Gives the user the target role and removes every other status role. When the stored roles do not match
 	 * the expected result, the roles the user had before are restored and false is returned.
 	 *
-	 * @param array<string,string> $status_roles Configured role of each status.
+	 * @param array<string,string> $status_roles The role of each status.
 	 */
 	private function change_roles( \WP_User $user, array $status_roles, string $target_role ): bool
 	{
@@ -466,8 +460,8 @@ final class MemberActionController implements Service
 			self::ERROR_PERMISSION => __( 'You do not have permission to perform this action.', 'mac-members' ),
 			self::ERROR_STATUS_CHANGED => __( 'This member\'s status has changed. Please reload the page.', 'mac-members' ),
 			self::ERROR_UPDATE_FAILED => __( 'Unable to update user role.', 'mac-members' ),
-			self::ERROR_MISSING_ROLE => __( 'A role needed for this action does not exist. Please review the MAC Members settings.', 'mac-members' ),
-			self::ERROR_ROLE_SETTINGS => __( 'The role settings are not allowed: the four roles must differ, and the role being added must not grant administrative capabilities. Please review the MAC Members settings.', 'mac-members' ),
+			self::ERROR_MISSING_ROLE => __( 'A member role this change needs does not exist. Deactivate and activate MAC Members to create it again.', 'mac-members' ),
+			self::ERROR_UNSAFE_ROLE => __( 'The member role this change adds grants administrative capabilities. Remove them from the role and try again.', 'mac-members' ),
 			self::ERROR_STALE_TABLE => __( 'This table is out of date. Please reload the page and try again.', 'mac-members' ),
 			self::ERROR_BUSY => __( 'This member is being updated in another request. Please wait a moment and reload the page.', 'mac-members' ),
 			default => __( 'Invalid request.', 'mac-members' ),

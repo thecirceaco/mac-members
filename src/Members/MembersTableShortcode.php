@@ -13,6 +13,7 @@ use MacMembers\Assets\FrontendAssets;
 use MacMembers\Contracts\Service;
 use MacMembers\Integrations\MacCoreLastLogin;
 use MacMembers\Security\Capabilities;
+use MacMembers\Security\Roles;
 use MacMembers\Settings\SettingsRepositoryInterface;
 use MacMembers\Settings\SettingsSchema;
 
@@ -120,7 +121,7 @@ final class MembersTableShortcode implements Service
 			$view,
 			null === $fixed_view ? $this->get_filters( $view, $base_url, $role, $search, $kept ) : array(),
 			$this->get_pagination( $view, $page, $per_page, $members['total'], $base_url, $kept ),
-			$this->settings->get_missing_role_slugs(),
+			Roles::missing(),
 			$this->render_token->issue( $user_ids ),
 			$this->get_search_form( null === $fixed_view ? $view : null, $base_url, $roles, $role, $search ),
 			array(

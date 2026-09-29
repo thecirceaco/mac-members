@@ -1,6 +1,6 @@
 <?php
 /**
- * Tests for MAC Members settings storage and validation.
+ * Tests for MAC Members settings storage and cleaning.
  *
  * @package MacMembers\Tests\Unit
  */
@@ -9,11 +9,9 @@ declare(strict_types=1);
 
 namespace MacMembers\Tests\Unit;
 
-use MacMembers\Security\Capabilities;
 use MacMembers\Settings\SettingsSchema;
 use MacMembers\Settings\WordPressSettingsRepository;
 use PHPUnit\Framework\Attributes\CoversClass;
-use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 
 use function delete_option;
@@ -36,10 +34,6 @@ final class SettingsRepositoryTest extends TestCase {
 		$repository = $this->create_repository();
 		$settings   = $repository->all();
 
-		self::assertSame( 'mac_members_pending', $settings['pending_role'] );
-		self::assertSame( 'mac_members_approved', $settings['approved_role'] );
-		self::assertSame( 'mac_members_inactive', $settings['inactive_role'] );
-		self::assertSame( 'mac_members_denied', $settings['denied_role'] );
 		self::assertSame( 'admin@example.test', $settings['admin_notification_email'] );
 		self::assertSame( 'admin@example.test', $settings['from_email'] );
 		self::assertTrue( $settings['send_member_approval_email'] );
@@ -91,10 +85,6 @@ final class SettingsRepositoryTest extends TestCase {
 		self::assertSame( array( 'administrator', 'officer' ), $this->create_repository()->all()['hidden_roles'] );
 	}
 
-	public function test_validate_roles_rejects_a_pending_role_with_sensitive_capabilities(): void {
-		self::assertArrayHasKey( 'pending_role_sensitive', $this->create_repository()->validate_roles( array( 'pending_role' => 'administrator' ) ) );
-	}
-
 	public function test_hidden_roles_are_saved_as_existing_role_slugs_once_each(): void {
 		$GLOBALS['mac_members_test_roles']['officer'] = array( 'name' => 'Officer', 'capabilities' => array( 'read' => true ) );
 		$repository                                   = $this->create_repository();
@@ -107,20 +97,17 @@ final class SettingsRepositoryTest extends TestCase {
 		self::assertSame( array(), $repository->save( array() )['hidden_roles'] );
 	}
 
-	public function test_save_accepts_existing_role_slugs_only(): void {
+	public function test_the_status_role_settings_of_earlier_versions_are_dropped(): void {
+		$GLOBALS['mac_members_test_options'][ MAC_MEMBERS_SETTINGS_OPTION ] = array( 'pending_role' => 'subscriber' );
 		$repository = $this->create_repository();
 
-		$settings = $repository->save(
-			array(
-				'pending_role'  => 'subscriber',
-				'approved_role' => 'not-a-role',
-				'denied_role'   => 'administrator<script>',
-			)
-		);
+		self::assertArrayNotHasKey( 'pending_role', $repository->all() );
 
-		self::assertSame( 'subscriber', $settings['pending_role'] );
-		self::assertSame( 'mac_members_approved', $settings['approved_role'] );
-		self::assertSame( 'mac_members_denied', $settings['denied_role'] );
+		$settings = $repository->save( array( 'approved_role' => 'subscriber', 'from_email' => 'from@example.test' ) );
+
+		self::assertArrayNotHasKey( 'pending_role', $settings );
+		self::assertArrayNotHasKey( 'approved_role', $settings );
+		self::assertSame( 'from@example.test', $settings['from_email'] );
 		self::assertSame( $settings, $GLOBALS['mac_members_test_options'][ MAC_MEMBERS_SETTINGS_OPTION ] );
 	}
 
@@ -155,121 +142,6 @@ final class SettingsRepositoryTest extends TestCase {
 		self::assertFalse( $settings['send_admin_denial_email'] );
 	}
 
-	public function test_missing_roles_detects_configured_role_slugs_not_registered(): void {
-		$GLOBALS['mac_members_test_roles'] = array(
-			'administrator' => array( 'name' => 'Administrator' ),
-			'mac_members_approved'        => array( 'name' => 'Member' ),
-		);
-
-		$repository = $this->create_repository();
-
-		self::assertSame(
-			array( 'mac_members_pending', 'mac_members_inactive', 'mac_members_denied' ),
-			$repository->get_missing_role_slugs()
-		);
-		self::assertTrue( $repository->has_missing_roles() );
-	}
-
-	public function test_validate_roles_accepts_four_distinct_roles_without_sensitive_capabilities(): void {
-		self::assertSame( array(), $this->create_repository()->validate_roles( array() ) );
-		self::assertSame(
-			array(),
-			$this->create_repository()->validate_roles(
-				array(
-					'pending_role'  => 'subscriber',
-					'approved_role' => 'mac_members_approved',
-					'denied_role'   => 'mac_members_denied',
-				)
-			)
-		);
-	}
-
-	/**
-	 * @param array<string,string> $roles Submitted roles.
-	 */
-	#[DataProvider( 'provide_roles_that_are_not_distinct' )]
-	public function test_validate_roles_requires_four_distinct_roles( array $roles ): void {
-		self::assertSame(
-			array( 'roles_not_distinct' => 'The pending, approved, inactive and denied roles must be four different roles. The settings were not saved.' ),
-			$this->create_repository()->validate_roles( $roles )
-		);
-	}
-
-	/**
-	 * @return array<string,array{0:array<string,string>}>
-	 */
-	public static function provide_roles_that_are_not_distinct(): array {
-		return array(
-			'pending equals approved'  => array( array( 'approved_role' => 'mac_members_pending' ) ),
-			'pending equals denied'    => array( array( 'denied_role' => 'mac_members_pending' ) ),
-			'approved equals denied'   => array( array( 'denied_role' => 'mac_members_approved' ) ),
-			'inactive equals approved' => array( array( 'inactive_role' => 'mac_members_approved' ) ),
-			'inactive equals denied'   => array( array( 'inactive_role' => 'mac_members_denied' ) ),
-			'inactive equals pending'  => array( array( 'inactive_role' => 'mac_members_pending' ) ),
-		);
-	}
-
-	public function test_validate_roles_rejects_an_inactive_role_with_sensitive_capabilities(): void {
-		$errors = $this->create_repository()->validate_roles( array( 'inactive_role' => 'administrator' ) );
-
-		self::assertSame(
-			array( 'inactive_role_sensitive' => 'The inactive role "Administrator" grants administrative capabilities (manage_options, edit_users, promote_users, unfiltered_html). Choose a role without them. The settings were not saved.' ),
-			$errors
-		);
-	}
-
-	public function test_validate_roles_rejects_an_approved_role_with_sensitive_capabilities(): void {
-		$errors = $this->create_repository()->validate_roles( array( 'approved_role' => 'administrator' ) );
-
-		self::assertSame(
-			array( 'approved_role_sensitive' => 'The approved role "Administrator" grants administrative capabilities (manage_options, edit_users, promote_users, unfiltered_html). Choose a role without them. The settings were not saved.' ),
-			$errors
-		);
-	}
-
-	public function test_validate_roles_rejects_a_denied_role_with_any_listed_sensitive_capability(): void {
-		foreach ( Capabilities::SENSITIVE as $capability ) {
-			mac_members_tests_reset_wp_state();
-			$GLOBALS['mac_members_test_roles']['mac_members_denied']['capabilities'][ $capability ] = true;
-
-			$errors = $this->create_repository()->validate_roles( array() );
-
-			self::assertArrayHasKey( 'denied_role_sensitive', $errors, $capability );
-			self::assertStringContainsString( '(' . $capability . ')', $errors['denied_role_sensitive'] );
-		}
-	}
-
-	public function test_validate_roles_ignores_capabilities_a_role_does_not_grant(): void {
-		$GLOBALS['mac_members_test_roles']['mac_members_approved']['capabilities']['manage_options'] = false;
-
-		self::assertSame( array(), $this->create_repository()->validate_roles( array() ) );
-	}
-
-	public function test_save_keeps_the_saved_roles_when_the_submitted_roles_are_not_allowed(): void {
-		$repository = $this->create_repository();
-
-		$settings = $repository->save(
-			array(
-				'approved_role' => 'administrator',
-				'denied_role'   => 'subscriber',
-				'from_email'    => 'from@example.test',
-			)
-		);
-
-		self::assertSame( 'mac_members_approved', $settings['approved_role'] );
-		self::assertSame( 'mac_members_denied', $settings['denied_role'] );
-		self::assertSame( 'from@example.test', $settings['from_email'] );
-		self::assertSame( $settings, $GLOBALS['mac_members_test_options'][ MAC_MEMBERS_SETTINGS_OPTION ] );
-	}
-
-	public function test_role_exists_checks_registered_roles(): void {
-		$repository = $this->create_repository();
-
-		self::assertTrue( $repository->role_exists( 'mac_members_approved' ) );
-		self::assertFalse( $repository->role_exists( 'not-a-role' ) );
-		self::assertFalse( $repository->role_exists( '' ) );
-	}
-
 	public function test_ensure_defaults_persists_settings_when_option_missing(): void {
 		delete_option( MAC_MEMBERS_SETTINGS_OPTION );
 
@@ -277,7 +149,7 @@ final class SettingsRepositoryTest extends TestCase {
 		$settings   = $repository->ensure_defaults();
 
 		self::assertSame( $settings, $GLOBALS['mac_members_test_options'][ MAC_MEMBERS_SETTINGS_OPTION ] );
-		self::assertSame( 'mac_members_pending', $settings['pending_role'] );
+		self::assertSame( 'medium', $settings['table_size'] );
 	}
 
 	private function create_repository(): WordPressSettingsRepository {
