@@ -41,7 +41,7 @@ final class BootstrapTest extends TestCase
 	{
 		require_once dirname( __DIR__, 2 ) . '/inc/constants.php';
 
-		self::assertSame( '0.4.0', MAC_MEMBERS_VERSION );
+		self::assertSame( '0.5.0', MAC_MEMBERS_VERSION );
 		self::assertSame( 'mac-members', MAC_MEMBERS_ADMIN_SLUG );
 		self::assertSame( 'mac_members_settings', MAC_MEMBERS_SETTINGS_OPTION );
 		self::assertSame( dirname( __DIR__, 2 ) . '/', MAC_MEMBERS_PATH );
