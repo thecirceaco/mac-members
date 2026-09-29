@@ -15,7 +15,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 if ( ! defined( 'MAC_MEMBERS_VERSION' ) ) {
-	define( 'MAC_MEMBERS_VERSION', '0.2.0' );
+	define( 'MAC_MEMBERS_VERSION', '0.3.0' );
 }
 
 if ( ! defined( 'MAC_MEMBERS_ADMIN_SLUG' ) ) {
