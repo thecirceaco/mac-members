@@ -29,6 +29,11 @@ final class SettingsSchema
 	public const TABLE_SIZES = array( 'medium', 'small' );
 
 	/**
+	 * How the members table shows dates: see the "Dates in the members table" setting.
+	 */
+	public const DATE_DISPLAYS = array( 'date', 'relative' );
+
+	/**
 	 * @return array<string,array{label:string,type:string,default:mixed,description?:string,choices?:array<string,string>}>
 	 */
 	public function get_fields(): array
@@ -69,6 +74,16 @@ final class SettingsSchema
 					array( __( 'Medium', 'mac-members' ), __( 'Small', 'mac-members' ) )
 				),
 				'description' => __( 'Medium puts the table, its controls and its buttons in the normal text size, Small in the small one.', 'mac-members' ),
+			),
+			'date_display' => array(
+				'label'       => __( 'Dates in the members table', 'mac-members' ),
+				'type'        => self::TYPE_CHOICE,
+				'default'     => 'date',
+				'choices'     => array_combine(
+					self::DATE_DISPLAYS,
+					array( __( 'Date', 'mac-members' ), __( 'Relative', 'mac-members' ) )
+				),
+				'description' => __( 'For Registered and Last Login. Date shows the day in the site\'s date format, and Last Login the time too. Relative shows the time since, like 3 days ago. Both show the full date and time on hover.', 'mac-members' ),
 			),
 			'admin_notification_email' => array(
 				'label'   => __( 'Admin notification email', 'mac-members' ),

@@ -11,6 +11,7 @@ namespace MacMembers\Members;
 
 use MacMembers\Assets\FrontendAssets;
 use MacMembers\Contracts\Service;
+use MacMembers\Integrations\MacCoreLastLogin;
 use MacMembers\Security\Capabilities;
 use MacMembers\Settings\SettingsRepositoryInterface;
 use MacMembers\Settings\SettingsSchema;
@@ -56,7 +57,8 @@ final class MembersTableShortcode implements Service
 		private readonly MembersTableRenderer $renderer,
 		private readonly FrontendAssets $assets,
 		private readonly SettingsRepositoryInterface $settings,
-		private readonly RenderToken $render_token = new RenderToken()
+		private readonly RenderToken $render_token = new RenderToken(),
+		private readonly MacCoreLastLogin $last_login = new MacCoreLastLogin()
 	) {}
 
 	public function register(): void
@@ -101,19 +103,31 @@ final class MembersTableShortcode implements Service
 			$members = $this->query->get_members( $status, $page, $role, $search, $per_page );
 		}
 
+		$show_last_login = $this->last_login->is_enabled();
+		$user_ids        = $this->get_user_ids( $members['users'] );
+
+		// One query loads the user meta of every member on the page, instead of one query per member.
+		if ( array() !== $user_ids ) {
+			\update_meta_cache( 'user', $user_ids );
+		}
+
 		$base_url = \remove_query_arg( array( self::STATUS_QUERY_ARG, self::PAGE_QUERY_ARG, self::PER_PAGE_QUERY_ARG, self::ROLE_QUERY_ARG, self::SEARCH_QUERY_ARG ) );
 		$kept     = $this->get_kept_args( $role, $search, $per_page );
 
 		return $this->renderer->render(
-			$this->get_rows( $members['users'] ),
+			$this->get_rows( $members['users'], $show_last_login ),
 			$view,
 			null === $fixed_view ? $this->get_filters( $view, $base_url, $role, $search, $kept ) : array(),
 			$this->get_pagination( $view, $page, $per_page, $members['total'], $base_url, $kept ),
 			$this->settings->get_missing_role_slugs(),
-			$this->render_token->issue( $this->get_user_ids( $members['users'] ) ),
+			$this->render_token->issue( $user_ids ),
 			$this->get_search_form( null === $fixed_view ? $view : null, $base_url, $roles, $role, $search ),
-			$this->get_hidden_columns(),
-			$this->get_size()
+			array(
+				'hidden_columns' => $this->get_hidden_columns(),
+				'size'           => $this->get_choice( 'table_size', SettingsSchema::TABLE_SIZES ),
+				'dates'          => $this->get_choice( 'date_display', SettingsSchema::DATE_DISPLAYS ),
+				'last_login'     => $show_last_login,
+			)
 		);
 	}
 
@@ -198,19 +212,22 @@ final class MembersTableShortcode implements Service
 	}
 
 	/**
-	 * @param array<int,object> $users Members on this page.
+	 * @param array<int,object> $users           Members on this page.
+	 * @param bool              $show_last_login Whether the table shows MAC Core's last login.
 	 *
-	 * @return array<int,array{user:object,status:?MemberStatus,roles:array<string,string>}>
+	 * @return array<int,array{user:object,status:?MemberStatus,roles:array<string,string>,last_login:int|null}>
 	 */
-	private function get_rows( array $users ): array
+	private function get_rows( array $users, bool $show_last_login ): array
 	{
 		$rows = array();
 
 		foreach ( $users as $user ) {
-			$rows[] = array(
-				'user'   => $user,
-				'status' => $this->query->get_status( $user ),
-				'roles'  => $this->query->get_other_roles( $user ),
+			$user_id = isset( $user->ID ) ? \absint( $user->ID ) : 0;
+			$rows[]  = array(
+				'user'       => $user,
+				'status'     => $this->query->get_status( $user ),
+				'roles'      => $this->query->get_other_roles( $user ),
+				'last_login' => $show_last_login && 0 < $user_id ? $this->last_login->get( $user_id ) : null,
 			);
 		}
 
@@ -218,13 +235,15 @@ final class MembersTableShortcode implements Service
 	}
 
 	/**
-	 * @return string The table size from the settings: medium or small.
+	 * @param array<int,string> $choices The values the setting allows; the first is its default.
+	 *
+	 * @return string The setting's value, or its default.
 	 */
-	private function get_size(): string
+	private function get_choice( string $key, array $choices ): string
 	{
-		$size = (string) $this->settings->get( 'table_size', 'medium' );
+		$value = (string) $this->settings->get( $key, $choices[0] );
 
-		return in_array( $size, SettingsSchema::TABLE_SIZES, true ) ? $size : 'medium';
+		return in_array( $value, $choices, true ) ? $value : $choices[0];
 	}
 
 	/**

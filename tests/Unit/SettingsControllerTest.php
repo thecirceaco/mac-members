@@ -243,6 +243,13 @@ final class SettingsControllerTest extends TestCase {
 		self::assertStringContainsString( '<p class="description" id="mac-members-delete_data_on_uninstall-description">When the plugin is deleted, remove its settings, the review capability and the member roles that no user holds.', $output );
 	}
 
+	public function test_settings_page_has_the_date_display_choice(): void {
+		$output = $this->render_page( false );
+
+		self::assertStringContainsString( '<select id="mac-members-date_display" name="mac_members_settings[date_display]" aria-describedby="mac-members-date_display-description"><option value="date" selected="selected">Date</option><option value="relative">Relative</option></select>', $output );
+		self::assertStringContainsString( '<p class="description" id="mac-members-date_display-description">For Registered and Last Login.', $output );
+	}
+
 	public function test_settings_page_has_the_table_size_choice(): void {
 		$GLOBALS['mac_members_test_options'][ MAC_MEMBERS_SETTINGS_OPTION ] = array( 'table_size' => 'small' );
 

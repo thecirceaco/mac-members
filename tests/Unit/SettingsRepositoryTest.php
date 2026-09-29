@@ -50,6 +50,7 @@ final class SettingsRepositoryTest extends TestCase {
 		self::assertTrue( $settings['send_admin_deactivation_email'] );
 		self::assertFalse( $settings['delete_data_on_uninstall'] );
 		self::assertSame( 'medium', $settings['table_size'] );
+		self::assertSame( 'date', $settings['date_display'] );
 		self::assertSame( 'Example Site', $repository->get_from_name() );
 	}
 
@@ -59,6 +60,13 @@ final class SettingsRepositoryTest extends TestCase {
 		self::assertSame( 'small', $repository->save( array( 'table_size' => 'Small' ) )['table_size'] );
 		self::assertSame( 'medium', $repository->save( array( 'table_size' => 'mixed' ) )['table_size'] );
 		self::assertSame( 'medium', $repository->save( array( 'table_size' => array( 'small' ) ) )['table_size'] );
+	}
+
+	public function test_date_display_accepts_only_its_choices(): void {
+		$repository = $this->create_repository();
+
+		self::assertSame( 'relative', $repository->save( array( 'date_display' => 'Relative' ) )['date_display'] );
+		self::assertSame( 'date', $repository->save( array( 'date_display' => 'ago' ) )['date_display'] );
 	}
 
 	public function test_role_filter_exclusions_default_to_administrator(): void {

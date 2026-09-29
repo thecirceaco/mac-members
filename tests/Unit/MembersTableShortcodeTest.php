@@ -10,6 +10,7 @@ declare(strict_types=1);
 namespace MacMembers\Tests\Unit;
 
 use MacMembers\Assets\FrontendAssets;
+use MacMembers\Integrations\MacCoreLastLogin;
 use MacMembers\Members\MembersQuery;
 use MacMembers\Members\MembersTableRenderer;
 use MacMembers\Members\MembersTableShortcode;
@@ -28,6 +29,11 @@ use function mac_members_tests_reset_wp_state;
 #[CoversClass( MembersTableShortcode::class )]
 #[CoversClass( MembersTableRenderer::class )]
 final class MembersTableShortcodeTest extends TestCase {
+	/**
+	 * The columns without Last Login, which shows only while MAC Core records last logins.
+	 */
+	private const SHOWN_COLUMNS = array( 'user_id', 'email', 'first_name', 'last_name', 'username', 'registered', 'profile', 'status', 'roles', 'actions' );
+
 	protected function setUp(): void {
 		parent::setUp();
 
@@ -185,7 +191,7 @@ final class MembersTableShortcodeTest extends TestCase {
 			array( 'User ID', 'Email', 'First Name', 'Last Name', 'Username', 'Registered', 'Profile', 'Status', 'Roles', 'Actions' ),
 			$headers[2]
 		);
-		self::assertSame( MembersTableRenderer::COLUMN_KEYS, $headers[1] );
+		self::assertSame( self::SHOWN_COLUMNS, $headers[1] );
 		self::assertStringContainsString( '<tr class="mac-members-list__row" data-mac-members-user-id="7" data-mac-members-status="pending"><td data-mac-members-column="user_id">7</td><td data-mac-members-column="email">member7@example.test</td>', $output );
 	}
 
@@ -211,7 +217,7 @@ final class MembersTableShortcodeTest extends TestCase {
 		$output = $this->create_shortcode()->render();
 
 		self::assertSame( 10, preg_match_all( '/<input type="checkbox" value="([^"]+)" data-mac-members-column-toggle( checked)?>/', $output, $boxes ) );
-		self::assertSame( MembersTableRenderer::COLUMN_KEYS, $boxes[1] );
+		self::assertSame( self::SHOWN_COLUMNS, $boxes[1] );
 		self::assertSame( array_fill( 0, 10, ' checked' ), $boxes[2] );
 		self::assertStringContainsString( '<label class="mac-members-columns__option"><input type="checkbox" value="roles" data-mac-members-column-toggle checked>Roles</label>', $output );
 		// The checkboxes sit right above the table, under the status filters and the role and search form.
@@ -254,6 +260,84 @@ final class MembersTableShortcodeTest extends TestCase {
 			'the old mixed size' => array( 'mixed', 'mac-members-table--medium' ),
 			'unknown'            => array( 'huge', 'mac-members-table--medium' ),
 		);
+	}
+
+	public function test_registered_shows_the_date_with_the_full_date_and_time_on_hover(): void {
+		$this->store_people(
+			array(
+				1 => array(
+					'roles'           => array( 'mac_members_pending' ),
+					'user_registered' => '2026-05-01 12:00:00',
+				),
+			)
+		);
+
+		self::assertStringContainsString(
+			'<td data-mac-members-column="registered"><time datetime="2026-05-01T12:00:00+00:00" title="May 1, 2026 12:00 pm">May 1, 2026</time></td>',
+			$this->create_shortcode()->render()
+		);
+	}
+
+	public function test_relative_dates_show_the_time_since(): void {
+		$GLOBALS['mac_members_test_options'][ MAC_MEMBERS_SETTINGS_OPTION ] = array( 'date_display' => 'relative' );
+		$this->store_people(
+			array(
+				1 => array(
+					'roles'           => array( 'mac_members_pending' ),
+					'user_registered' => gmdate( 'Y-m-d H:i:s', time() - 3 * 86400 ),
+				),
+			)
+		);
+
+		self::assertMatchesRegularExpression(
+			'/<td data-mac-members-column="registered"><time datetime="[^"]+" title="[^"]+">3 days ago<\/time><\/td>/',
+			$this->create_shortcode()->render()
+		);
+	}
+
+	public function test_last_login_column_shows_after_registered_while_mac_core_records_last_logins(): void {
+		$this->store_people(
+			array(
+				1 => array(
+					'roles'               => array( 'mac_members_approved' ),
+					'mac_core_last_login' => '1790000000',
+				),
+				2 => array( 'roles' => array( 'mac_members_approved' ) ),
+			)
+		);
+		$_GET['mac_members_status'] = 'approved';
+
+		$output = $this->create_shortcode( $this->mac_core_last_login( true ) )->render();
+
+		self::assertSame( 11, preg_match_all( '/<th scope="col" data-mac-members-column="([^"]+)">/', $output, $headers ) );
+		self::assertSame( MembersTableRenderer::COLUMN_KEYS, $headers[1] );
+		self::assertStringContainsString( '<th scope="col" data-mac-members-column="last_login">Last Login</th>', $output );
+		self::assertStringContainsString( '<input type="checkbox" value="last_login" data-mac-members-column-toggle checked>Last Login</label>', $output );
+		// Last Login shows the time too, and stays empty for a member without a recorded login.
+		self::assertStringContainsString(
+			'<td data-mac-members-column="last_login"><time datetime="' . gmdate( 'c', 1790000000 ) . '" title="' . gmdate( 'F j, Y g:i a', 1790000000 ) . '">' . gmdate( 'F j, Y g:i a', 1790000000 ) . '</time></td>',
+			$output
+		);
+		self::assertStringContainsString( '<td data-mac-members-column="last_login"></td>', $output );
+	}
+
+	public function test_last_login_column_is_missing_while_mac_core_does_not_record_last_logins(): void {
+		$this->store_members( array( 1 => 'mac_members_pending' ) );
+
+		self::assertStringNotContainsString( 'last_login', $this->create_shortcode( $this->mac_core_last_login( false ) )->render() );
+	}
+
+	public function test_the_page_loads_the_meta_of_its_members_in_one_query(): void {
+		$this->store_members(
+			array(
+				3 => 'mac_members_pending',
+				5 => 'mac_members_pending',
+			)
+		);
+
+		$this->create_shortcode()->render();
+
+		self::assertSame( array( array( 'user', array( 3, 5 ) ) ), $GLOBALS['mac_members_test_meta_cache_loads'] );
 	}
 
 	public function test_empty_view_has_no_column_checkboxes(): void {
@@ -818,7 +902,7 @@ final class MembersTableShortcodeTest extends TestCase {
 		return $matches[1];
 	}
 
-	private function create_shortcode(): MembersTableShortcode {
+	private function create_shortcode( ?MacCoreLastLogin $last_login = null ): MembersTableShortcode {
 		$schema     = new SettingsSchema();
 		$repository = new WordPressSettingsRepository( $schema );
 
@@ -826,7 +910,22 @@ final class MembersTableShortcodeTest extends TestCase {
 			new MembersQuery( $repository ),
 			new MembersTableRenderer(),
 			new FrontendAssets(),
-			$repository
+			$repository,
+			new RenderToken(),
+			$last_login ?? new MacCoreLastLogin()
 		);
+	}
+
+	/**
+	 * MAC Core's last login, recorded or not, without defining MAC Core's constant in this process.
+	 */
+	private function mac_core_last_login( bool $enabled ): MacCoreLastLogin {
+		return new class( $enabled ) extends MacCoreLastLogin {
+			public function __construct( private readonly bool $enabled ) {}
+
+			public function is_enabled(): bool {
+				return $this->enabled;
+			}
+		};
 	}
 }

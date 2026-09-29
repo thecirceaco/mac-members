@@ -16,20 +16,38 @@ if ( ! defined( 'ABSPATH' ) ) {
 final class MembersTableRenderer
 {
 	/**
-	 * The table's columns, in order. The column checkboxes can hide any of them.
+	 * The table's columns, in order. The column checkboxes can hide any of them. Last Login shows only while MAC
+	 * Core records last logins.
 	 */
-	public const COLUMN_KEYS = array( 'user_id', 'email', 'first_name', 'last_name', 'username', 'registered', 'profile', 'status', 'roles', 'actions' );
+	public const COLUMN_KEYS = array( 'user_id', 'email', 'first_name', 'last_name', 'username', 'registered', 'last_login', 'profile', 'status', 'roles', 'actions' );
 
 	/**
-	 * @param array<int,array{user:object,status:?MemberStatus,roles?:array<string,string>}> $rows Members on this page, their status and their other roles.
+	 * Display options: the columns the viewer hid, the size (medium or small), how dates show (date or relative)
+	 * and whether the Last Login column shows.
+	 */
+	private const DISPLAY_DEFAULTS = array(
+		'hidden_columns' => array(),
+		'size'           => 'medium',
+		'dates'          => 'date',
+		'last_login'     => false,
+	);
+
+	/**
+	 * The display options of the table being rendered.
+	 *
+	 * @var array{hidden_columns:array<int,string>,size:string,dates:string,last_login:bool}
+	 */
+	private array $display = self::DISPLAY_DEFAULTS;
+
+	/**
+	 * @param array<int,array{user:object,status:?MemberStatus,roles?:array<string,string>,last_login?:int|null}> $rows Members on this page, their status, their other roles and their last login.
 	 * @param string                                                 $view Shown view: a status value or "all".
 	 * @param array<int,array{view:string,label:string,count:int,url:string,current:bool}> $filters Status filters; empty hides them.
 	 * @param array{page?:int,pages?:int,per_page?:int,total?:int,first?:int,last?:int,links?:array<int,array{page:int,url:string,current:bool}|null>,previous_url?:string,next_url?:string} $pagination Pagination.
 	 * @param array<int,string>                                      $missing_roles Configured role slugs that do not exist.
 	 * @param string                                                 $render_token Token that status changes from this table must send.
 	 * @param array{action?:string,hidden?:array<string,string>,roles?:array<string,string>,role?:string,search?:string} $search_form Role and search form; empty hides it.
-	 * @param array<int,string>                                      $hidden_columns Keys of the columns the viewer hid.
-	 * @param string                                                 $size Table size: medium or small.
+	 * @param array{hidden_columns?:array<int,string>,size?:string,dates?:string,last_login?:bool} $display Display options.
 	 */
 	public function render(
 		array $rows,
@@ -39,19 +57,20 @@ final class MembersTableRenderer
 		array $missing_roles = array(),
 		string $render_token = '',
 		array $search_form = array(),
-		array $hidden_columns = array(),
-		string $size = 'medium'
+		array $display = array()
 	): string {
+		$this->display = array_merge( self::DISPLAY_DEFAULTS, $display );
+
 		$body     = $this->render_rows( $rows );
 		$narrowed = '' !== ( $search_form['role'] ?? '' ) || '' !== ( $search_form['search'] ?? '' );
 		// The page size select in the footer belongs to this form, so changing it keeps the role and search.
 		$form_id = array() === $search_form ? '' : \wp_unique_id( 'mac-members-search-' );
 
-		$output  = '<div class="mac-members-table mac-members-table--' . esc_attr( $size ) . '" data-mac-members-table data-mac-members-view="' . esc_attr( $view ) . '" data-mac-members-render-token="' . esc_attr( $render_token ) . '">';
+		$output  = '<div class="mac-members-table mac-members-table--' . esc_attr( (string) $this->display['size'] ) . '" data-mac-members-table data-mac-members-view="' . esc_attr( $view ) . '" data-mac-members-render-token="' . esc_attr( $render_token ) . '">';
 		$output .= $this->render_missing_roles_warning( $missing_roles );
 		$output .= $this->render_filters( $filters );
 		$output .= $this->render_search_form( $search_form, $form_id );
-		$output .= '' === $body ? '' : $this->render_column_toggles( $hidden_columns );
+		$output .= '' === $body ? '' : $this->render_column_toggles( (array) $this->display['hidden_columns'] );
 		$output .= '<div class="mac-members-notices" aria-live="polite" aria-atomic="true"></div>';
 		$output .= '<p class="mac-members-empty"' . ( '' === $body ? '' : ' hidden' ) . '>' . esc_html( $this->get_empty_text( $view, $narrowed ) ) . '</p>';
 
@@ -87,11 +106,11 @@ final class MembersTableRenderer
 	}
 
 	/**
-	 * @return array<string,string> Column labels keyed by column key, in order.
+	 * @return array<string,string> Labels of the columns the table shows, keyed by column key, in order.
 	 */
 	public function get_columns(): array
 	{
-		return array_combine(
+		$columns = array_combine(
 			self::COLUMN_KEYS,
 			array(
 				__( 'User ID', 'mac-members' ),
@@ -100,12 +119,19 @@ final class MembersTableRenderer
 				__( 'Last Name', 'mac-members' ),
 				__( 'Username', 'mac-members' ),
 				__( 'Registered', 'mac-members' ),
+				__( 'Last Login', 'mac-members' ),
 				__( 'Profile', 'mac-members' ),
 				__( 'Status', 'mac-members' ),
 				__( 'Roles', 'mac-members' ),
 				__( 'Actions', 'mac-members' ),
 			)
 		);
+
+		if ( true !== $this->display['last_login'] ) {
+			unset( $columns['last_login'] );
+		}
+
+		return $columns;
 	}
 
 	/**
@@ -129,7 +155,7 @@ final class MembersTableRenderer
 	}
 
 	/**
-	 * @param array<int,array{user:object,status:?MemberStatus,roles?:array<string,string>}> $rows Members, their status and their other roles.
+	 * @param array<int,array{user:object,status:?MemberStatus,roles?:array<string,string>,last_login?:int|null}> $rows Members, their status, their other roles and their last login.
 	 */
 	private function render_rows( array $rows ): string
 	{
@@ -157,7 +183,8 @@ final class MembersTableRenderer
 				'first_name' => esc_html( $this->get_user_value( $user, 'first_name' ) ),
 				'last_name'  => esc_html( $this->get_user_value( $user, 'last_name' ) ),
 				'username'   => esc_html( $this->get_user_value( $user, 'user_login' ) ),
-				'registered' => esc_html( $this->format_registered_date( $this->get_user_value( $user, 'user_registered' ) ) ),
+				'registered' => $this->render_date( $this->get_registered_time( $user ), false ),
+				'last_login' => $this->render_date( $row['last_login'] ?? null, true ),
 				'profile'    => '<a class="mac-members-profile-link" href="' . esc_url( $this->get_profile_url( $id ) ) . '" target="_blank" rel="noopener noreferrer">' . esc_html__( 'View profile', 'mac-members' ) . '</a>',
 				'status'     => '<span class="mac-members-status__label mac-members-status__label--' . esc_attr( $status->value ) . '">' . esc_html( $status->label() ) . '</span>',
 				'roles'      => esc_html( implode( ', ', $row['roles'] ?? array() ) ),
@@ -171,7 +198,7 @@ final class MembersTableRenderer
 
 			$output .= '<tr class="mac-members-list__row" data-mac-members-user-id="' . esc_attr( (string) $id ) . '" data-mac-members-status="' . esc_attr( $status->value ) . '">';
 
-			foreach ( self::COLUMN_KEYS as $key ) {
+			foreach ( array_keys( $this->get_columns() ) as $key ) {
 				$class   = isset( $classes[ $key ] ) ? ' class="' . esc_attr( $classes[ $key ] ) . '"' : '';
 				$output .= '<td' . $class . ' data-mac-members-column="' . esc_attr( $key ) . '">' . $cells[ $key ] . '</td>';
 			}
@@ -413,14 +440,36 @@ final class MembersTableRenderer
 		return \admin_url( 'user-edit.php?user_id=' . $user_id );
 	}
 
-	private function format_registered_date( string $registered_date ): string
+	/**
+	 * When the user registered, from user_registered, which WordPress stores in UTC.
+	 */
+	private function get_registered_time( object $user ): ?int
 	{
-		$timestamp = strtotime( $registered_date );
+		$registered = $this->get_user_value( $user, 'user_registered' );
+		$timestamp  = '' === $registered ? false : strtotime( $registered . ' UTC' );
 
-		if ( false === $timestamp ) {
-			return $registered_date;
+		return false === $timestamp ? null : $timestamp;
+	}
+
+	/**
+	 * A date in the site's date format, with the time when asked, or the time since, like "3 days ago", when
+	 * the "Dates in the members table" setting is Relative. The full date and time shows on hover either way.
+	 * Empty without a time.
+	 */
+	private function render_date( ?int $timestamp, bool $with_time ): string
+	{
+		if ( null === $timestamp ) {
+			return '';
 		}
 
-		return \wp_date( (string) \get_option( 'date_format', 'F j, Y' ), $timestamp );
+		$date_format = (string) \get_option( 'date_format', 'F j, Y' );
+		$date_time   = $date_format . ' ' . (string) \get_option( 'time_format', 'g:i a' );
+
+		$text = 'relative' === $this->display['dates']
+			/* translators: %s: time since, such as "3 days". */
+			? sprintf( __( '%s ago', 'mac-members' ), \human_time_diff( $timestamp, time() ) )
+			: \wp_date( $with_time ? $date_time : $date_format, $timestamp );
+
+		return '<time datetime="' . esc_attr( gmdate( 'c', $timestamp ) ) . '" title="' . esc_attr( (string) \wp_date( $date_time, $timestamp ) ) . '">' . esc_html( (string) $text ) . '</time>';
 	}
 }

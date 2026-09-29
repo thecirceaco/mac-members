@@ -47,6 +47,7 @@ The settings page also includes:
 - member and admin denial email toggles
 - member and admin deactivation email toggles
 - members table size: Medium by default, or Small (see Members Table below)
+- dates in the members table: Date by default, or Relative (see Members Table below)
 - delete plugin data on uninstall, off by default (see Review capability below)
 
 All email notification toggles are enabled by default.
@@ -67,7 +68,7 @@ The table has a filter for each status (Pending, Approved, Inactive, Denied) and
 [mac_members_table status="pending"]
 ```
 
-Every view lists the newest registrations first. The columns are User ID, Email, First Name, Last Name, Username, Registered, Profile, Status, Roles and Actions. Roles lists the member's roles other than the status roles, for example Officer or Trustee, and the Actions column has only the status changes the member's status allows.
+Every view lists the newest registrations first. The columns are User ID, Email, First Name, Last Name, Username, Registered, Last Login, Profile, Status, Roles and Actions. Roles lists the member's roles other than the status roles, for example Officer or Trustee, and the Actions column has only the status changes the member's status allows.
 
 Right above the table, under the role and search form, a checkbox for each column shows or hides it, and all are checked at first. While User ID is hidden, the first visible column is the one that stays at the left. The stylesheet hides a column while its checkbox is unchecked, and the script keeps the hidden columns in the `mac_members_hidden_columns` cookie for a year, so the next pages and later visits in the same browser keep them hidden.
 
@@ -87,6 +88,10 @@ After a change, a row that no longer belongs in a filtered view disappears, and 
 When the table fits its frame, the header sticks to the page, under the admin bar (ACSS's `--admin-bar-height`). A site with a sticky header sets `--mac-members-sticky-offset` to that header's height; ACSS's `--header-height` is not used, because it is the header's height whether or not the header stays on screen. When it doesn't fit, for example on a narrow screen or with many columns, the table scrolls inside its frame, both ways, up to 80% of the screen height, and keeps its header and first visible column in view. The script checks the fit when the page loads and again when the frame or the table changes size.
 
 The "Members table size" setting sets the text and button size: Medium, the default, puts the table, its controls and its buttons in `--text-m`, and Small in `--text-s`. The buttons keep ACSS's `btn--s` class, and Medium sets ACSS's `--btn-font-size`.
+
+Last Login shows only while MAC Core is active and its "Show last login column" setting is on. MAC Core then records the time of each login through a login form in the `mac_core_last_login` user meta, and MAC Members only reads it; the cell is empty for a member without a recorded login. MAC Members detects MAC Core by its `MAC_CORE_VERSION` constant and reads the setting from the `mac_core_settings` option, so if that option changes shape, the column stops showing rather than failing. The table loads the user meta of every member on the page in one query.
+
+The "Dates in the members table" setting applies to Registered and Last Login. Date, the default, shows the day in the site's date format, and Last Login also the time; Relative shows the time since, like "3 days ago". Both show the full date and time on hover, in a `<time>` element.
 
 The stylesheet and the script are versioned with the plugin version and the file's modification time, so a new build reaches browsers and CDNs that keep the old files for a year.
 

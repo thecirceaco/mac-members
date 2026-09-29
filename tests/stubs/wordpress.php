@@ -566,6 +566,7 @@ function mac_members_tests_reset_wp_state(): void {
 	$GLOBALS['mac_members_test_user_queries']      = array();
 	$GLOBALS['mac_members_test_role_translations'] = array();
 	$GLOBALS['mac_members_test_unique_id']         = 0;
+	$GLOBALS['mac_members_test_meta_cache_loads']  = array();
 	$GLOBALS['mac_members_test_registered_styles'] = array();
 	$GLOBALS['mac_members_test_registered_scripts'] = array();
 	$GLOBALS['mac_members_test_enqueued_styles']    = array();
@@ -797,6 +798,57 @@ function __( string $text, string $domain = 'default' ): string {
 	unset( $domain );
 
 	return $text;
+}
+
+/**
+ * Reads the value from the test user's data, like the user meta WordPress keeps next to the user.
+ */
+function get_user_meta( int $user_id, string $key = '', bool $single = false ): mixed {
+	foreach ( $GLOBALS['mac_members_test_users'] ?? array() as $user ) {
+		if ( $user->ID === $user_id ) {
+			$value = $user->get( $key );
+
+			if ( $single ) {
+				return $value ?? '';
+			}
+
+			return null === $value ? array() : array( $value );
+		}
+	}
+
+	return $single ? '' : array();
+}
+
+/**
+ * Records which objects' meta a call loads at once.
+ *
+ * @param array<int,int> $object_ids Object IDs.
+ */
+function update_meta_cache( string $meta_type, array $object_ids ): array {
+	$GLOBALS['mac_members_test_meta_cache_loads'][] = array( $meta_type, array_values( $object_ids ) );
+
+	return array();
+}
+
+/**
+ * Like WordPress for whole days, hours and minutes: "1 day", "3 days", "2 hours", "5 mins".
+ */
+function human_time_diff( int $from, int $to = 0 ): string {
+	$diff = abs( ( 0 === $to ? time() : $to ) - $from );
+
+	if ( 86400 <= $diff ) {
+		$days = (int) round( $diff / 86400 );
+
+		return 1 === $days ? '1 day' : $days . ' days';
+	}
+
+	if ( 3600 <= $diff ) {
+		$hours = (int) round( $diff / 3600 );
+
+		return 1 === $hours ? '1 hour' : $hours . ' hours';
+	}
+
+	return max( 1, (int) round( $diff / 60 ) ) . ' mins';
 }
 
 function number_format_i18n( float|int $number, int $decimals = 0 ): string {
