@@ -88,7 +88,7 @@ final class MemberActionControllerTest extends TestCase {
 		return array(
 			'invalid nonce'   => array( 'invalid nonce', 'invalid_request' ),
 			'wrong action'    => array( 'wrong action', 'invalid_request' ),
-			'no capability'   => array( 'no capability', 'permission_denied' ),
+			'logged out'      => array( 'logged out', 'permission_denied' ),
 			'no user id'      => array( 'no user id', 'invalid_user' ),
 			'unknown user'    => array( 'unknown user', 'invalid_user' ),
 			'self action'     => array( 'self action', 'permission_denied' ),
@@ -96,7 +96,7 @@ final class MemberActionControllerTest extends TestCase {
 			'missing role'    => array( 'missing role', 'missing_role' ),
 			'not pending'     => array( 'not pending', 'status_changed' ),
 			'no review cap'   => array( 'no review cap', 'permission_denied' ),
-			'cannot promote'  => array( 'cannot promote', 'permission_denied' ),
+			'hidden target'   => array( 'hidden target', 'permission_denied' ),
 			'unsafe roles'    => array( 'unsafe roles', 'invalid_role_settings' ),
 			'not editable'    => array( 'not editable', 'permission_denied' ),
 			'stale table'     => array( 'stale table', 'stale_table' ),
@@ -394,7 +394,7 @@ final class MemberActionControllerTest extends TestCase {
 		self::assertSame( array( 'mac_members_approved' ), $user->roles );
 	}
 
-	public function test_capability_denial_returns_permission_error(): void {
+	public function test_a_reviewer_needs_no_promote_users(): void {
 		$user = $this->store_user( 12, array( 'mac_members_pending' ) );
 		$GLOBALS['mac_members_test_current_user_caps']['promote_users'] = false;
 
@@ -404,10 +404,8 @@ final class MemberActionControllerTest extends TestCase {
 			fn (): mixed => $this->create_controller()->approve()
 		);
 
-		self::assertFalse( $response['success'] );
-		self::assertSame( 403, $response['status'] );
-		self::assertSame( 'You do not have permission to perform this action.', $response['data']['message'] );
-		self::assertSame( array( 'mac_members_pending' ), $user->roles );
+		self::assertTrue( $response['success'] );
+		self::assertSame( array( 'mac_members_approved' ), $user->roles );
 	}
 
 	public function test_invalid_nonce_returns_invalid_request(): void {
@@ -616,7 +614,7 @@ final class MemberActionControllerTest extends TestCase {
 		self::assertSame( array( 'mac_members_pending' ), $user->roles );
 	}
 
-	public function test_review_capability_is_required_in_addition_to_promote_users(): void {
+	public function test_review_capability_is_required(): void {
 		$GLOBALS['mac_members_test_current_user_caps']['mac_members_review'] = false;
 
 		$user = $this->store_user( 12, array( 'mac_members_pending' ) );
@@ -631,11 +629,13 @@ final class MemberActionControllerTest extends TestCase {
 		self::assertSame( array( 'mac_members_pending' ), $user->roles );
 	}
 
-	public function test_promote_user_is_checked_for_the_target_user(): void {
-		$GLOBALS['mac_members_test_current_user_object_caps']['promote_user'][12] = false;
+	public function test_a_member_with_a_hidden_role_is_refused_even_from_a_valid_table(): void {
+		$GLOBALS['mac_members_test_roles']['officer'] = array( 'name' => 'Officer', 'capabilities' => array( 'read' => true ) );
+		$user  = $this->store_user( 12, array( 'mac_members_pending', 'officer' ) );
+		$other = $this->store_user( 13, array( 'mac_members_pending' ) );
 
-		$user = $this->store_user( 12, array( 'mac_members_pending' ) );
-		$this->store_user( 13, array( 'mac_members_pending' ) );
+		// The role was hidden after the table was rendered, so the token still lists the member.
+		$GLOBALS['mac_members_test_options'][ MAC_MEMBERS_SETTINGS_OPTION ] = array( 'hidden_roles' => 'officer' );
 		$this->prepare_ajax_request( FrontendAssets::APPROVE_ACTION, $user->ID );
 
 		$response = $this->capture_ajax_response(
@@ -643,9 +643,9 @@ final class MemberActionControllerTest extends TestCase {
 		);
 
 		self::assertSame( 403, $response['status'] );
-		self::assertSame( array( 'mac_members_pending' ), $user->roles );
+		self::assertSame( array( 'mac_members_pending', 'officer' ), $user->roles );
 
-		$this->prepare_ajax_request( FrontendAssets::APPROVE_ACTION, 13 );
+		$this->prepare_ajax_request( FrontendAssets::APPROVE_ACTION, $other->ID );
 
 		$response = $this->capture_ajax_response(
 			fn (): mixed => $this->create_controller()->approve()
@@ -899,8 +899,8 @@ final class MemberActionControllerTest extends TestCase {
 			case 'wrong action':
 				$_POST['action'] = FrontendAssets::DENY_ACTION;
 				break;
-			case 'no capability':
-				$GLOBALS['mac_members_test_current_user_caps']['promote_users'] = false;
+			case 'logged out':
+				$GLOBALS['mac_members_test_logged_in'] = false;
 				break;
 			case 'no user id':
 				$_POST['user_id'] = '0';
@@ -932,8 +932,10 @@ final class MemberActionControllerTest extends TestCase {
 			case 'no review cap':
 				$GLOBALS['mac_members_test_current_user_caps']['mac_members_review'] = false;
 				break;
-			case 'cannot promote':
-				$GLOBALS['mac_members_test_current_user_object_caps']['promote_user'][12] = false;
+			case 'hidden target':
+				$GLOBALS['mac_members_test_roles']['officer']                      = array( 'name' => 'Officer', 'capabilities' => array( 'read' => true ) );
+				$GLOBALS['mac_members_test_options'][ MAC_MEMBERS_SETTINGS_OPTION ] = array( 'hidden_roles' => 'officer' );
+				$this->store_user( 12, array( 'mac_members_pending', 'officer' ) );
 				break;
 			case 'unsafe roles':
 				$GLOBALS['mac_members_test_options'][ MAC_MEMBERS_SETTINGS_OPTION ] = array( 'approved_role' => 'administrator' );

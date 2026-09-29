@@ -60,7 +60,7 @@ Add the members table to a protected admin or internal page with:
 [mac_members_table]
 ```
 
-The shortcode shows the table to logged-in users who have the `mac_members_review` capability and can `promote_users`. Other users see no output.
+The shortcode shows the table to logged-in users who have the `mac_members_review` capability. Other users see no output.
 
 The table has a filter for each status (Pending, Approved, Inactive, Denied) and one for All, each with its number of members, and opens on Pending. The view is kept in the `mac_members_status` query argument. To show a single view without the filters, set the `status` attribute to `pending`, `approved`, `inactive`, `denied` or `all`:
 
@@ -139,7 +139,7 @@ Values the applicant controls (first name, last name, display name, username and
 
 ## Security
 
-MAC Members uses authenticated WordPress AJAX actions for the four status changes (`mac_members_approve_user`, `mac_members_deny_user`, `mac_members_deactivate_user` and `mac_members_reactivate_user`). It checks the nonce with `check_ajax_referer()` and requires the acting user to have the `mac_members_review` capability and `promote_users`. For each target user it checks `current_user_can( 'promote_user', $user_id )` and that every role the change adds or removes is in `get_editable_roles()`. It verifies that the target user still has a status the change applies to, blocks self-actions, and blocks actions against target users who hold any of the sensitive capabilities listed under Settings.
+MAC Members uses authenticated WordPress AJAX actions for the four status changes (`mac_members_approve_user`, `mac_members_deny_user`, `mac_members_deactivate_user` and `mac_members_reactivate_user`). It checks the nonce with `check_ajax_referer()` and requires the acting user to have the `mac_members_review` capability. For each target user it checks that every role the change adds or removes is in `get_editable_roles()`, so a site's role editor can still narrow them. It verifies that the target user still has a status the change applies to, and blocks self-actions, actions against target users who hold any of the sensitive capabilities listed under Settings, and actions against users with a hidden role.
 
 Every check that fails sends an error and ends the request, and so does the success response, so a failed check can never reach the role change, even when a `wp_die` handler does not exit.
 
@@ -147,7 +147,14 @@ The plugin does not expose public unauthenticated endpoints and does not provide
 
 ### Review capability
 
-Activating the plugin gives the `administrator` role the `mac_members_review` capability. A site that updates the plugin without reactivating it gets the same step once, on the next request. To let another role review members, give it `mac_members_review` and `promote_users` with a role editor.
+Activating the plugin gives the `administrator` role the `mac_members_review` capability. A site that updates the plugin without reactivating it gets the same step once, on the next request. To let another role review members, give it `mac_members_review` with a role editor, or with WP-CLI:
+
+```bash
+wp role create membership_manager "Membership Manager" --clone=subscriber
+wp cap add membership_manager mac_members_review
+```
+
+`mac_members_review` works as a narrow `promote_users`: the plugin changes the roles itself, and only moves members between the four status roles, which cannot grant administrative capabilities. A reviewer does not need `promote_users`, which in wp-admin would let them give any user any role, or `edit_users`, which would let them edit any user, administrators included.
 
 Deleting the plugin from the Plugins screen keeps its data, like MAC Core, unless "Delete plugin data on uninstall" is on in the settings; it is off by default. With it on, deleting the plugin removes the settings, `mac_members_review` from every role, and the four member roles that no user holds. Roles that users still hold stay, so nobody is left without a role; the settings page shows how many users hold each member role next to the setting. The per-user lock rows always go, because they only exist while a status change runs.
 

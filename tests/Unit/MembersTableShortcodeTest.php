@@ -61,9 +61,8 @@ final class MembersTableShortcodeTest extends TestCase {
 	#[DataProvider( 'provide_users_who_cannot_review' )]
 	public function test_render_returns_empty_for_users_who_cannot_review( string $case ): void {
 		match ( $case ) {
-			'logged out'       => $GLOBALS['mac_members_test_logged_in'] = false,
-			'no review cap'    => $GLOBALS['mac_members_test_current_user_caps']['mac_members_review'] = false,
-			'no promote_users' => $GLOBALS['mac_members_test_current_user_caps']['promote_users'] = false,
+			'logged out'    => $GLOBALS['mac_members_test_logged_in'] = false,
+			'no review cap' => $GLOBALS['mac_members_test_current_user_caps']['mac_members_review'] = false,
 		};
 
 		self::assertSame( '', $this->create_shortcode()->render() );
@@ -76,10 +75,15 @@ final class MembersTableShortcodeTest extends TestCase {
 	 */
 	public static function provide_users_who_cannot_review(): array {
 		return array(
-			'logged out'       => array( 'logged out' ),
-			'no review cap'    => array( 'no review cap' ),
-			'no promote_users' => array( 'no promote_users' ),
+			'logged out'    => array( 'logged out' ),
+			'no review cap' => array( 'no review cap' ),
 		);
+	}
+
+	public function test_a_reviewer_without_promote_users_sees_the_table(): void {
+		$GLOBALS['mac_members_test_current_user_caps']['promote_users'] = false;
+
+		self::assertStringContainsString( 'class="mac-members-table', $this->create_shortcode()->render() );
 	}
 
 	public function test_render_adds_a_render_token_that_allows_only_the_rendered_users(): void {

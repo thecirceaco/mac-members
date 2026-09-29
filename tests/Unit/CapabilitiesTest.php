@@ -72,13 +72,13 @@ final class CapabilitiesTest extends TestCase {
 		self::assertTrue( Capabilities::user_has_sensitive_capability( $editor ) );
 	}
 
-	public function test_current_user_can_review_needs_login_the_review_capability_and_promote_users(): void {
+	public function test_current_user_can_review_needs_login_and_the_review_capability_only(): void {
 		self::assertTrue( Capabilities::current_user_can_review() );
 
+		// The review capability is a narrow promote_users, so a reviewer does not need promote_users itself.
 		$GLOBALS['mac_members_test_current_user_caps']['promote_users'] = false;
-		self::assertFalse( Capabilities::current_user_can_review() );
+		self::assertTrue( Capabilities::current_user_can_review() );
 
-		$GLOBALS['mac_members_test_current_user_caps']['promote_users']      = true;
 		$GLOBALS['mac_members_test_current_user_caps']['mac_members_review'] = false;
 		self::assertFalse( Capabilities::current_user_can_review() );
 

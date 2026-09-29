@@ -56,13 +56,15 @@ final class Capabilities
 	);
 
 	/**
-	 * Whether the current user may review pending members.
+	 * Whether the current user may use the members table: see it and change member statuses. The review
+	 * capability is a narrow promote_users: the plugin only moves members between the four status roles, which
+	 * cannot grant administrative capabilities, and never touches the reviewer, a user with a sensitive
+	 * capability or a user with a hidden role. So a reviewer needs no promote_users, which in wp-admin would let
+	 * them give anyone any role.
 	 */
 	public static function current_user_can_review(): bool
 	{
-		return \is_user_logged_in()
-			&& \current_user_can( self::REVIEW )
-			&& \current_user_can( 'promote_users' );
+		return \is_user_logged_in() && \current_user_can( self::REVIEW );
 	}
 
 	/**
