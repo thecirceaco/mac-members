@@ -100,7 +100,7 @@ final class MemberNotificationServiceTest extends TestCase {
 
 		$message = $GLOBALS['mac_members_test_mail'][1]['message'];
 
-		self::assertStringContainsString( "User ID: 42<br>\nFirst Name: Mia Member<br>\nLast Name: Bold Last<br>\nUsername: mia member<br>\nEmail Address: pending@example.test<br>\nProfile: ", $message );
+		self::assertStringContainsString( "User ID: 42<br>\nFirst Name: Mia Member<br>\nLast Name: Bold Last<br>\nUsername: mia member<br>\nEmail Address: pending@example.test<br>\n<br>", $message );
 	}
 
 	public function test_applicant_values_are_capped_at_100_characters(): void {
@@ -118,7 +118,7 @@ final class MemberNotificationServiceTest extends TestCase {
 		self::assertStringContainsString( 'Last Name: ' . str_repeat( 'é', 100 ) . '<br>', $GLOBALS['mac_members_test_mail'][1]['message'] );
 	}
 
-	public function test_admin_approval_email_contains_member_fields_and_profile_url(): void {
+	public function test_admin_approval_email_contains_member_fields_without_a_profile_link(): void {
 		$user = $this->create_user(
 			array(
 				'ID'           => 42,
@@ -141,7 +141,9 @@ final class MemberNotificationServiceTest extends TestCase {
 		self::assertStringContainsString( 'Username: miamember', $mail['message'] );
 		self::assertStringContainsString( 'Email Address: pending@example.test', $mail['message'] );
 		self::assertStringContainsString( 'User ID: 42', $mail['message'] );
-		self::assertStringContainsString( 'Profile: https://example.test/wp-admin/user-edit.php?user_id=42', $mail['message'] );
+		// The member details are in the members table, not on the WordPress profile screen.
+		self::assertStringNotContainsString( 'Profile:', $mail['message'] );
+		self::assertStringNotContainsString( 'user-edit.php', $mail['message'] );
 	}
 
 	public function test_headers_use_sanitized_from_and_reply_to_routing(): void {
@@ -219,7 +221,8 @@ final class MemberNotificationServiceTest extends TestCase {
 		self::assertSame( 'admin@example.test', $admin['to'] );
 		self::assertSame( 'Member account deactivated', $admin['subject'] );
 		self::assertStringContainsString( 'A member account has been deactivated on Example Site.', $admin['message'] );
-		self::assertStringContainsString( 'user-edit.php?user_id=12', $admin['message'] );
+		self::assertStringContainsString( 'User ID: 12', $admin['message'] );
+		self::assertStringNotContainsString( 'user-edit.php', $admin['message'] );
 		self::assertContains( 'Reply-To: pending@example.test', $admin['headers'] );
 	}
 

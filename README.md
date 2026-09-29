@@ -141,7 +141,7 @@ The current notification types are:
 - admin denial email
 - admin deactivation email
 
-Member emails link to the site's home page rather than `wp-login.php`, because many sites have their own login, registration and password pages. Admin emails list the member's details with the User ID first, then first name, last name, username, email address and profile link.
+Member emails link to the site's home page rather than `wp-login.php`, because many sites have their own login, registration and password pages. Admin emails list the member's details with the User ID first, then first name, last name, username and email address. They don't link to the WordPress profile screen; the member's full details are in the members table.
 
 Each notification type can be toggled from the settings page. Email delivery failures do not roll back the role update; the action response includes a warning and the failure is logged with lightweight action and user ID context.
 

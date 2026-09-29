@@ -21,9 +21,9 @@ final class MemberNotificationService
 	private const BODY_MEMBER_APPROVAL = "Hi {first_name},\n\nYour account has been approved and your membership is now active. You can now log in and access your account.\n\n{site_url}\n\nBest,\n{site_name}";
 	private const BODY_MEMBER_DENIAL = "Hi {first_name},\n\nYour account request has been reviewed and was not approved at this time.\n\nIf you believe this was a mistake, please contact us for assistance.\n\n{site_url}\n\nBest,\n{site_name}";
 	private const BODY_MEMBER_DEACTIVATION = "Hi {first_name},\n\nYour membership on {site_name} is no longer active.\n\nIf you believe this was a mistake, please contact us for assistance.\n\n{site_url}\n\nBest,\n{site_name}";
-	private const BODY_ADMIN_APPROVAL = "Hi,\n\nA member account has been approved on {site_name}.\n\nUser ID: {user_id}\nFirst Name: {first_name}\nLast Name: {last_name}\nUsername: {username}\nEmail Address: {email}\nProfile: {profile_url}\n\nBest,\n{site_name}";
-	private const BODY_ADMIN_DENIAL = "Hi,\n\nA pending member account has been denied on {site_name}.\n\nUser ID: {user_id}\nFirst Name: {first_name}\nLast Name: {last_name}\nUsername: {username}\nEmail Address: {email}\nProfile: {profile_url}\n\nBest,\n{site_name}";
-	private const BODY_ADMIN_DEACTIVATION = "Hi,\n\nA member account has been deactivated on {site_name}.\n\nUser ID: {user_id}\nFirst Name: {first_name}\nLast Name: {last_name}\nUsername: {username}\nEmail Address: {email}\nProfile: {profile_url}\n\nBest,\n{site_name}";
+	private const BODY_ADMIN_APPROVAL = "Hi,\n\nA member account has been approved on {site_name}.\n\nUser ID: {user_id}\nFirst Name: {first_name}\nLast Name: {last_name}\nUsername: {username}\nEmail Address: {email}\n\nBest,\n{site_name}";
+	private const BODY_ADMIN_DENIAL = "Hi,\n\nA pending member account has been denied on {site_name}.\n\nUser ID: {user_id}\nFirst Name: {first_name}\nLast Name: {last_name}\nUsername: {username}\nEmail Address: {email}\n\nBest,\n{site_name}";
+	private const BODY_ADMIN_DEACTIVATION = "Hi,\n\nA member account has been deactivated on {site_name}.\n\nUser ID: {user_id}\nFirst Name: {first_name}\nLast Name: {last_name}\nUsername: {username}\nEmail Address: {email}\n\nBest,\n{site_name}";
 
 	/**
 	 * Longest value, in characters, that an applicant can put into an email through a placeholder.
@@ -179,7 +179,6 @@ final class MemberNotificationService
 			'{email}'        => $this->clean_user_value( $this->get_user_email( $user ) ),
 			'{user_id}'      => (string) $user_id,
 			'{site_url}'     => \home_url( '/' ),
-			'{profile_url}'  => \admin_url( 'user-edit.php?user_id=' . $user_id ),
 		);
 	}
 
