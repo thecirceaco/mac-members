@@ -13,7 +13,7 @@
  * Version:           0.3.0
  * Author:            Circea
  * Author URI:        https://circea.co
- * Update URI:        https://github.com/thecirceaco/mac-members
+ * Update URI:        https://updates.circea.co/mac-members/
  * Requires PHP:      8.3
  * Requires at least: 6.0
  * License:           GPL v3 or later

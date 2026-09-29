@@ -34,7 +34,9 @@ shipped_paths=(
 	"$slug.php"
 	'assets/' 'assets/index.php' 'assets/*.css' 'assets/*.js'
 	'bin/'
-	'inc/' 'inc/*.php'
+	'inc/' 'inc/*/' 'inc/*.php'
+	'inc/Vendor/SureCart/Licensing/README.md'
+	'release.json'
 	'src/' 'src/*/' 'src/*.php'
 )
 

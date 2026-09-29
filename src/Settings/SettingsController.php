@@ -10,7 +10,9 @@ declare(strict_types=1);
 namespace MacMembers\Settings;
 
 use MacMembers\Admin\MenuIcon;
+use MacMembers\Admin\MenuPlacement;
 use MacMembers\Contracts\Service;
+use MacMembers\Licensing\LicensingService;
 use MacMembers\Security\Capabilities;
 use MacMembers\Security\Roles;
 
@@ -36,6 +38,10 @@ final class SettingsController implements Service
 	 */
 	private ?bool $top_level = null;
 
+	private readonly MenuPlacement $placement;
+
+	private readonly LicensingService $licensing;
+
 	/**
 	 * @param \Closure|null $end_request Runs instead of exiting after the redirect that follows a save. Tests
 	 *                                   pass a closure that throws, to see where the request ended.
@@ -43,8 +49,13 @@ final class SettingsController implements Service
 	public function __construct(
 		private readonly SettingsRepositoryInterface $settings,
 		private readonly SettingsSchema $schema,
-		private readonly ?\Closure $end_request = null
-	) {}
+		private readonly ?\Closure $end_request = null,
+		?MenuPlacement $placement = null,
+		?LicensingService $licensing = null
+	) {
+		$this->placement = $placement ?? new MenuPlacement( $settings );
+		$this->licensing = $licensing ?? new LicensingService( $this->placement );
+	}
 
 	public function register(): void
 	{
@@ -149,6 +160,17 @@ final class SettingsController implements Service
 			\settings_errors( MAC_MEMBERS_SETTINGS_OPTION );
 		}
 
+		$tab = $this->get_current_tab();
+
+		// phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- render_tabs() returns escaped links.
+		echo $this->render_tabs( $tab );
+
+		if ( 'license' === $tab ) {
+			$this->licensing->render_view();
+			echo '</div>';
+			return;
+		}
+
 		echo '<form method="post" action="">';
 		echo '<input type="hidden" name="mac_members_action" value="' . esc_attr( self::ACTION_SAVE_SETTINGS ) . '">';
 		\wp_nonce_field( self::NONCE_ACTION, self::NONCE_NAME );
@@ -189,7 +211,7 @@ final class SettingsController implements Service
 	private function redirect_to_settings_page(): void
 	{
 		\set_transient( 'settings_errors', \get_settings_errors(), 30 );
-		\wp_safe_redirect( \add_query_arg( array( 'settings-updated' => 'true' ), $this->get_page_url( $this->wants_top_level() ) ) );
+		\wp_safe_redirect( \add_query_arg( array( 'settings-updated' => 'true' ), $this->placement->url() ) );
 
 		if ( null !== $this->end_request ) {
 			( $this->end_request )();
@@ -198,14 +220,42 @@ final class SettingsController implements Service
 		exit;
 	}
 
-	private function get_page_url( bool $top_level ): string
-	{
-		return \admin_url( ( $top_level ? 'admin.php' : 'options-general.php' ) . '?page=' . MAC_MEMBERS_ADMIN_SLUG );
-	}
-
 	private function wants_top_level(): bool
 	{
-		return true === (bool) $this->settings->get( 'top_level_menu', false );
+		return $this->placement->is_top_level();
+	}
+
+	/**
+	 * The page's tabs: the settings, and the SureCart license.
+	 *
+	 * @return array<string,string> Tab labels keyed by tab.
+	 */
+	private function get_tabs(): array
+	{
+		return array(
+			'settings' => __( 'Settings', 'mac-members' ),
+			'license'  => __( 'License', 'mac-members' ),
+		);
+	}
+
+	private function get_current_tab(): string
+	{
+		// phpcs:ignore WordPress.Security.NonceVerification.Recommended -- Read-only admin routing.
+		$tab = isset( $_GET['tab'] ) ? \sanitize_key( (string) \wp_unslash( $_GET['tab'] ) ) : '';
+
+		return array_key_exists( $tab, $this->get_tabs() ) ? $tab : 'settings';
+	}
+
+	private function render_tabs( string $current ): string
+	{
+		$output = '<nav class="nav-tab-wrapper wp-clearfix" aria-label="' . esc_attr__( 'MAC Members sections', 'mac-members' ) . '">';
+
+		foreach ( $this->get_tabs() as $tab => $label ) {
+			$active  = $tab === $current;
+			$output .= '<a href="' . esc_url( $this->placement->url( 'settings' === $tab ? '' : $tab ) ) . '" class="nav-tab' . ( $active ? ' nav-tab-active' : '' ) . '"' . ( $active ? ' aria-current="page"' : '' ) . '>' . esc_html( $label ) . '</a>';
+		}
+
+		return $output . '</nav>';
 	}
 
 	private function is_top_level(): bool

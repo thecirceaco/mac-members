@@ -1006,6 +1006,14 @@ function set_transient( string $transient, mixed $value, int $expiration = 0 ): 
 	return true;
 }
 
+function delete_transient( string $transient ): bool {
+	$existed = array_key_exists( $transient, $GLOBALS['mac_members_test_transients'] ?? array() );
+
+	unset( $GLOBALS['mac_members_test_transients'][ $transient ] );
+
+	return $existed;
+}
+
 function wp_safe_redirect( string $location, int $status = 302 ): bool {
 	$GLOBALS['mac_members_test_redirect'] = array(
 		'location' => $location,

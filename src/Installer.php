@@ -84,8 +84,8 @@ final class Installer implements Service
 	 *
 	 * The per-user lock rows always go, because they only exist while a status change runs. Everything else
 	 * stays, like in MAC Core, unless "Delete plugin data on uninstall" is on. Then the settings, the install
-	 * version, the review capability and the member roles that no user holds go too. Roles that users still
-	 * hold stay, so nobody is left without a role.
+	 * version, the review capability, the member roles that no user holds, and the SureCart license and update
+	 * data go too. Roles that users still hold stay, so nobody is left without a role.
 	 */
 	public static function uninstall(): void
 	{
@@ -104,6 +104,9 @@ final class Installer implements Service
 		Roles::remove_unused();
 		\delete_option( self::VERSION_OPTION );
 		\delete_option( MAC_MEMBERS_SETTINGS_OPTION );
+		// The SureCart SDK names these after the product name and the plugin slug.
+		\delete_option( 'macmembers_license_options' );
+		\delete_transient( 'surecart_' . md5( 'mac-members' ) . '_version_info' );
 	}
 
 	private function grant_review_capability(): void

@@ -18,6 +18,12 @@ if ( ! defined( 'MAC_MEMBERS_VERSION' ) ) {
 	define( 'MAC_MEMBERS_VERSION', '0.3.0' );
 }
 
+// SureCart licensing public token for the MAC Members product. It isn't a secret: every copy of the plugin
+// carries it. Empty until the product exists in SureCart.
+if ( ! defined( 'MAC_MEMBERS_SURECART_PUBLIC_TOKEN' ) ) {
+	define( 'MAC_MEMBERS_SURECART_PUBLIC_TOKEN', '' );
+}
+
 if ( ! defined( 'MAC_MEMBERS_ADMIN_SLUG' ) ) {
 	define( 'MAC_MEMBERS_ADMIN_SLUG', 'mac-members' );
 }

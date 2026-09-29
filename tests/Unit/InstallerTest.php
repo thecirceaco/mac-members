@@ -112,6 +112,21 @@ final class InstallerTest extends TestCase {
 		self::assertArrayNotHasKey( MAC_MEMBERS_SETTINGS_OPTION, $GLOBALS['mac_members_test_options'] );
 	}
 
+	public function test_uninstall_removes_the_surecart_license_data_only_with_that_setting(): void {
+		$version_info = 'surecart_' . md5( 'mac-members' ) . '_version_info';
+
+		foreach ( array( false, true ) as $delete_data ) {
+			$GLOBALS['mac_members_test_options'][ MAC_MEMBERS_SETTINGS_OPTION ] = array( 'delete_data_on_uninstall' => $delete_data );
+			$GLOBALS['mac_members_test_options']['macmembers_license_options'] = array( 'sc_license_key' => 'key_mac_members' );
+			$GLOBALS['mac_members_test_transients'][ $version_info ]           = array( 'version' => '0.4.0' );
+
+			Installer::uninstall();
+
+			self::assertSame( ! $delete_data, array_key_exists( 'macmembers_license_options', $GLOBALS['mac_members_test_options'] ) );
+			self::assertSame( ! $delete_data, array_key_exists( $version_info, $GLOBALS['mac_members_test_transients'] ) );
+		}
+	}
+
 	public function test_install_creates_the_missing_member_roles_with_read_only(): void {
 		$this->remove_member_roles();
 

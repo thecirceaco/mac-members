@@ -192,6 +192,29 @@ final class SettingsControllerTest extends TestCase {
 		self::assertSame( $sorted, $positions );
 	}
 
+	public function test_settings_page_has_a_settings_tab_and_a_license_tab(): void {
+		$output = $this->render_page( false );
+
+		self::assertStringContainsString(
+			'<nav class="nav-tab-wrapper wp-clearfix" aria-label="MAC Members sections">'
+			. '<a href="https://example.test/wp-admin/options-general.php?page=mac-members" class="nav-tab nav-tab-active" aria-current="page">Settings</a>'
+			. '<a href="https://example.test/wp-admin/options-general.php?page=mac-members&amp;tab=license" class="nav-tab">License</a></nav>',
+			$output
+		);
+		self::assertStringContainsString( 'name="mac_members_action" value="save_settings"', $output );
+	}
+
+	public function test_license_tab_shows_the_license_view_instead_of_the_settings_form(): void {
+		$_GET['tab'] = 'license';
+
+		$output = $this->render_page( true );
+
+		self::assertStringContainsString( '<a href="https://example.test/wp-admin/admin.php?page=mac-members&amp;tab=license" class="nav-tab nav-tab-active" aria-current="page">License</a>', $output );
+		// No public token in the tests, so the view says licensing isn't available.
+		self::assertStringContainsString( 'MAC Members licensing is not available.', $output );
+		self::assertStringNotContainsString( 'save_settings', $output );
+	}
+
 	public function test_email_toggles_share_one_row_for_the_member_and_one_for_the_admin(): void {
 		$output = $this->render_page( false, array( 'send_member_denial_email' => false ) );
 
