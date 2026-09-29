@@ -217,42 +217,33 @@ final class InstallerTest extends TestCase {
 		self::assertArrayNotHasKey( 'mac_members_inactive', $GLOBALS['mac_members_test_roles'] );
 	}
 
-	public function test_uninstall_with_that_setting_removes_only_the_member_roles_that_no_user_holds(): void {
-		$GLOBALS['mac_members_test_users'] = array(
-			new \WP_User( array( 'ID' => 12, 'roles' => array( 'mac_members_approved', 'subscriber' ) ) ),
-		);
+	public function test_uninstall_with_that_setting_keeps_every_role_even_when_no_user_holds_it(): void {
+		( new Installer() )->install();
+		// The registration form and the default role name Member (Pending), and nobody holds a member role.
+		$GLOBALS['mac_members_test_options']['default_role'] = 'mac_members_pending';
+		$GLOBALS['mac_members_test_users']                   = array();
 		$this->turn_on_data_deletion();
 
 		Installer::uninstall();
 
-		self::assertArrayHasKey( 'mac_members_approved', $GLOBALS['mac_members_test_roles'] );
-		self::assertArrayNotHasKey( 'mac_members_pending', $GLOBALS['mac_members_test_roles'] );
-		self::assertArrayNotHasKey( 'mac_members_inactive', $GLOBALS['mac_members_test_roles'] );
-		self::assertArrayNotHasKey( 'mac_members_denied', $GLOBALS['mac_members_test_roles'] );
-		self::assertArrayHasKey( 'subscriber', $GLOBALS['mac_members_test_roles'] );
-		self::assertArrayHasKey( 'administrator', $GLOBALS['mac_members_test_roles'] );
+		foreach ( array( ...array_keys( Roles::defaults() ), Roles::REVIEWER ) as $slug ) {
+			self::assertArrayHasKey( $slug, $GLOBALS['mac_members_test_roles'], $slug );
+		}
+
+		self::assertSame( array( 'read' => true ), $GLOBALS['mac_members_test_roles']['mac_members_pending']['capabilities'] );
 	}
 
-	public function test_uninstall_with_that_setting_removes_the_member_reviewer_role_unless_a_user_holds_it(): void {
-		foreach ( array( false, true ) as $held ) {
-			mac_members_tests_reset_wp_state();
-			( new Installer() )->install();
-			$GLOBALS['mac_members_test_users'] = $held
-				? array( new \WP_User( array( 'ID' => 12, 'roles' => array( 'editor', Roles::REVIEWER ) ) ) )
-				: array();
-			$this->turn_on_data_deletion();
+	public function test_uninstall_with_that_setting_leaves_member_reviewer_without_the_capability_until_the_next_activation(): void {
+		( new Installer() )->install();
+		$this->turn_on_data_deletion();
 
-			Installer::uninstall();
+		Installer::uninstall();
 
-			self::assertSame( $held, array_key_exists( Roles::REVIEWER, $GLOBALS['mac_members_test_roles'] ) );
+		self::assertSame( array(), $GLOBALS['mac_members_test_roles'][ Roles::REVIEWER ]['capabilities'] );
 
-			if ( $held ) {
-				// The role stays for its user, without the capability; activating the plugin again gives it back.
-				self::assertArrayNotHasKey( Capabilities::REVIEW, $GLOBALS['mac_members_test_roles'][ Roles::REVIEWER ]['capabilities'] );
-				( new Installer() )->install();
-				self::assertTrue( $GLOBALS['mac_members_test_roles'][ Roles::REVIEWER ]['capabilities'][ Capabilities::REVIEW ] );
-			}
-		}
+		( new Installer() )->install();
+
+		self::assertTrue( $GLOBALS['mac_members_test_roles'][ Roles::REVIEWER ]['capabilities'][ Capabilities::REVIEW ] );
 	}
 
 	public function test_uninstall_removes_lock_rows_left_by_requests_that_died(): void {

@@ -199,7 +199,7 @@ final class SettingsSchema
 				'default'     => false,
 				'section'     => 'plugin',
 				'option'      => __( 'Delete plugin data on uninstall', 'mac-members' ),
-				'description' => __( 'When the plugin is deleted, also remove its settings, the review capability and the member roles that no user holds. Roles that users still hold stay.', 'mac-members' ),
+				'description' => __( 'When the plugin is deleted, also remove its settings, its license and the review capability. Its roles always stay, because a registration form or the default role for new users may still name them.', 'mac-members' ),
 			),
 		);
 	}

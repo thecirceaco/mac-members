@@ -28,12 +28,6 @@ final class SettingsController implements Service
 	private const ACTION_SAVE_SETTINGS = 'save_settings';
 
 	/**
-	 * The setting that decides whether deleting the plugin removes its data. The page shows how many users
-	 * hold each member role next to it, because roles in use are kept.
-	 */
-	private const DELETE_DATA_SETTING = 'delete_data_on_uninstall';
-
-	/**
 	 * Whether this request registered the page as a top-level menu item, or under Settings.
 	 */
 	private ?bool $top_level = null;
@@ -313,7 +307,7 @@ final class SettingsController implements Service
 			$output .= SettingsSchema::TYPE_ROLES === $field['type']
 				? '<tr><th scope="row">' . esc_html( $field['label'] ) . '</th>'
 				: '<tr><th scope="row"><label for="mac-members-' . esc_attr( $key ) . '">' . esc_html( $field['label'] ) . '</label></th>';
-			$output .= '<td>' . $this->render_field( $key, $field, $settings[ $key ] ?? null ) . $this->render_description( $key, $field ) . ( self::DELETE_DATA_SETTING === $key ? $this->render_member_role_usage() : '' ) . '</td></tr>';
+			$output .= '<td>' . $this->render_field( $key, $field, $settings[ $key ] ?? null ) . $this->render_description( $key, $field ) . '</td></tr>';
 		}
 
 		return $output;
@@ -348,36 +342,6 @@ final class SettingsController implements Service
 			SettingsSchema::TYPE_FIELDS => $this->render_textarea( $key, (string) $value, (int) ( $field['rows'] ?? 6 ), isset( $field['description'] ) ),
 			default                     => '',
 		};
-	}
-
-	/**
-	 * How many users hold each member role, so the admin sees which roles deleting the plugin would keep.
-	 */
-	private function render_member_role_usage(): string
-	{
-		$usage = Roles::usage();
-
-		if ( array() === $usage ) {
-			return '';
-		}
-
-		$counts = array();
-		$held   = false;
-
-		foreach ( $usage as $role ) {
-			/* translators: 1: role name, 2: number of users. */
-			$counts[] = sprintf( __( '%1$s: %2$s', 'mac-members' ), $role['name'], \number_format_i18n( $role['users'] ) );
-			$held     = $held || 0 < $role['users'];
-		}
-
-		$outcome = $held
-			? __( 'The roles that users hold stay when the plugin is deleted.', 'mac-members' )
-			: __( 'No user holds a member role, so deleting the plugin with this setting on removes them all.', 'mac-members' );
-
-		/* translators: %s: comma-separated list of member roles and their number of users. */
-		$summary = sprintf( __( 'Users per member role: %s.', 'mac-members' ), implode( ', ', $counts ) );
-
-		return '<p class="description mac-members-role-usage">' . esc_html( $summary . ' ' . $outcome ) . '</p>';
 	}
 
 	private function render_description( string $key, array $field ): string

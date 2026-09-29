@@ -266,7 +266,7 @@ final class SettingsControllerTest extends TestCase {
 		// A short row title, and the full sentence next to the checkbox.
 		self::assertStringContainsString( '<th scope="row"><label for="mac-members-delete_data_on_uninstall">Delete plugin data</label></th>', $output );
 		self::assertStringContainsString( '<input type="checkbox" id="mac-members-delete_data_on_uninstall" name="mac_members_settings[delete_data_on_uninstall]" value="1" aria-describedby="mac-members-delete_data_on_uninstall-description"> Delete plugin data on uninstall</label>', $output );
-		self::assertStringContainsString( '<p class="description" id="mac-members-delete_data_on_uninstall-description">When the plugin is deleted, also remove its settings, the review capability and the member roles that no user holds.', $output );
+		self::assertStringContainsString( '<p class="description" id="mac-members-delete_data_on_uninstall-description">When the plugin is deleted, also remove its settings, its license and the review capability. Its roles always stay, because a registration form or the default role for new users may still name them.</p>', $output );
 		self::assertStringContainsString( '<th scope="row"><label for="mac-members-top_level_menu">Top-level admin menu</label></th>', $output );
 		self::assertStringContainsString( 'name="mac_members_settings[top_level_menu]" value="1"> Show MAC Members as a top-level admin menu item</label>', $output );
 	}
@@ -305,28 +305,6 @@ final class SettingsControllerTest extends TestCase {
 		self::assertStringContainsString( '<select id="mac-members-table_size" name="mac_members_settings[table_size]" aria-describedby="mac-members-table_size-description"><option value="medium">Medium</option><option value="small" selected="selected">Small</option></select>', $output );
 		self::assertStringContainsString( '<th scope="row"><label for="mac-members-table_size">Interface scale</label></th>', $output );
 		self::assertStringContainsString( '<p class="description" id="mac-members-table_size-description">The text and button size of the members table, its controls and its modal.', $output );
-	}
-
-	public function test_uninstall_setting_shows_how_many_users_hold_each_member_role(): void {
-		$GLOBALS['mac_members_test_users'] = array(
-			new \WP_User( array( 'ID' => 1, 'roles' => array( 'mac_members_approved' ) ) ),
-			new \WP_User( array( 'ID' => 2, 'roles' => array( 'mac_members_approved', 'subscriber' ) ) ),
-			new \WP_User( array( 'ID' => 3, 'roles' => array( 'mac_members_pending' ) ) ),
-		);
-
-		self::assertStringContainsString(
-			'<p class="description mac-members-role-usage">Users per member role: Member (Pending): 1, Member: 2, Member (Inactive): 0, Member (Denied): 0. The roles that users hold stay when the plugin is deleted.</p>',
-			$this->render_page( false )
-		);
-	}
-
-	public function test_uninstall_setting_says_when_no_user_holds_a_member_role(): void {
-		unset( $GLOBALS['mac_members_test_roles']['mac_members_denied'] );
-
-		self::assertStringContainsString(
-			'Users per member role: Member (Pending): 0, Member: 0, Member (Inactive): 0. No user holds a member role, so deleting the plugin with this setting on removes them all.',
-			$this->render_page( false )
-		);
 	}
 
 	public function test_save_redirects_back_to_the_page_with_the_notices_in_a_transient(): void {

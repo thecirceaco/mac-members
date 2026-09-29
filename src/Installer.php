@@ -90,9 +90,12 @@ final class Installer implements Service
 	 *
 	 * The per-user lock rows always go, because they only exist while a status change runs. Everything else
 	 * stays, like in MAC Core, unless "Delete plugin data on uninstall" is on. Then the settings, the install
-	 * version, the review capability, the member and Member Reviewer roles that no user holds, and the SureCart
-	 * license and update data go too. Roles that users still hold stay, so nobody is left without a role;
-	 * activating the plugin again gives the Member Reviewer role its capability back.
+	 * version, the review capability and the SureCart license and update data go too.
+	 *
+	 * The member roles and the Member Reviewer role always stay, even when no user holds them. A registration
+	 * form or the default role for new users may still name Member (Pending), and a role that no longer exists
+	 * shows there as another one: WS Form's role list starts with Administrator, and the next save of the form
+	 * stores it. Activating the plugin again gives the Member Reviewer role its capability back.
 	 */
 	public static function uninstall(): void
 	{
@@ -108,7 +111,6 @@ final class Installer implements Service
 			$role->remove_cap( Capabilities::REVIEW );
 		}
 
-		Roles::remove_unused();
 		\delete_option( self::VERSION_OPTION );
 		\delete_option( MAC_MEMBERS_SETTINGS_OPTION );
 		// The SureCart SDK names these after the product name and the plugin slug.
