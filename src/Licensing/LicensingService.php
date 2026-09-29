@@ -98,8 +98,9 @@ final class LicensingService implements Service
 	}
 
 	/**
-	 * The SureCart product's public token, from MAC_MEMBERS_SURECART_PUBLIC_TOKEN or the
-	 * mac_members_surecart_public_token filter. It isn't a secret: every copy of the plugin carries it.
+	 * The SureCart store's public token, from MAC_MEMBERS_SURECART_PUBLIC_TOKEN or the
+	 * mac_members_surecart_public_token filter. The license key decides the product. The token isn't a secret:
+	 * every copy of the plugin carries it.
 	 */
 	private function get_public_token(): string
 	{

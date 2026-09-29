@@ -162,7 +162,7 @@ Deleting the plugin from the Plugins screen keeps its data, like MAC Core, unles
 MAC Members gets its updates from SureCart, like MAC Core. Enter the license key from SureCart in the License tab of the settings page. With an active license, WordPress offers new versions under Dashboard > Updates, and "View details" shows the changelog from `release.json`. Only users with `manage_options` see and change the license.
 
 - The bundled SureCart licensing SDK v1.2.1 is in `inc/Vendor/SureCart/Licensing/`, with the MAC Members namespace and one patch that keeps the SDK from adding its own menu page; its README lists both changes.
-- `MAC_MEMBERS_SURECART_PUBLIC_TOKEN` in `inc/constants.php` holds the public token of the MAC Members product in SureCart, and the `mac_members_surecart_public_token` filter can replace it. Without a token, administrators see a notice and the License tab says licensing isn't available.
+- `MAC_MEMBERS_SURECART_PUBLIC_TOKEN` in `inc/constants.php` holds the public token of the Circea SureCart store, the same as MAC Core's, and the `mac_members_surecart_public_token` filter can replace it. The license key decides the product. Without a token, administrators see a notice and the License tab says licensing isn't available.
 - `Update URI` is `https://updates.circea.co/mac-members/`, a Circea name WordPress never requests, so no other updater plugin can supply MAC Members.
 - "Delete plugin data" also removes the stored license and the cached update details.
 - Each release ZIP also goes to the MAC Members product in SureCart by hand; `release.json` carries the version and the changelog SureCart shows, and the release check requires its version to match the tag.
