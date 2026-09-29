@@ -62,7 +62,7 @@ enum MemberTransition: string
 
 	/**
 	 * Automatic.css button classes, in the site's ACSS status colors: solid success to approve and danger to
-	 * deny, the review decisions, and outline warning to deactivate and info to reactivate, so the long lists
+	 * deny, the review decisions, and the same colors in outline to reactivate and deactivate, so the long lists
 	 * of approved members stay calm.
 	 */
 	public function button_classes(): string
@@ -70,8 +70,8 @@ enum MemberTransition: string
 		return match ( $this ) {
 			self::Approve    => 'btn--success btn--s',
 			self::Deny       => 'btn--danger btn--s',
-			self::Deactivate => 'btn--warning btn--outline btn--s',
-			self::Reactivate => 'btn--info btn--outline btn--s',
+			self::Deactivate => 'btn--danger btn--outline btn--s',
+			self::Reactivate => 'btn--success btn--outline btn--s',
 		};
 	}
 

@@ -218,13 +218,13 @@ final class MembersTableShortcode implements Service
 	}
 
 	/**
-	 * @return string The table size from the settings: mixed, small or medium.
+	 * @return string The table size from the settings: medium or small.
 	 */
 	private function get_size(): string
 	{
-		$size = (string) $this->settings->get( 'table_size', 'mixed' );
+		$size = (string) $this->settings->get( 'table_size', 'medium' );
 
-		return in_array( $size, SettingsSchema::TABLE_SIZES, true ) ? $size : 'mixed';
+		return in_array( $size, SettingsSchema::TABLE_SIZES, true ) ? $size : 'medium';
 	}
 
 	/**

@@ -252,8 +252,8 @@ final class SettingsControllerTest extends TestCase {
 		$controller->render_settings_page();
 		$output = (string) ob_get_clean();
 
-		self::assertStringContainsString( '<select id="mac-members-table_size" name="mac_members_settings[table_size]" aria-describedby="mac-members-table_size-description"><option value="mixed">Mixed</option><option value="small" selected="selected">Small</option><option value="medium">Medium</option></select>', $output );
-		self::assertStringContainsString( '<p class="description" id="mac-members-table_size-description">Mixed: the search, the dropdowns and the page size and range under the table in the normal text size', $output );
+		self::assertStringContainsString( '<select id="mac-members-table_size" name="mac_members_settings[table_size]" aria-describedby="mac-members-table_size-description"><option value="medium">Medium</option><option value="small" selected="selected">Small</option></select>', $output );
+		self::assertStringContainsString( '<p class="description" id="mac-members-table_size-description">Medium puts the table, its controls and its buttons in the normal text size, Small in the small one.', $output );
 	}
 
 	public function test_uninstall_setting_shows_how_many_users_hold_each_member_role(): void {

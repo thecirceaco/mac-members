@@ -164,8 +164,8 @@ final class MembersTableShortcodeTest extends TestCase {
 
 		self::assertStringContainsString( 'data-mac-members-view="all"', $output );
 		self::assertMatchesRegularExpression( '/data-mac-members-user-id="1" data-mac-members-status="pending">.*data-mac-members-action="approve".*data-mac-members-action="deny"/s', $output );
-		self::assertStringContainsString( 'class="mac-members-button mac-members-button--deactivate btn--warning btn--outline btn--s" data-mac-members-action="deactivate" data-mac-members-user-id="2"', $output );
-		self::assertStringContainsString( 'class="mac-members-button mac-members-button--reactivate btn--info btn--outline btn--s" data-mac-members-action="reactivate" data-mac-members-user-id="3"', $output );
+		self::assertStringContainsString( 'class="mac-members-button mac-members-button--deactivate btn--danger btn--outline btn--s" data-mac-members-action="deactivate" data-mac-members-user-id="2"', $output );
+		self::assertStringContainsString( 'class="mac-members-button mac-members-button--reactivate btn--success btn--outline btn--s" data-mac-members-action="reactivate" data-mac-members-user-id="3"', $output );
 		self::assertStringContainsString( 'data-mac-members-action="approve" data-mac-members-user-id="4"', $output );
 		self::assertStringNotContainsString( 'data-mac-members-action="deny" data-mac-members-user-id="4"', $output );
 		self::assertStringNotContainsString( 'data-mac-members-user-id="5"', $output );
@@ -248,10 +248,11 @@ final class MembersTableShortcodeTest extends TestCase {
 	 */
 	public static function provide_table_sizes(): array {
 		return array(
-			'mixed by default' => array( null, 'mac-members-table--mixed' ),
-			'small'            => array( 'small', 'mac-members-table--small' ),
-			'medium'           => array( 'medium', 'mac-members-table--medium' ),
-			'unknown'          => array( 'huge', 'mac-members-table--mixed' ),
+			'medium by default'  => array( null, 'mac-members-table--medium' ),
+			'small'              => array( 'small', 'mac-members-table--small' ),
+			'medium'             => array( 'medium', 'mac-members-table--medium' ),
+			'the old mixed size' => array( 'mixed', 'mac-members-table--medium' ),
+			'unknown'            => array( 'huge', 'mac-members-table--medium' ),
 		);
 	}
 
@@ -685,7 +686,7 @@ final class MembersTableShortcodeTest extends TestCase {
 
 		$output = $this->create_shortcode()->render();
 
-		self::assertStringContainsString( 'class="mac-members-table mac-members-table--mixed"', $output );
+		self::assertStringContainsString( 'class="mac-members-table mac-members-table--medium"', $output );
 		self::assertStringContainsString( 'class="mac-members-list"', $output );
 		self::assertStringContainsString( 'data-mac-members-user-id="123"', $output );
 		self::assertStringContainsString( 'pending@example.test', $output );

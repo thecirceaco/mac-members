@@ -29,7 +29,7 @@ final class MembersTableRenderer
 	 * @param string                                                 $render_token Token that status changes from this table must send.
 	 * @param array{action?:string,hidden?:array<string,string>,roles?:array<string,string>,role?:string,search?:string} $search_form Role and search form; empty hides it.
 	 * @param array<int,string>                                      $hidden_columns Keys of the columns the viewer hid.
-	 * @param string                                                 $size Table size: mixed, small or medium.
+	 * @param string                                                 $size Table size: medium or small.
 	 */
 	public function render(
 		array $rows,
@@ -40,7 +40,7 @@ final class MembersTableRenderer
 		string $render_token = '',
 		array $search_form = array(),
 		array $hidden_columns = array(),
-		string $size = 'mixed'
+		string $size = 'medium'
 	): string {
 		$body     = $this->render_rows( $rows );
 		$narrowed = '' !== ( $search_form['role'] ?? '' ) || '' !== ( $search_form['search'] ?? '' );

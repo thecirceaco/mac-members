@@ -26,7 +26,7 @@ final class SettingsSchema
 	/**
 	 * Sizes of the members table: see the "Members table size" setting.
 	 */
-	public const TABLE_SIZES = array( 'mixed', 'small', 'medium' );
+	public const TABLE_SIZES = array( 'medium', 'small' );
 
 	/**
 	 * @return array<string,array{label:string,type:string,default:mixed,description?:string,choices?:array<string,string>}>
@@ -63,12 +63,12 @@ final class SettingsSchema
 			'table_size' => array(
 				'label'       => __( 'Members table size', 'mac-members' ),
 				'type'        => self::TYPE_CHOICE,
-				'default'     => 'mixed',
+				'default'     => 'medium',
 				'choices'     => array_combine(
 					self::TABLE_SIZES,
-					array( __( 'Mixed', 'mac-members' ), __( 'Small', 'mac-members' ), __( 'Medium', 'mac-members' ) )
+					array( __( 'Medium', 'mac-members' ), __( 'Small', 'mac-members' ) )
 				),
-				'description' => __( 'Mixed: the search, the dropdowns and the page size and range under the table in the normal text size, and the table, the column checkboxes and the buttons small. Small: everything small. Medium: everything in the normal text size.', 'mac-members' ),
+				'description' => __( 'Medium puts the table, its controls and its buttons in the normal text size, Small in the small one.', 'mac-members' ),
 			),
 			'admin_notification_email' => array(
 				'label'   => __( 'Admin notification email', 'mac-members' ),
