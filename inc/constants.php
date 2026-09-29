@@ -15,7 +15,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 if ( ! defined( 'MAC_MEMBERS_VERSION' ) ) {
-	define( 'MAC_MEMBERS_VERSION', '0.5.0' );
+	define( 'MAC_MEMBERS_VERSION', '0.5.1' );
 }
 
 // Public token of the Circea SureCart store, the same as MAC Core's. The license key decides the product. It
