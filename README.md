@@ -40,7 +40,7 @@ The four roles must be different roles, and none of them may grant administrativ
 
 The settings page also includes:
 
-- roles hidden from the members table, `administrator` by default (see Members Table below)
+- roles hidden from the members table, none checked by default (see Members Table below)
 - admin notification email
 - from email
 - member and admin approval email toggles
@@ -71,7 +71,9 @@ The table has a filter for each status (Pending, Approved, Inactive, Denied) and
 
 Every view lists the newest registrations first. The columns are User ID, Email, First Name, Last Name, Username, Registered, Last Login, Details, Status, Roles and Actions. Roles lists the member's roles other than the status roles, for example Officer or Trustee, and the Actions column has only the status changes the member's status allows.
 
-"View details" in the Details column opens a dialog with the row's fields, in the table's order, followed by the fields the "Member details fields" setting lists. Admins use the same dialog; the table doesn't link to the WordPress profile screen. Close, Escape or a click outside the dialog closes it. Each row carries its details in a `<template>`, escaped on the server, and the script only copies that template into the dialog, so opening it sends no request and a value can't add markup.
+"View details" in the Details column opens a dialog with the row's fields, in the table's order, followed by the fields the "Member details fields" setting lists. Admins use the same dialog; the table doesn't link to the WordPress profile screen. Close, Escape or a click outside the dialog closes it. While it is open, only the dialog scrolls: the page gets `overflow: hidden`, and `scrollbar-gutter: stable` keeps it from shifting where its scrollbar was. Each row carries its details in a `<template>`, escaped on the server, and the script only copies that template into the dialog, so opening it sends no request and a value can't add markup.
+
+The dialog's footer has the row's status buttons, the full width of the dialog. A change made there closes the dialog, and the table shows the result as it does for the row's own buttons; an error shows in the footer, since the table's notices are behind the dialog.
 
 The "Member details fields" setting lists the extra fields, one per line or comma-separated, each a user meta key, a colon and a label:
 
@@ -102,7 +104,9 @@ When the table fits its frame, the header sticks to the page, under the admin ba
 
 The "Members table size" setting sets the text and button size: Medium, the default, puts the table, its controls and its buttons in `--text-m`, and Small in `--text-s`. The buttons keep ACSS's `btn--s` class, and Medium sets ACSS's `--btn-font-size`.
 
-Users who hold a hidden role never show in the members table: not in its rows, its counts, its search or its role filter, so nobody can change their status there. The "Roles hidden from the members table" setting names the hidden roles by slug or name, or by a capability they have, for example `administrator, manage_options, officer`; it is `administrator` by default. The four status roles cannot be hidden, so a name like "Member" cannot empty a whole view. The table leaves those users out with `role__not_in` in every user query.
+Users who hold a hidden role never show in the members table: not in its rows, its counts, its search or its role filter, so nobody can change their status there. The "Roles hidden from the members table" setting has a checkbox for each role except the four status roles, which cannot be hidden; none is checked by default. Roles with any of the sensitive capabilities listed under Settings, like Administrator and Editor (which has `unfiltered_html`), are always hidden, because status changes refuse their users anyway; their checkboxes show checked and disabled. The table leaves those users out with `role__not_in` in every user query. Development builds kept this setting as comma-separated text; its role slugs and names carry over, and its capabilities are dropped.
+
+The table and the dialog use only ACSS tokens and button classes, and ACSS 4 defines its colors with `light-dark()`, so they follow the color scheme of the page or section around them: the site's scheme, a `scheme--dark` or `scheme--light` section, or the visitor's device when ACSS's scheme is auto. The dialog's backdrop stays black in both. How ACSS's main colors look in the dark scheme, for example the neutral buttons, comes from the site's ACSS settings.
 
 Last Login shows only while MAC Core is active and its "Show last login column" setting is on. MAC Core then records the time of each login through a login form in the `mac_core_last_login` user meta, and MAC Members only reads it; the cell is empty for a member without a recorded login. The column starts hidden, and its checkbox shows it. MAC Members detects MAC Core by its `MAC_CORE_VERSION` constant and reads the setting from the `mac_core_settings` option, so if that option changes shape, the column stops showing rather than failing. The table loads the user meta of every member on the page in one query.
 

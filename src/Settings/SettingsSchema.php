@@ -20,7 +20,7 @@ final class SettingsSchema
 	public const TYPE_ROLE   = 'role';
 	public const TYPE_EMAIL  = 'email';
 	public const TYPE_TOGGLE = 'toggle';
-	public const TYPE_LIST   = 'list';
+	public const TYPE_ROLES  = 'roles';
 	public const TYPE_CHOICE = 'choice';
 	public const TYPE_FIELDS = 'fields';
 
@@ -62,9 +62,9 @@ final class SettingsSchema
 			),
 			'hidden_roles' => array(
 				'label'       => __( 'Roles hidden from the members table', 'mac-members' ),
-				'type'        => self::TYPE_LIST,
-				'default'     => 'administrator',
-				'description' => __( 'Comma-separated role slugs, role names or capabilities, for example administrator, manage_options. Users who hold a matching role, or a role with one of these capabilities, never show in the members table, its counts, its search or its role filter, so nobody can change their status there. The four status roles cannot be hidden.', 'mac-members' ),
+				'type'        => self::TYPE_ROLES,
+				'default'     => array(),
+				'description' => __( 'Users who hold a checked role never show in the members table, its counts, its search or its role filter, so nobody can change their status there. Roles with administrative capabilities, like Administrator and Editor, are always hidden, because the plugin never changes their users. The four status roles cannot be hidden.', 'mac-members' ),
 			),
 			'table_size' => array(
 				'label'       => __( 'Members table size', 'mac-members' ),
@@ -186,6 +186,14 @@ final class SettingsSchema
 	}
 
 	/**
+	 * @return array<int,string>
+	 */
+	public function get_roles_fields(): array
+	{
+		return $this->get_fields_by_type( self::TYPE_ROLES );
+	}
+
+	/**
 	 * Reads the member details fields: one "key : label" per line or comma-separated, the label optional.
 	 *
 	 * @return array<int,array{key:string,label:string}>
@@ -213,7 +221,8 @@ final class SettingsSchema
 	}
 
 	/**
-	 * Splits a comma-separated list into its trimmed, non-empty entries.
+	 * Splits a comma-separated list into its trimmed, non-empty entries. Development builds kept the hidden roles
+	 * as such a list.
 	 *
 	 * @return array<int,string>
 	 */

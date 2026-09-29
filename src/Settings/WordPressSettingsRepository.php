@@ -212,7 +212,7 @@ final class WordPressSettingsRepository implements SettingsRepositoryInterface
 				SettingsSchema::TYPE_ROLE   => $this->sanitize_role( $value, $fallback[ $key ] ?? $field['default'] ),
 				SettingsSchema::TYPE_EMAIL  => $this->sanitize_email( $value ),
 				SettingsSchema::TYPE_TOGGLE => $this->sanitize_toggle( $value ),
-				SettingsSchema::TYPE_LIST   => $this->sanitize_list( $value, (string) $field['default'] ),
+				SettingsSchema::TYPE_ROLES  => $this->sanitize_roles( $value ),
 				SettingsSchema::TYPE_CHOICE => $this->sanitize_choice( $value, array_keys( $field['choices'] ?? array() ), (string) $field['default'] ),
 				SettingsSchema::TYPE_FIELDS => $this->sanitize_fields( $value, (string) $field['default'] ),
 				default                     => $field['default'],
@@ -232,8 +232,13 @@ final class WordPressSettingsRepository implements SettingsRepositoryInterface
 			return $input[ $key ];
 		}
 
+		// A form leaves out unchecked checkboxes, so a missing toggle is off and missing roles are none.
 		if ( $for_save && in_array( $key, $this->schema->get_toggle_fields(), true ) ) {
 			return false;
+		}
+
+		if ( $for_save && in_array( $key, $this->schema->get_roles_fields(), true ) ) {
+			return array();
 		}
 
 		return $fallback[ $key ] ?? null;
@@ -313,26 +318,25 @@ final class WordPressSettingsRepository implements SettingsRepositoryInterface
 	}
 
 	/**
-	 * A comma-separated list with each entry cleaned, cut to 100 characters and listed once, at most 50
-	 * entries. A value that is not text falls back to the default.
+	 * The slugs of existing roles, each once, sorted by slug. Development builds kept the
+	 * hidden roles as comma-separated slugs, names or capabilities: their slugs and names count, and the
+	 * capabilities are dropped.
+	 *
+	 * @return array<int,string>
 	 */
-	private function sanitize_list( mixed $value, string $default ): string
+	private function sanitize_roles( mixed $value ): array
 	{
-		if ( ! \is_scalar( $value ) ) {
-			return $default;
-		}
+		$entries = \is_array( $value ) ? $value : SettingsSchema::parse_list( \is_scalar( $value ) ? (string) $value : '' );
+		$entries = array_map( static fn ( mixed $entry ): string => \is_scalar( $entry ) ? strtolower( trim( (string) $entry ) ) : '', $entries );
+		$roles   = array();
 
-		$entries = array();
-
-		foreach ( SettingsSchema::parse_list( (string) $value ) as $entry ) {
-			$entry = mb_substr( \sanitize_text_field( $entry ), 0, 100 );
-
-			if ( '' !== $entry && ! in_array( strtolower( $entry ), array_map( 'strtolower', $entries ), true ) ) {
-				$entries[] = $entry;
+		foreach ( $this->get_available_roles() as $slug => $name ) {
+			if ( in_array( $slug, $entries, true ) || in_array( strtolower( $name ), $entries, true ) ) {
+				$roles[] = $slug;
 			}
 		}
 
-		return implode( ', ', array_slice( $entries, 0, 50 ) );
+		return $roles;
 	}
 
 	private function get_site_admin_email(): string

@@ -79,29 +79,32 @@ final class SettingsRepositoryTest extends TestCase {
 		);
 	}
 
-	public function test_hidden_roles_default_to_administrator(): void {
-		self::assertSame( 'administrator', $this->create_repository()->all()['hidden_roles'] );
+	public function test_no_roles_are_chosen_as_hidden_by_default(): void {
+		self::assertSame( array(), $this->create_repository()->all()['hidden_roles'] );
 	}
 
-	public function test_hidden_roles_carry_over_from_the_development_setting_name(): void {
-		$GLOBALS['mac_members_test_options'][ MAC_MEMBERS_SETTINGS_OPTION ] = array( 'role_filter_exclusions' => 'administrator, officer' );
+	public function test_hidden_roles_carry_over_from_the_development_setting_name_and_text(): void {
+		$GLOBALS['mac_members_test_roles']['officer']                      = array( 'name' => 'Officer', 'capabilities' => array( 'read' => true ) );
+		$GLOBALS['mac_members_test_options'][ MAC_MEMBERS_SETTINGS_OPTION ] = array( 'role_filter_exclusions' => 'Officer, administrator, manage_options' );
 
-		self::assertSame( 'administrator, officer', $this->create_repository()->all()['hidden_roles'] );
+		// Slugs and names count; the capability is dropped.
+		self::assertSame( array( 'administrator', 'officer' ), $this->create_repository()->all()['hidden_roles'] );
 	}
 
 	public function test_validate_roles_rejects_a_pending_role_with_sensitive_capabilities(): void {
 		self::assertArrayHasKey( 'pending_role_sensitive', $this->create_repository()->validate_roles( array( 'pending_role' => 'administrator' ) ) );
 	}
 
-	public function test_hidden_roles_are_saved_as_a_clean_comma_separated_list(): void {
-		$repository = $this->create_repository();
+	public function test_hidden_roles_are_saved_as_existing_role_slugs_once_each(): void {
+		$GLOBALS['mac_members_test_roles']['officer'] = array( 'name' => 'Officer', 'capabilities' => array( 'read' => true ) );
+		$repository                                   = $this->create_repository();
 
 		self::assertSame(
-			'administrator, manage_options, Shop Steward',
-			$repository->save( array( 'hidden_roles' => ' administrator,, manage_options , <b>Shop Steward</b>, ADMINISTRATOR ' ) )['hidden_roles']
+			array( 'officer', 'subscriber' ),
+			$repository->save( array( 'hidden_roles' => array( 'subscriber', 'not-a-role', '<b>officer</b>', 'officer', 'subscriber', array( 'officer' ) ) ) )['hidden_roles']
 		);
-		self::assertSame( '', $repository->save( array( 'hidden_roles' => '' ) )['hidden_roles'] );
-		self::assertSame( 'administrator', $repository->save( array( 'hidden_roles' => array( 'editor' ) ) )['hidden_roles'] );
+		// The form leaves out unchecked checkboxes: no hidden roles were sent, so none are hidden.
+		self::assertSame( array(), $repository->save( array() )['hidden_roles'] );
 	}
 
 	public function test_save_accepts_existing_role_slugs_only(): void {

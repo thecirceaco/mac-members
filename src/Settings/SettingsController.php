@@ -163,7 +163,10 @@ final class SettingsController implements Service
 
 		foreach ( $this->schema->get_fields() as $key => $field ) {
 			echo '<tr>';
-			echo '<th scope="row"><label for="mac-members-' . esc_attr( $key ) . '">' . esc_html( $field['label'] ) . '</label></th>';
+			// A group of checkboxes has its own legend instead of a label.
+			echo SettingsSchema::TYPE_ROLES === $field['type']
+				? '<th scope="row">' . esc_html( $field['label'] ) . '</th>'
+				: '<th scope="row"><label for="mac-members-' . esc_attr( $key ) . '">' . esc_html( $field['label'] ) . '</label></th>';
 			// phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- render_field() returns escaped admin form controls.
 			echo '<td>' . $this->render_field( $key, $field, $settings[ $key ] ?? null ) . $this->render_description( $key, $field ) . ( self::DELETE_DATA_SETTING === $key ? $this->render_member_role_usage() : '' ) . '</td>';
 			echo '</tr>';
@@ -225,7 +228,7 @@ final class SettingsController implements Service
 			SettingsSchema::TYPE_ROLE   => $this->render_role_select( $key, (string) $value ),
 			SettingsSchema::TYPE_EMAIL  => $this->render_email_input( $key, (string) $value ),
 			SettingsSchema::TYPE_TOGGLE => $this->render_toggle( $key, (bool) $value, (string) $field['label'], isset( $field['description'] ) ),
-			SettingsSchema::TYPE_LIST   => $this->render_list_input( $key, (string) $value, isset( $field['description'] ) ),
+			SettingsSchema::TYPE_ROLES  => $this->render_role_checkboxes( $key, (array) $value, (string) $field['label'], isset( $field['description'] ) ),
 			SettingsSchema::TYPE_CHOICE => $this->render_choice_select( $key, (string) $value, $field['choices'] ?? array(), isset( $field['description'] ) ),
 			SettingsSchema::TYPE_FIELDS => $this->render_textarea( $key, (string) $value, (int) ( $field['rows'] ?? 6 ), isset( $field['description'] ) ),
 			default                     => '',
@@ -293,11 +296,30 @@ final class SettingsController implements Service
 		return '<textarea class="large-text code" id="mac-members-' . esc_attr( $key ) . '" name="mac_members_settings[' . esc_attr( $key ) . ']" rows="' . esc_attr( (string) $rows ) . '"' . $describedby . '>' . esc_textarea( $value ) . '</textarea>';
 	}
 
-	private function render_list_input( string $key, string $value, bool $described ): string
+	/**
+	 * A checkbox for each role that can be hidden. The status roles cannot, so they are left out. Roles with
+	 * administrative capabilities are always hidden, so their checkboxes show checked and disabled.
+	 *
+	 * @param array<int,string> $value The checked role slugs.
+	 */
+	private function render_role_checkboxes( string $key, array $value, string $label, bool $described ): string
 	{
-		$describedby = $described ? ' aria-describedby="mac-members-' . esc_attr( $key ) . '-description"' : '';
+		$describedby  = $described ? ' aria-describedby="mac-members-' . esc_attr( $key ) . '-description"' : '';
+		$status_roles = array_map( fn ( string $field ): string => (string) $this->settings->get( $field, '' ), $this->schema->get_role_fields() );
+		$output       = '<fieldset id="mac-members-' . esc_attr( $key ) . '"' . $describedby . '><legend class="screen-reader-text">' . esc_html( $label ) . '</legend>';
 
-		return '<input type="text" class="regular-text" id="mac-members-' . esc_attr( $key ) . '" name="mac_members_settings[' . esc_attr( $key ) . ']" value="' . esc_attr( $value ) . '"' . $describedby . '>';
+		foreach ( $this->settings->get_available_roles() as $slug => $name ) {
+			if ( in_array( $slug, $status_roles, true ) ) {
+				continue;
+			}
+
+			$always  = array() !== Capabilities::sensitive_capabilities_of_role( $slug );
+			$output .= '<label><input type="checkbox" name="mac_members_settings[' . esc_attr( $key ) . '][]" value="' . esc_attr( $slug ) . '"' . $this->checked_attr( $always || in_array( $slug, $value, true ) ) . ( $always ? ' disabled' : '' ) . '> ' . esc_html( \translate_user_role( $name ) ) . '</label>';
+			$output .= $always ? ' <span class="description">' . esc_html__( '(always hidden)', 'mac-members' ) . '</span>' : '';
+			$output .= '<br>';
+		}
+
+		return $output . '</fieldset>';
 	}
 
 	/**

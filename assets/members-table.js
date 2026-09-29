@@ -28,9 +28,8 @@
 		return '';
 	};
 
-	const showNotice = (root, type, message) => {
-		const notices = root.querySelector('.mac-members-notices');
-
+	// Shows a message in a notices area: the table's, or the member details dialog's.
+	const showNotice = (notices, type, message) => {
 		if (!notices) {
 			return;
 		}
@@ -48,6 +47,34 @@
 		row.querySelectorAll('button').forEach((button) => {
 			button.disabled = isProcessing;
 		});
+	};
+
+	const findRow = (root, userId) => [...root.querySelectorAll(rowSelector)].find((row) => row.dataset.macMembersUserId === userId) || null;
+
+	// The member details dialog, while it still shows this member.
+	const dialogFor = (dialog, userId) => (dialog && dialog.open && dialog.dataset.macMembersDetailsUserId === userId ? dialog : null);
+
+	const setDialogProcessing = (dialog, isProcessing) => {
+		if (!dialog) {
+			return;
+		}
+
+		dialog.querySelectorAll('[data-mac-members-details-actions] button').forEach((button) => {
+			button.disabled = isProcessing;
+		});
+	};
+
+	// Fills the member details dialog from a row: the details from its template, the footer's buttons from its
+	// Actions cell.
+	const fillDetails = (dialog, row) => {
+		const template = row.querySelector('template[data-mac-members-details]');
+		const actions = row.querySelector('.mac-members-actions');
+
+		dialog.dataset.macMembersDetailsUserId = row.dataset.macMembersUserId || '';
+		dialog.querySelector('.mac-members-details__title').textContent = template.dataset.macMembersDetailsTitle || '';
+		dialog.querySelector('[data-mac-members-details-body]').replaceChildren(template.content.cloneNode(true));
+		dialog.querySelector('[data-mac-members-details-notices]').replaceChildren();
+		dialog.querySelector('[data-mac-members-details-actions]').replaceChildren(...(actions ? [...actions.children].map((button) => button.cloneNode(true)) : []));
 	};
 
 	const showEmptyStateIfNeeded = (root) => {
@@ -224,6 +251,8 @@
 		};
 	};
 
+	// The status buttons of a row, and their copies in the member details dialog's footer. A change made from the
+	// dialog closes it, and the table shows the result; an error shows in the dialog.
 	document.addEventListener('click', async (event) => {
 		const button = event.target.closest(actionSelector);
 
@@ -232,7 +261,9 @@
 		}
 
 		const root = button.closest(rootSelector);
-		const row = button.closest(rowSelector);
+		const userId = button.dataset.macMembersUserId;
+		const dialog = button.closest('[data-mac-members-details-dialog]');
+		const row = button.closest(rowSelector) || (root ? findRow(root, userId) : null);
 
 		if (!root || !row || !config.ajaxUrl) {
 			return;
@@ -244,67 +275,92 @@
 			return;
 		}
 
-		const userId = button.dataset.macMembersUserId;
 		const renderToken = root.dataset.macMembersRenderToken || '';
 		const previousStatus = row.dataset.macMembersStatus || '';
 		const isAllView = root.dataset.macMembersView === 'all';
+		const tableNotices = root.querySelector('.mac-members-notices');
+		// Errors show in the dialog while it still shows this member, or else above the table.
+		const errorNotices = () => {
+			const open = dialogFor(dialog, userId);
+
+			return open ? open.querySelector('[data-mac-members-details-notices]') : tableNotices;
+		};
+		const closeDialog = () => {
+			const open = dialogFor(dialog, userId);
+
+			if (open) {
+				open.close();
+			}
+		};
 
 		setRowProcessing(row, true);
+		setDialogProcessing(dialog, true);
 
 		try {
 			const result = await sendAction(transition.action, userId, renderToken);
 
 			if (!result.ok) {
-				showNotice(root, 'error', getMessage(result.data, genericError));
+				showNotice(errorNotices(), 'error', getMessage(result.data, genericError));
 
-				// The member's status changed elsewhere, so this row no longer belongs in a filtered view.
+				// The member's status changed elsewhere, so this row no longer belongs in a filtered view, and the
+				// dialog's buttons no longer apply.
 				if (getErrorCode(result.data) === 'status_changed' && !isAllView) {
+					const open = dialogFor(dialog, userId);
+
+					if (open) {
+						open.querySelector('[data-mac-members-details-actions]').replaceChildren();
+					}
+
 					removeRow(root, row);
 					return;
 				}
 
 				setRowProcessing(row, false);
+				setDialogProcessing(dialogFor(dialog, userId), false);
 				return;
 			}
 
 			const data = (result.data && result.data.data) || {};
 
-			showNotice(root, data.warning ? 'warning' : 'success', getMessage(result.data, genericSuccess));
+			showNotice(tableNotices, data.warning ? 'warning' : 'success', getMessage(result.data, genericSuccess));
 			changeCount(root, previousStatus, -1);
 			changeCount(root, data.status, 1);
 
 			if (isAllView && data.status) {
 				updateRowStatus(row, data.status, data.status_label || data.status);
 				setRowProcessing(row, false);
+				// After the row's buttons are enabled again, so the dialog can give the focus back to "View details".
+				closeDialog();
 				row.classList.add('is-success');
 				window.setTimeout(() => row.classList.remove('is-success'), 900);
 				return;
 			}
 
+			closeDialog();
 			removeRow(root, row);
 		} catch (error) {
 			console.warn('MAC Members: AJAX action failed', error);
-			showNotice(root, 'error', genericError);
+			showNotice(errorNotices(), 'error', genericError);
 			setRowProcessing(row, false);
+			setDialogProcessing(dialogFor(dialog, userId), false);
 		}
 	});
 
-	// Member details: "View details" copies the row's template into the table's dialog and opens it. Close, Escape
-	// and a click outside the dialog close it.
+	// Member details: "View details" fills the table's dialog from the row and opens it. Close, Escape and a click
+	// outside the dialog close it.
 	document.addEventListener('click', (event) => {
 		const opener = event.target.closest('[data-mac-members-details-open]');
 
 		if (opener) {
 			const root = opener.closest(rootSelector);
-			const template = opener.parentElement ? opener.parentElement.querySelector('template[data-mac-members-details]') : null;
+			const row = opener.closest(rowSelector);
 			const dialog = root ? root.querySelector('[data-mac-members-details-dialog]') : null;
 
-			if (!template || !dialog || typeof dialog.showModal !== 'function') {
+			if (!row || !row.querySelector('template[data-mac-members-details]') || !dialog || typeof dialog.showModal !== 'function') {
 				return;
 			}
 
-			dialog.querySelector('[data-mac-members-details-body]').replaceChildren(template.content.cloneNode(true));
-			dialog.querySelector('.mac-members-details__title').textContent = template.dataset.macMembersDetailsTitle || '';
+			fillDetails(dialog, row);
 			dialog.showModal();
 			return;
 		}

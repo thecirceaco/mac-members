@@ -9,8 +9,8 @@ declare(strict_types=1);
 
 namespace MacMembers\Members;
 
+use MacMembers\Security\Capabilities;
 use MacMembers\Settings\SettingsRepositoryInterface;
-use MacMembers\Settings\SettingsSchema;
 
 if ( ! defined( 'ABSPATH' ) ) {
 	exit; // Exit if accessed directly.
@@ -195,9 +195,9 @@ final class MembersQuery
 	}
 
 	/**
-	 * Roles whose users never show in the members table: the roles that the "Roles hidden from the members
-	 * table" setting names by slug or name, or that have a capability it names. The status roles are never
-	 * hidden, so a name like "Member" cannot empty a whole view.
+	 * Roles whose users never show in the members table: the roles checked in the "Roles hidden from the members
+	 * table" setting, and every role with a sensitive capability, like Administrator, since status changes refuse
+	 * its users anyway. The status roles are never hidden.
 	 *
 	 * @return array<int,string> Role slugs.
 	 */
@@ -208,16 +208,14 @@ final class MembersQuery
 		}
 
 		$status_roles = array_values( $this->get_status_roles() );
-		$names        = array_map( 'strtolower', SettingsSchema::parse_list( (string) $this->settings->get( 'hidden_roles', '' ) ) );
+		$chosen       = (array) $this->settings->get( 'hidden_roles', array() );
 		$hidden       = array();
 
-		if ( array() !== $names ) {
-			foreach ( $this->get_site_roles() as $slug => $role ) {
-				$name = isset( $role['name'] ) ? (string) $role['name'] : $slug;
+		foreach ( array_keys( $this->get_site_roles() ) as $slug ) {
+			$slug = (string) $slug;
 
-				if ( ! in_array( $slug, $status_roles, true ) && $this->is_excluded( $slug, $name, $role['capabilities'] ?? array(), $names ) ) {
-					$hidden[] = $slug;
-				}
+			if ( ! in_array( $slug, $status_roles, true ) && ( in_array( $slug, $chosen, true ) || array() !== Capabilities::sensitive_capabilities_of_role( $slug ) ) ) {
+				$hidden[] = $slug;
 			}
 		}
 
@@ -352,27 +350,6 @@ final class MembersQuery
 		$words = array_values( array_unique( array_filter( $words, static fn ( string $word ): bool => '' !== $word ) ) );
 
 		return array_slice( $words, 0, self::SEARCH_MAX_WORDS );
-	}
-
-	/**
-	 * @param mixed             $capabilities The role's capabilities.
-	 * @param array<int,string> $exclusions   Lowercase entries of the role filter exclusions setting.
-	 */
-	private function is_excluded( string $slug, string $name, mixed $capabilities, array $exclusions ): bool
-	{
-		$names = array( strtolower( $slug ), strtolower( $name ), strtolower( \translate_user_role( $name ) ) );
-
-		if ( array() !== array_intersect( $names, $exclusions ) ) {
-			return true;
-		}
-
-		foreach ( \is_array( $capabilities ) ? $capabilities : array() as $capability => $granted ) {
-			if ( $granted && in_array( strtolower( (string) $capability ), $exclusions, true ) ) {
-				return true;
-			}
-		}
-
-		return false;
 	}
 
 	/**

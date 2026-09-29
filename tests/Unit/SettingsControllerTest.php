@@ -228,12 +228,17 @@ final class SettingsControllerTest extends TestCase {
 		self::assertStringContainsString( '>Save Settings</button>', $top_level );
 	}
 
-	public function test_settings_page_has_the_hidden_roles_field_and_its_description(): void {
-		$output = $this->render_page( false );
+	public function test_settings_page_has_a_checkbox_for_each_role_that_can_be_hidden(): void {
+		$output = $this->render_page( false, array( 'hidden_roles' => array( 'subscriber' ) ) );
 
-		self::assertStringContainsString( '<label for="mac-members-hidden_roles">Roles hidden from the members table</label>', $output );
-		self::assertStringContainsString( '<input type="text" class="regular-text" id="mac-members-hidden_roles" name="mac_members_settings[hidden_roles]" value="administrator" aria-describedby="mac-members-hidden_roles-description">', $output );
-		self::assertStringContainsString( '<p class="description" id="mac-members-hidden_roles-description">Comma-separated role slugs, role names or capabilities, for example administrator, manage_options. Users who hold a matching role', $output );
+		// No status roles; Administrator is always hidden, so its checkbox is checked and disabled.
+		self::assertStringContainsString(
+			'<th scope="row">Roles hidden from the members table</th><td><fieldset id="mac-members-hidden_roles" aria-describedby="mac-members-hidden_roles-description"><legend class="screen-reader-text">Roles hidden from the members table</legend>'
+			. '<label><input type="checkbox" name="mac_members_settings[hidden_roles][]" value="administrator" checked="checked" disabled> Administrator</label> <span class="description">(always hidden)</span><br>'
+			. '<label><input type="checkbox" name="mac_members_settings[hidden_roles][]" value="subscriber" checked="checked"> Subscriber</label><br></fieldset>'
+			. '<p class="description" id="mac-members-hidden_roles-description">Users who hold a checked role never show in the members table',
+			$output
+		);
 	}
 
 	public function test_status_role_dropdowns_leave_out_roles_with_administrative_capabilities(): void {
@@ -354,8 +359,11 @@ final class SettingsControllerTest extends TestCase {
 		);
 	}
 
-	private function render_page( bool $top_level ): string {
-		$GLOBALS['mac_members_test_options'][ MAC_MEMBERS_SETTINGS_OPTION ] = array( 'top_level_menu' => $top_level );
+	/**
+	 * @param array<string,mixed> $settings Other saved settings.
+	 */
+	private function render_page( bool $top_level, array $settings = array() ): string {
+		$GLOBALS['mac_members_test_options'][ MAC_MEMBERS_SETTINGS_OPTION ] = array( 'top_level_menu' => $top_level ) + $settings;
 
 		$controller = $this->create_controller();
 		$controller->register_settings_page();

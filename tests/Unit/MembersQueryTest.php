@@ -134,15 +134,16 @@ final class MembersQueryTest extends TestCase {
 		);
 	}
 
-	public function test_hidden_roles_match_by_slug_name_or_capability_and_never_hide_a_status_role(): void {
+	public function test_hidden_roles_are_the_checked_roles_and_every_role_with_a_sensitive_capability(): void {
 		$this->add_test_roles();
+		$GLOBALS['mac_members_test_roles']['moderator'] = array( 'name' => 'Moderator', 'capabilities' => array( 'read' => true, 'unfiltered_html' => true ) );
 		$repository = $this->create_settings_repository();
-		$repository->save( array( 'hidden_roles' => 'administrator, EDITOR, manage_options, Member' ) );
+		$repository->save( array( 'hidden_roles' => array( 'officer', 'mac_members_approved' ) ) );
 
-		// Administrator by slug, Editor by name, Site Manager by capability. "Member" names the approved status
-		// role, which cannot be hidden, and Author does not grant manage_options.
+		// Officer is checked. Administrator and Site Manager grant manage_options, and Moderator unfiltered_html.
+		// The approved status role cannot be hidden, and Author does not grant manage_options.
 		self::assertSame(
-			array( 'administrator', 'editor', 'site_manager' ),
+			array( 'administrator', 'officer', 'site_manager', 'moderator' ),
 			( new MembersQuery( $repository ) )->get_hidden_roles()
 		);
 	}
@@ -153,14 +154,16 @@ final class MembersQueryTest extends TestCase {
 			new \WP_User( array( 'ID' => 1, 'user_login' => 'ana-officer', 'roles' => array( 'mac_members_approved', 'officer' ) ) ),
 			new \WP_User( array( 'ID' => 2, 'user_login' => 'ana-admin', 'roles' => array( 'mac_members_approved', 'administrator' ) ) ),
 			new \WP_User( array( 'ID' => 3, 'user_login' => 'ana-manager', 'roles' => array( 'mac_members_pending', 'site_manager' ) ) ),
+			new \WP_User( array( 'ID' => 4, 'user_login' => 'ana-trustee', 'roles' => array( 'mac_members_approved', 'trustee' ) ) ),
 		);
 		$repository = $this->create_settings_repository();
-		$repository->save( array( 'hidden_roles' => 'administrator, manage_options' ) );
+		$repository->save( array( 'hidden_roles' => array( 'officer' ) ) );
 		$query = new MembersQuery( $repository );
 
-		self::assertSame( array( 1 ), array_map( static fn ( \WP_User $user ): int => $user->ID, $query->get_members( null )['users'] ) );
+		// Officer is checked; Administrator and Site Manager are hidden for their manage_options.
+		self::assertSame( array( 4 ), array_map( static fn ( \WP_User $user ): int => $user->ID, $query->get_members( null )['users'] ) );
 		self::assertSame( array( 'pending' => 0, 'approved' => 1, 'inactive' => 0, 'denied' => 0 ), $query->count_by_status() );
-		self::assertSame( array( 1 ), array_map( static fn ( \WP_User $user ): int => $user->ID, $query->get_members( null, 1, '', 'ana' )['users'] ) );
+		self::assertSame( array( 4 ), array_map( static fn ( \WP_User $user ): int => $user->ID, $query->get_members( null, 1, '', 'ana' )['users'] ) );
 	}
 
 	public function test_filter_roles_are_the_roles_shown_members_hold(): void {
@@ -174,10 +177,10 @@ final class MembersQueryTest extends TestCase {
 			new \WP_User( array( 'ID' => 6, 'roles' => array( 'subscriber' ) ) ),
 		);
 		$repository = $this->create_settings_repository();
-		$repository->save( array( 'hidden_roles' => 'administrator, manage_options' ) );
+		$repository->save( array( 'hidden_roles' => array() ) );
 
-		// Not offered: the hidden Administrator and Site Manager, Editor, which only a hidden member holds, and
-		// Subscriber, which only a non-member holds.
+		// Not offered: Administrator and Site Manager, hidden for their manage_options, Editor, which only a hidden
+		// member holds, and Subscriber, which only a non-member holds.
 		self::assertSame(
 			array(
 				'author'       => 'Author',

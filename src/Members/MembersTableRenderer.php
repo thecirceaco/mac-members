@@ -497,7 +497,9 @@ final class MembersTableRenderer
 	}
 
 	/**
-	 * The member details dialog, one per table. The script fills it from the row's template and opens it.
+	 * The member details dialog, one per table. The script fills it from the row, the details from its template
+	 * and the footer's buttons from its Actions cell, and opens it. The footer's notices show the errors of those
+	 * buttons, since the table's notices are behind the dialog.
 	 */
 	private function render_details_dialog(): string
 	{
@@ -509,6 +511,10 @@ final class MembersTableRenderer
 		$output .= '<button type="button" class="mac-members-button btn--neutral btn--outline btn--s" data-mac-members-details-close>' . esc_html__( 'Close', 'mac-members' ) . '</button>';
 		$output .= '</div>';
 		$output .= '<div class="mac-members-details__body" data-mac-members-details-body></div>';
+		$output .= '<div class="mac-members-details__footer">';
+		$output .= '<div class="mac-members-details__notices" aria-live="polite" aria-atomic="true" data-mac-members-details-notices></div>';
+		$output .= '<div class="mac-members-details__actions" data-mac-members-details-actions></div>';
+		$output .= '</div>';
 		$output .= '</dialog>';
 
 		return $output;

@@ -838,6 +838,7 @@ final class MembersTableShortcodeTest extends TestCase {
 		self::assertStringContainsString( '<button type="button" class="mac-members-details-button" data-mac-members-details-open>View details</button>', $output );
 		self::assertStringContainsString( '<template data-mac-members-details data-mac-members-details-title="Mia &lt;Admin&gt; O&#039;Connor">', $output );
 		self::assertSame( 1, substr_count( $output, '<dialog class="mac-members-details" data-mac-members-details-dialog' ) );
+		self::assertStringContainsString( '<div class="mac-members-details__footer"><div class="mac-members-details__notices" aria-live="polite" aria-atomic="true" data-mac-members-details-notices></div><div class="mac-members-details__actions" data-mac-members-details-actions></div></div></dialog>', $output );
 		self::assertStringContainsString( 'data-mac-members-action="approve"', $output );
 		self::assertStringContainsString( 'data-mac-members-action="deny"', $output );
 		self::assertStringContainsString( '<p class="mac-members-empty" hidden>There are no pending members.</p>', $output );

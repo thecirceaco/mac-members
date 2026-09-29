@@ -635,7 +635,7 @@ final class MemberActionControllerTest extends TestCase {
 		$other = $this->store_user( 13, array( 'mac_members_pending' ) );
 
 		// The role was hidden after the table was rendered, so the token still lists the member.
-		$GLOBALS['mac_members_test_options'][ MAC_MEMBERS_SETTINGS_OPTION ] = array( 'hidden_roles' => 'officer' );
+		$GLOBALS['mac_members_test_options'][ MAC_MEMBERS_SETTINGS_OPTION ] = array( 'hidden_roles' => array( 'officer' ) );
 		$this->prepare_ajax_request( FrontendAssets::APPROVE_ACTION, $user->ID );
 
 		$response = $this->capture_ajax_response(
@@ -934,7 +934,7 @@ final class MemberActionControllerTest extends TestCase {
 				break;
 			case 'hidden target':
 				$GLOBALS['mac_members_test_roles']['officer']                      = array( 'name' => 'Officer', 'capabilities' => array( 'read' => true ) );
-				$GLOBALS['mac_members_test_options'][ MAC_MEMBERS_SETTINGS_OPTION ] = array( 'hidden_roles' => 'officer' );
+				$GLOBALS['mac_members_test_options'][ MAC_MEMBERS_SETTINGS_OPTION ] = array( 'hidden_roles' => array( 'officer' ) );
 				$this->store_user( 12, array( 'mac_members_pending', 'officer' ) );
 				break;
 			case 'unsafe roles':
