@@ -192,16 +192,31 @@ final class SettingsControllerTest extends TestCase {
 		self::assertSame( $sorted, $positions );
 	}
 
-	public function test_settings_page_has_a_settings_tab_and_a_license_tab(): void {
+	public function test_settings_page_has_settings_license_and_support_tabs(): void {
 		$output = $this->render_page( false );
 
 		self::assertStringContainsString(
 			'<nav class="nav-tab-wrapper wp-clearfix" aria-label="MAC Members sections">'
 			. '<a href="https://example.test/wp-admin/options-general.php?page=mac-members" class="nav-tab nav-tab-active" aria-current="page">Settings</a>'
-			. '<a href="https://example.test/wp-admin/options-general.php?page=mac-members&amp;tab=license" class="nav-tab">License</a></nav>',
+			. '<a href="https://example.test/wp-admin/options-general.php?page=mac-members&amp;tab=license" class="nav-tab">License</a>'
+			. '<a href="https://example.test/wp-admin/options-general.php?page=mac-members&amp;tab=support" class="nav-tab">Support</a></nav>',
 			$output
 		);
 		self::assertStringContainsString( 'name="mac_members_action" value="save_settings"', $output );
+	}
+
+	public function test_support_tab_shows_the_support_email_and_the_documentation_instead_of_the_settings_form(): void {
+		$_GET['tab'] = 'support';
+
+		$output = $this->render_page( false );
+
+		self::assertStringContainsString( '<a href="https://example.test/wp-admin/options-general.php?page=mac-members&amp;tab=support" class="nav-tab nav-tab-active" aria-current="page">Support</a>', $output );
+		self::assertStringContainsString(
+			'<p>You can get support by sending an email to <a href="mailto:mihai@circea.co">mihai@circea.co</a>. Before you do, make sure to check out our '
+			. '<a href="https://docs.circea.co/doc/mac-members/" target="_blank" rel="noopener noreferrer">documentation</a>.</p>',
+			$output
+		);
+		self::assertStringNotContainsString( 'save_settings', $output );
 	}
 
 	public function test_license_tab_shows_the_license_view_instead_of_the_settings_form(): void {

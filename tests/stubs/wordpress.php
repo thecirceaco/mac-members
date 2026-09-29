@@ -1264,3 +1264,7 @@ function wp_mail(
 function plugin_dir_url( string $file ): string {
 	return 'https://example.test/wp-content/plugins/' . basename( dirname( $file ) ) . '/';
 }
+
+function plugin_basename( string $file ): string {
+	return 'mac-members/' . basename( $file );
+}

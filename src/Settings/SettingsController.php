@@ -171,6 +171,12 @@ final class SettingsController implements Service
 			return;
 		}
 
+		if ( 'support' === $tab ) {
+			$this->render_support();
+			echo '</div>';
+			return;
+		}
+
 		echo '<form method="post" action="">';
 		echo '<input type="hidden" name="mac_members_action" value="' . esc_attr( self::ACTION_SAVE_SETTINGS ) . '">';
 		\wp_nonce_field( self::NONCE_ACTION, self::NONCE_NAME );
@@ -226,7 +232,7 @@ final class SettingsController implements Service
 	}
 
 	/**
-	 * The page's tabs: the settings, and the SureCart license.
+	 * The page's tabs: the settings, the SureCart license, and where to get support.
 	 *
 	 * @return array<string,string> Tab labels keyed by tab.
 	 */
@@ -235,7 +241,23 @@ final class SettingsController implements Service
 		return array(
 			'settings' => __( 'Settings', 'mac-members' ),
 			'license'  => __( 'License', 'mac-members' ),
+			'support'  => __( 'Support', 'mac-members' ),
 		);
+	}
+
+	/**
+	 * The Support tab, with the same text as MAC Core's.
+	 */
+	private function render_support(): void
+	{
+		$email = '<a href="mailto:mihai@circea.co">mihai@circea.co</a>';
+		$docs  = '<a href="' . esc_url( MAC_MEMBERS_DOCS_URL ) . '" target="_blank" rel="noopener noreferrer">' . esc_html__( 'documentation', 'mac-members' ) . '</a>';
+
+		/* translators: 1: support email address, as a link. 2: "documentation", as a link. */
+		$text = esc_html__( 'You can get support by sending an email to %1$s. Before you do, make sure to check out our %2$s.', 'mac-members' );
+
+		// phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- The text is escaped and both links are built from escaped parts.
+		echo '<p>' . sprintf( $text, $email, $docs ) . '</p>';
 	}
 
 	private function get_current_tab(): string

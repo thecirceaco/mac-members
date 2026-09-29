@@ -30,8 +30,9 @@ final class Installer implements Service
 	 *
 	 * 1: administrators get the review capability.
 	 * 2: the member roles are created.
+	 * 3: the Member Reviewer role is created.
 	 */
-	private const VERSION = 2;
+	private const VERSION = 3;
 
 	/**
 	 * Role that receives the review capability.
@@ -52,6 +53,7 @@ final class Installer implements Service
 	{
 		$this->grant_review_capability();
 		Roles::create_missing();
+		Roles::create_reviewer();
 		$this->finish();
 	}
 
@@ -76,6 +78,10 @@ final class Installer implements Service
 			Roles::create_missing();
 		}
 
+		if ( 3 > $installed ) {
+			Roles::create_reviewer();
+		}
+
 		$this->finish();
 	}
 
@@ -84,8 +90,9 @@ final class Installer implements Service
 	 *
 	 * The per-user lock rows always go, because they only exist while a status change runs. Everything else
 	 * stays, like in MAC Core, unless "Delete plugin data on uninstall" is on. Then the settings, the install
-	 * version, the review capability, the member roles that no user holds, and the SureCart license and update
-	 * data go too. Roles that users still hold stay, so nobody is left without a role.
+	 * version, the review capability, the member and Member Reviewer roles that no user holds, and the SureCart
+	 * license and update data go too. Roles that users still hold stay, so nobody is left without a role;
+	 * activating the plugin again gives the Member Reviewer role its capability back.
 	 */
 	public static function uninstall(): void
 	{

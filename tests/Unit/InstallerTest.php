@@ -38,16 +38,54 @@ final class InstallerTest extends TestCase {
 		self::assertSame( array( $installer, 'maybe_install' ), $GLOBALS['mac_members_test_actions']['init'][0]['callback'] );
 	}
 
-	public function test_install_grants_the_review_capability_to_administrators_only(): void {
+	public function test_install_grants_the_review_capability_to_administrators_and_member_reviewers_only(): void {
 		( new Installer() )->install();
 
 		self::assertTrue( $GLOBALS['mac_members_test_roles']['administrator']['capabilities'][ Capabilities::REVIEW ] );
+		self::assertTrue( $GLOBALS['mac_members_test_roles'][ Roles::REVIEWER ]['capabilities'][ Capabilities::REVIEW ] );
 
 		foreach ( array( 'mac_members_pending', 'mac_members_approved', 'mac_members_inactive', 'mac_members_denied', 'subscriber' ) as $role ) {
 			self::assertArrayNotHasKey( Capabilities::REVIEW, $GLOBALS['mac_members_test_roles'][ $role ]['capabilities'], $role );
 		}
 
-		self::assertSame( 2, $GLOBALS['mac_members_test_options'][ Installer::VERSION_OPTION ] );
+		self::assertSame( 3, $GLOBALS['mac_members_test_options'][ Installer::VERSION_OPTION ] );
+	}
+
+	public function test_install_creates_the_member_reviewer_role_with_only_the_review_capability(): void {
+		( new Installer() )->install();
+
+		self::assertSame(
+			array( 'name' => 'Member Reviewer', 'capabilities' => array( Capabilities::REVIEW => true ) ),
+			$GLOBALS['mac_members_test_roles'][ Roles::REVIEWER ]
+		);
+	}
+
+	public function test_install_gives_an_existing_member_reviewer_role_the_capability_back_and_keeps_its_name(): void {
+		$GLOBALS['mac_members_test_roles'][ Roles::REVIEWER ] = array( 'name' => 'Union Reviewer', 'capabilities' => array() );
+
+		( new Installer() )->install();
+
+		self::assertSame(
+			array( 'name' => 'Union Reviewer', 'capabilities' => array( Capabilities::REVIEW => true ) ),
+			$GLOBALS['mac_members_test_roles'][ Roles::REVIEWER ]
+		);
+	}
+
+	public function test_maybe_install_on_a_version_two_site_creates_the_member_reviewer_role_once(): void {
+		$GLOBALS['mac_members_test_options'][ Installer::VERSION_OPTION ] = 2;
+		$installer = new Installer();
+
+		$installer->maybe_install();
+
+		self::assertArrayHasKey( Roles::REVIEWER, $GLOBALS['mac_members_test_roles'] );
+		self::assertArrayNotHasKey( Capabilities::REVIEW, $GLOBALS['mac_members_test_roles']['administrator']['capabilities'] );
+		self::assertSame( 3, $GLOBALS['mac_members_test_options'][ Installer::VERSION_OPTION ] );
+
+		// A site owner deletes the role on purpose; it must not come back until the plugin is activated again.
+		unset( $GLOBALS['mac_members_test_roles'][ Roles::REVIEWER ] );
+		$installer->maybe_install();
+
+		self::assertArrayNotHasKey( Roles::REVIEWER, $GLOBALS['mac_members_test_roles'] );
 	}
 
 	public function test_install_registers_a_static_uninstall_callback(): void {
@@ -65,7 +103,7 @@ final class InstallerTest extends TestCase {
 
 		( new Installer() )->install();
 
-		self::assertSame( 2, $GLOBALS['mac_members_test_options'][ Installer::VERSION_OPTION ] );
+		self::assertSame( 3, $GLOBALS['mac_members_test_options'][ Installer::VERSION_OPTION ] );
 	}
 
 	public function test_maybe_install_runs_once_on_a_site_that_updated_without_reactivating(): void {
@@ -163,15 +201,15 @@ final class InstallerTest extends TestCase {
 
 		self::assertArrayNotHasKey( Capabilities::REVIEW, $GLOBALS['mac_members_test_roles']['administrator']['capabilities'] );
 
-		foreach ( array_keys( Roles::defaults() ) as $slug ) {
+		foreach ( array( ...array_keys( Roles::defaults() ), Roles::REVIEWER ) as $slug ) {
 			self::assertArrayHasKey( $slug, $GLOBALS['mac_members_test_roles'], $slug );
 		}
 
-		self::assertSame( 2, $GLOBALS['mac_members_test_options'][ Installer::VERSION_OPTION ] );
+		self::assertSame( 3, $GLOBALS['mac_members_test_options'][ Installer::VERSION_OPTION ] );
 	}
 
 	public function test_maybe_install_on_a_current_site_does_not_bring_back_a_deleted_role(): void {
-		$GLOBALS['mac_members_test_options'][ Installer::VERSION_OPTION ] = 2;
+		$GLOBALS['mac_members_test_options'][ Installer::VERSION_OPTION ] = 3;
 		unset( $GLOBALS['mac_members_test_roles']['mac_members_inactive'] );
 
 		( new Installer() )->maybe_install();
@@ -193,6 +231,28 @@ final class InstallerTest extends TestCase {
 		self::assertArrayNotHasKey( 'mac_members_denied', $GLOBALS['mac_members_test_roles'] );
 		self::assertArrayHasKey( 'subscriber', $GLOBALS['mac_members_test_roles'] );
 		self::assertArrayHasKey( 'administrator', $GLOBALS['mac_members_test_roles'] );
+	}
+
+	public function test_uninstall_with_that_setting_removes_the_member_reviewer_role_unless_a_user_holds_it(): void {
+		foreach ( array( false, true ) as $held ) {
+			mac_members_tests_reset_wp_state();
+			( new Installer() )->install();
+			$GLOBALS['mac_members_test_users'] = $held
+				? array( new \WP_User( array( 'ID' => 12, 'roles' => array( 'editor', Roles::REVIEWER ) ) ) )
+				: array();
+			$this->turn_on_data_deletion();
+
+			Installer::uninstall();
+
+			self::assertSame( $held, array_key_exists( Roles::REVIEWER, $GLOBALS['mac_members_test_roles'] ) );
+
+			if ( $held ) {
+				// The role stays for its user, without the capability; activating the plugin again gives it back.
+				self::assertArrayNotHasKey( Capabilities::REVIEW, $GLOBALS['mac_members_test_roles'][ Roles::REVIEWER ]['capabilities'] );
+				( new Installer() )->install();
+				self::assertTrue( $GLOBALS['mac_members_test_roles'][ Roles::REVIEWER ]['capabilities'][ Capabilities::REVIEW ] );
+			}
+		}
 	}
 
 	public function test_uninstall_removes_lock_rows_left_by_requests_that_died(): void {

@@ -11,6 +11,7 @@ namespace MacMembers;
 
 use MacMembers\Actions\MemberActionController;
 use MacMembers\Admin\MenuPlacement;
+use MacMembers\Admin\PluginListingLinks;
 use MacMembers\Assets\FrontendAssets;
 use MacMembers\Contracts\Service;
 use MacMembers\Email\MemberNotificationService;
@@ -65,6 +66,7 @@ final class Kernel
 		$services             = [
 			new Installer(),
 			new SettingsController( $settings_repository, $settings_schema, null, $menu_placement, $licensing ),
+			new PluginListingLinks( $menu_placement ),
 			$licensing,
 			new MemberActionController( $settings_repository, $notifications ),
 			$frontend_assets,

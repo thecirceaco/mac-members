@@ -21,6 +21,12 @@ final class Roles
 	public const DENIED   = 'mac_members_denied';
 
 	/**
+	 * The Member Reviewer role: only the review capability, so it goes on top of a user's own role, which gives
+	 * them `read` and the rest. It isn't a status role.
+	 */
+	public const REVIEWER = 'mac_members_reviewer';
+
+	/**
 	 * @return array<string,string> Display names keyed by role slug.
 	 */
 	public static function defaults(): array
@@ -44,6 +50,22 @@ final class Roles
 				\add_role( $slug, $name, array( 'read' => true ) );
 			}
 		}
+	}
+
+	/**
+	 * Adds the Member Reviewer role with only the review capability. When the role exists, it keeps its name
+	 * and gets the capability back, for example after deleting the plugin with its data removed it.
+	 */
+	public static function create_reviewer(): void
+	{
+		$role = \get_role( self::REVIEWER );
+
+		if ( $role instanceof \WP_Role ) {
+			$role->add_cap( Capabilities::REVIEW );
+			return;
+		}
+
+		\add_role( self::REVIEWER, __( 'Member Reviewer', 'mac-members' ), array( Capabilities::REVIEW => true ) );
 	}
 
 	/**
@@ -90,12 +112,12 @@ final class Roles
 	}
 
 	/**
-	 * Removes the member roles that no user holds. A role that a user still holds stays, so uninstalling the
-	 * plugin never leaves a user without the role they had.
+	 * Removes the member roles and the Member Reviewer role when no user holds them. A role that a user still
+	 * holds stays, so uninstalling the plugin never leaves a user without the role they had.
 	 */
 	public static function remove_unused(): void
 	{
-		foreach ( array_keys( self::defaults() ) as $slug ) {
+		foreach ( array( ...array_keys( self::defaults() ), self::REVIEWER ) as $slug ) {
 			if ( \wp_roles()->is_role( $slug ) && ! self::is_held( $slug ) ) {
 				\remove_role( $slug );
 			}

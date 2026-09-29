@@ -24,6 +24,11 @@ if ( ! defined( 'MAC_MEMBERS_SURECART_PUBLIC_TOKEN' ) ) {
 	define( 'MAC_MEMBERS_SURECART_PUBLIC_TOKEN', 'pt_T7wtCcQ2DNPZvadkHjy1uXbw' );
 }
 
+// The MAC Members page on the Circea docs site, linked from the plugins screen and the Support tab.
+if ( ! defined( 'MAC_MEMBERS_DOCS_URL' ) ) {
+	define( 'MAC_MEMBERS_DOCS_URL', 'https://docs.circea.co/doc/mac-members/' );
+}
+
 if ( ! defined( 'MAC_MEMBERS_ADMIN_SLUG' ) ) {
 	define( 'MAC_MEMBERS_ADMIN_SLUG', 'mac-members' );
 }

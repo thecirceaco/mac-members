@@ -25,13 +25,17 @@ Activation creates the four member roles if they don't exist yet, each with only
 
 A role that already exists keeps its name and capabilities. A site that updates the plugin without reactivating it gets the missing roles once, on the next request.
 
+Activation also creates the Member Reviewer role, `mac_members_reviewer`, for the people who review members (see Review capability below).
+
 MAC Members always uses these four roles. New registrations need `mac_members_pending`, for example from the registration form's user action, and membership rules, for example in SureMembers, use `mac_members_approved`. Earlier versions, up to 0.2.0, let a site choose other roles for the statuses; a site whose members hold other roles moves them to these once, for example with WP-CLI.
 
 ## Settings
 
 The settings page is under `Settings > MAC Members`. Turn on "Top-level admin menu" to give it its own menu item with the MAC icon instead, at the end of the menu next to MAC Core, since both add their items at `admin_menu` priority 20; it's off by default. Saving sends you back to the page, at its new address when this setting changed.
 
-The settings page has three sections:
+The page has three tabs: Settings, below; License (see License and Updates); and Support, with the support email and a link to the MAC Members documentation. Like MAC Core, the MAC Members row on the Plugins screen links to Settings and License next to Deactivate, and to Support and Documentation next to View details.
+
+The Settings tab has three sections:
 
 - **Interface**: Hidden roles, none checked by default; Extra modal fields, empty by default; Date format, Date by default, or Datetime or Relative; and Interface scale, Medium by default, or Small (see Members Table below).
 - **Emails**: From email; Member emails, one row with Approval, Denial, Deactivation and Reactivation checkboxes; Admin notification email; and Admin emails, a row with the same four checkboxes. Every email is on by default.
@@ -146,16 +150,19 @@ The plugin does not expose public unauthenticated endpoints and does not provide
 
 ### Review capability
 
-Activating the plugin gives the `administrator` role the `mac_members_review` capability. A site that updates the plugin without reactivating it gets the same step once, on the next request. To let another role review members, give it `mac_members_review` with a role editor, or with WP-CLI:
+Activating the plugin gives the `administrator` role the `mac_members_review` capability and creates the Member Reviewer role, `mac_members_reviewer`, which has only that capability. A site that updates the plugin without reactivating it gets both once, on the next request.
+
+To let someone review members, add Member Reviewer on top of their own role, which gives them `read` and the rest. The WordPress user screen has a single Role dropdown, so add the second role from the users table with Admin Columns Pro, with a role editor, or with WP-CLI:
 
 ```bash
-wp role create membership_manager "Membership Manager" --clone=subscriber
-wp cap add membership_manager mac_members_review
+wp user add-role 42 mac_members_reviewer
 ```
+
+A role of the site's own can also get the capability, with a role editor or with `wp cap add membership_manager mac_members_review`.
 
 `mac_members_review` works as a narrow `promote_users`: the plugin changes the roles itself, and only moves members between its four roles, and never adds one that grants a sensitive capability. A reviewer does not need `promote_users`, which in wp-admin would let them give any user any role, or `edit_users`, which would let them edit any user, administrators included.
 
-Deleting the plugin from the Plugins screen keeps its data, like MAC Core, unless "Delete plugin data" is on in the settings; it is off by default. With it on, deleting the plugin removes the settings, `mac_members_review` from every role, and the four member roles that no user holds. Roles that users still hold stay, so nobody is left without a role; the settings page shows how many users hold each member role next to the setting. The per-user lock rows always go, because they only exist while a status change runs.
+Deleting the plugin from the Plugins screen keeps its data, like MAC Core, unless "Delete plugin data" is on in the settings; it is off by default. With it on, deleting the plugin removes the settings, `mac_members_review` from every role, and the four member roles and the Member Reviewer role when no user holds them. Roles that users still hold stay, so nobody is left without a role; the settings page shows how many users hold each member role next to the setting. Activating the plugin again gives Member Reviewer its capability back; a role of the site's own needs it again from a role editor. The per-user lock rows always go, because they only exist while a status change runs.
 
 ## License and Updates
 
