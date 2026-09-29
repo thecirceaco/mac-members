@@ -269,7 +269,7 @@ final class SettingsController implements Service
 	{
 		return match ( $field['type'] ) {
 			SettingsSchema::TYPE_EMAIL  => $this->render_email_input( $key, (string) $value ),
-			SettingsSchema::TYPE_TOGGLE => $this->render_toggle( $key, (bool) $value, (string) $field['label'], isset( $field['description'] ) ),
+			SettingsSchema::TYPE_TOGGLE => $this->render_toggle( $key, (bool) $value, (string) ( $field['option'] ?? $field['label'] ), isset( $field['description'] ) ),
 			SettingsSchema::TYPE_ROLES  => $this->render_role_checkboxes( $key, (array) $value, (string) $field['label'], isset( $field['description'] ) ),
 			SettingsSchema::TYPE_CHOICE => $this->render_choice_select( $key, (string) $value, $field['choices'] ?? array(), isset( $field['description'] ) ),
 			SettingsSchema::TYPE_FIELDS => $this->render_textarea( $key, (string) $value, (int) ( $field['rows'] ?? 6 ), isset( $field['description'] ) ),

@@ -250,6 +250,40 @@ final class MemberNotificationServiceTest extends TestCase {
 		self::assertSame( array( 'Member account deactivated' ), array_column( $GLOBALS['mac_members_test_mail'], 'subject' ) );
 	}
 
+	public function test_reactivation_emails_go_to_the_member_and_the_admin(): void {
+		$this->create_service()->send_reactivation_notifications( $this->create_user() );
+
+		self::assertCount( 2, $GLOBALS['mac_members_test_mail'] );
+
+		$member = $GLOBALS['mac_members_test_mail'][0];
+		$admin  = $GLOBALS['mac_members_test_mail'][1];
+
+		self::assertSame( 'pending@example.test', $member['to'] );
+		self::assertSame( 'Your membership is active again', $member['subject'] );
+		self::assertStringContainsString( 'Your membership on Example Site is active again. You can log in and access your account.', $member['message'] );
+		self::assertStringContainsString( "<br>\nhttps://example.test/<br>", $member['message'] );
+		self::assertSame( 'admin@example.test', $admin['to'] );
+		self::assertSame( 'Member account reactivated', $admin['subject'] );
+		self::assertStringContainsString( 'A member account has been reactivated on Example Site.', $admin['message'] );
+		self::assertStringContainsString( 'User ID: 12', $admin['message'] );
+	}
+
+	public function test_toggle_settings_control_the_reactivation_notifications_apart_from_approval(): void {
+		$repository = $this->create_repository();
+		$repository->save(
+			array(
+				'send_member_approval_email'     => '1',
+				'send_admin_approval_email'      => '1',
+				'send_member_reactivation_email' => '1',
+				'send_admin_reactivation_email'  => '0',
+			)
+		);
+
+		( new MemberNotificationService( $repository ) )->send_reactivation_notifications( $this->create_user() );
+
+		self::assertSame( array( 'Your membership is active again' ), array_column( $GLOBALS['mac_members_test_mail'], 'subject' ) );
+	}
+
 	public function test_invalid_admin_and_from_settings_fall_back_to_site_admin_email(): void {
 		$GLOBALS['mac_members_test_options'][ MAC_MEMBERS_SETTINGS_OPTION ] = array(
 			'admin_notification_email' => "notify@example.test\r\nBcc: leak@example.test",

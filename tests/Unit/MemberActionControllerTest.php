@@ -374,7 +374,7 @@ final class MemberActionControllerTest extends TestCase {
 
 		self::assertTrue( $this->capture_ajax_response( fn (): mixed => $this->create_controller( $this->create_notification_service() )->reactivate() )['success'] );
 		self::assertSame(
-			array( 'Your account has been approved', 'Member account approved' ),
+			array( 'Your membership is active again', 'Member account reactivated' ),
 			array_column( $GLOBALS['mac_members_test_mail'], 'subject' )
 		);
 		self::assertSame( array( 'mac_members_approved' ), $user->roles );

@@ -168,12 +168,12 @@ final class SettingsControllerTest extends TestCase {
 		$positions = array_map(
 			static fn ( string $needle ): int|false => strpos( $output, $needle ),
 			array(
-				'<h2 class="title">Members table</h2>',
+				'<h2 class="title">Interface</h2>',
 				'id="mac-members-hidden_roles"',
 				'id="mac-members-detail_fields"',
 				'id="mac-members-date_display"',
 				'id="mac-members-table_size"',
-				'<h2 class="title">Emails</h2><p>The approval emails also go out when an inactive member is reactivated.</p>',
+				'<h2 class="title">Emails</h2><table',
 				'id="mac-members-from_email"',
 				'id="mac-members-send_member_approval_email"',
 				'id="mac-members-admin_notification_email"',
@@ -200,6 +200,7 @@ final class SettingsControllerTest extends TestCase {
 			. '<label><input type="checkbox" id="mac-members-send_member_approval_email" name="mac_members_settings[send_member_approval_email]" value="1" checked="checked"> Approval</label><br>'
 			. '<label><input type="checkbox" id="mac-members-send_member_denial_email" name="mac_members_settings[send_member_denial_email]" value="1"> Denial</label><br>'
 			. '<label><input type="checkbox" id="mac-members-send_member_deactivation_email" name="mac_members_settings[send_member_deactivation_email]" value="1" checked="checked"> Deactivation</label><br>'
+			. '<label><input type="checkbox" id="mac-members-send_member_reactivation_email" name="mac_members_settings[send_member_reactivation_email]" value="1" checked="checked"> Reactivation</label><br>'
 			. '</fieldset></td></tr>',
 			$output
 		);
@@ -213,10 +214,10 @@ final class SettingsControllerTest extends TestCase {
 		// No status roles, which are fixed; Administrator is always hidden, so its checkbox is checked and disabled.
 		self::assertStringNotContainsString( '_role]', $output );
 		self::assertStringContainsString(
-			'<th scope="row">Roles hidden from the members table</th><td><fieldset id="mac-members-hidden_roles" aria-describedby="mac-members-hidden_roles-description"><legend class="screen-reader-text">Roles hidden from the members table</legend>'
+			'<th scope="row">Hidden roles</th><td><fieldset id="mac-members-hidden_roles" aria-describedby="mac-members-hidden_roles-description"><legend class="screen-reader-text">Hidden roles</legend>'
 			. '<label><input type="checkbox" name="mac_members_settings[hidden_roles][]" value="administrator" checked="checked" disabled> Administrator</label> <span class="description">(always hidden)</span><br>'
 			. '<label><input type="checkbox" name="mac_members_settings[hidden_roles][]" value="subscriber" checked="checked"> Subscriber</label><br></fieldset>'
-			. '<p class="description" id="mac-members-hidden_roles-description">Users who hold a checked role never show in the members table',
+			. '<p class="description" id="mac-members-hidden_roles-description">Members with a checked role don&#039;t show in the members table',
 			$output
 		);
 	}
@@ -224,8 +225,12 @@ final class SettingsControllerTest extends TestCase {
 	public function test_settings_page_has_the_uninstall_checkbox_off_with_its_description(): void {
 		$output = $this->render_page( false );
 
+		// A short row title, and the full sentence next to the checkbox.
+		self::assertStringContainsString( '<th scope="row"><label for="mac-members-delete_data_on_uninstall">Delete plugin data</label></th>', $output );
 		self::assertStringContainsString( '<input type="checkbox" id="mac-members-delete_data_on_uninstall" name="mac_members_settings[delete_data_on_uninstall]" value="1" aria-describedby="mac-members-delete_data_on_uninstall-description"> Delete plugin data on uninstall</label>', $output );
-		self::assertStringContainsString( '<p class="description" id="mac-members-delete_data_on_uninstall-description">When the plugin is deleted, remove its settings, the review capability and the member roles that no user holds.', $output );
+		self::assertStringContainsString( '<p class="description" id="mac-members-delete_data_on_uninstall-description">When the plugin is deleted, also remove its settings, the review capability and the member roles that no user holds.', $output );
+		self::assertStringContainsString( '<th scope="row"><label for="mac-members-top_level_menu">Top-level admin menu</label></th>', $output );
+		self::assertStringContainsString( 'name="mac_members_settings[top_level_menu]" value="1"> Show MAC Members as a top-level admin menu item</label>', $output );
 	}
 
 	public function test_settings_page_has_the_detail_fields_textarea(): void {
@@ -238,14 +243,16 @@ final class SettingsControllerTest extends TestCase {
 		$output = (string) ob_get_clean();
 
 		self::assertStringContainsString( '<textarea class="large-text code" id="mac-members-detail_fields" name="mac_members_settings[detail_fields]" rows="12" aria-describedby="mac-members-detail_fields-description">phone : Phone' . "\n" . 'local_number</textarea>', $output );
-		self::assertStringContainsString( '<p class="description" id="mac-members-detail_fields-description">One field per line or comma-separated', $output );
+		self::assertStringContainsString( '<th scope="row"><label for="mac-members-detail_fields">Extra modal fields</label></th>', $output );
+		self::assertStringContainsString( '<p class="description" id="mac-members-detail_fields-description">Fields the member details modal shows after the table&#039;s fields, in this order; the table itself doesn&#039;t show them.', $output );
 	}
 
 	public function test_settings_page_has_the_date_display_choice(): void {
 		$output = $this->render_page( false );
 
-		self::assertStringContainsString( '<select id="mac-members-date_display" name="mac_members_settings[date_display]" aria-describedby="mac-members-date_display-description"><option value="relative" selected="selected">Relative</option><option value="date">Date</option></select>', $output );
-		self::assertStringContainsString( '<p class="description" id="mac-members-date_display-description">For Registered and Last Login.', $output );
+		self::assertStringContainsString( '<th scope="row"><label for="mac-members-date_display">Date format</label></th>', $output );
+		self::assertStringContainsString( '<select id="mac-members-date_display" name="mac_members_settings[date_display]" aria-describedby="mac-members-date_display-description"><option value="date" selected="selected">Date</option><option value="datetime">Datetime</option><option value="relative">Relative</option></select>', $output );
+		self::assertStringContainsString( '<p class="description" id="mac-members-date_display-description">For Registered and Last Login, in the table and the modal.', $output );
 	}
 
 	public function test_settings_page_has_the_table_size_choice(): void {
@@ -258,7 +265,8 @@ final class SettingsControllerTest extends TestCase {
 		$output = (string) ob_get_clean();
 
 		self::assertStringContainsString( '<select id="mac-members-table_size" name="mac_members_settings[table_size]" aria-describedby="mac-members-table_size-description"><option value="medium">Medium</option><option value="small" selected="selected">Small</option></select>', $output );
-		self::assertStringContainsString( '<p class="description" id="mac-members-table_size-description">Medium puts the table, its controls and its buttons in the normal text size, Small in the small one.', $output );
+		self::assertStringContainsString( '<th scope="row"><label for="mac-members-table_size">Interface scale</label></th>', $output );
+		self::assertStringContainsString( '<p class="description" id="mac-members-table_size-description">The text and button size of the members table, its controls and its modal.', $output );
 	}
 
 	public function test_uninstall_setting_shows_how_many_users_hold_each_member_role(): void {

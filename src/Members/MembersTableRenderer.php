@@ -27,8 +27,8 @@ final class MembersTableRenderer
 	public const DEFAULT_HIDDEN_COLUMNS = array( 'last_login' );
 
 	/**
-	 * Display options: the columns the viewer hid, the size (medium or small), how dates show (date or relative)
-	 * and whether the Last Login column shows.
+	 * Display options: the columns the viewer hid, the size (medium or small), how dates show (date, datetime or
+	 * relative) and whether the Last Login column shows.
 	 */
 	private const DISPLAY_DEFAULTS = array(
 		'hidden_columns' => array(),
@@ -189,8 +189,8 @@ final class MembersTableRenderer
 				'first_name' => esc_html( $this->get_user_value( $user, 'first_name' ) ),
 				'last_name'  => esc_html( $this->get_user_value( $user, 'last_name' ) ),
 				'username'   => esc_html( $this->get_user_value( $user, 'user_login' ) ),
-				'registered' => $this->render_date( $this->get_registered_time( $user ), false ),
-				'last_login' => $this->render_date( $row['last_login'] ?? null, true ),
+				'registered' => $this->render_date( $this->get_registered_time( $user ) ),
+				'last_login' => $this->render_date( $row['last_login'] ?? null ),
 				'details'    => $this->render_details_cell( $row, $id ),
 				'status'     => '<span class="mac-members-status__label mac-members-status__label--' . esc_attr( $status->value ) . '">' . esc_html( $status->label() ) . '</span>',
 				'roles'      => esc_html( implode( ', ', $row['roles'] ?? array() ) ),
@@ -464,11 +464,11 @@ final class MembersTableRenderer
 			array( __( 'First Name', 'mac-members' ), esc_html( $first ) ),
 			array( __( 'Last Name', 'mac-members' ), esc_html( $last ) ),
 			array( __( 'Username', 'mac-members' ), esc_html( $login ) ),
-			array( __( 'Registered', 'mac-members' ), $this->render_date( $this->get_registered_time( $user ), false ) ),
+			array( __( 'Registered', 'mac-members' ), $this->render_date( $this->get_registered_time( $user ) ) ),
 		);
 
 		if ( true === $this->display['last_login'] ) {
-			$items[] = array( __( 'Last Login', 'mac-members' ), $this->render_date( $row['last_login'] ?? null, true ) );
+			$items[] = array( __( 'Last Login', 'mac-members' ), $this->render_date( $row['last_login'] ?? null ) );
 		}
 
 		if ( $status instanceof MemberStatus ) {
@@ -532,11 +532,10 @@ final class MembersTableRenderer
 	}
 
 	/**
-	 * A date in the site's date format, with the time when asked, or the time since, like "3 days ago", when
-	 * the "Dates in the members table" setting is Relative. The full date and time shows on hover either way.
-	 * Empty without a time.
+	 * A date as the "Date format" setting says: the day, the day and time, or the time since, like "3 days ago",
+	 * each in the site's formats. The full date and time show on hover. Empty without a time.
 	 */
-	private function render_date( ?int $timestamp, bool $with_time ): string
+	private function render_date( ?int $timestamp ): string
 	{
 		if ( null === $timestamp ) {
 			return '';
@@ -545,10 +544,12 @@ final class MembersTableRenderer
 		$date_format = (string) \get_option( 'date_format', 'F j, Y' );
 		$date_time   = $date_format . ' ' . (string) \get_option( 'time_format', 'g:i a' );
 
-		$text = 'relative' === $this->display['dates']
+		$text = match ( $this->display['dates'] ) {
 			/* translators: %s: time since, such as "3 days". */
-			? sprintf( __( '%s ago', 'mac-members' ), \human_time_diff( $timestamp, time() ) )
-			: \wp_date( $with_time ? $date_time : $date_format, $timestamp );
+			'relative' => sprintf( __( '%s ago', 'mac-members' ), \human_time_diff( $timestamp, time() ) ),
+			'datetime' => \wp_date( $date_time, $timestamp ),
+			default    => \wp_date( $date_format, $timestamp ),
+		};
 
 		return '<time datetime="' . esc_attr( gmdate( 'c', $timestamp ) ) . '" title="' . esc_attr( (string) \wp_date( $date_time, $timestamp ) ) . '">' . esc_html( (string) $text ) . '</time>';
 	}

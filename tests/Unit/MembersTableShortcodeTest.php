@@ -266,8 +266,7 @@ final class MembersTableShortcodeTest extends TestCase {
 		);
 	}
 
-	public function test_registered_shows_the_date_with_the_full_date_and_time_on_hover(): void {
-		$GLOBALS['mac_members_test_options'][ MAC_MEMBERS_SETTINGS_OPTION ] = array( 'date_display' => 'date' );
+	public function test_dates_show_the_day_by_default_with_the_full_date_and_time_on_hover(): void {
 		$this->store_people(
 			array(
 				1 => array(
@@ -283,7 +282,25 @@ final class MembersTableShortcodeTest extends TestCase {
 		);
 	}
 
-	public function test_relative_dates_show_the_time_since_by_default(): void {
+	public function test_datetime_dates_show_the_day_and_the_time(): void {
+		$GLOBALS['mac_members_test_options'][ MAC_MEMBERS_SETTINGS_OPTION ] = array( 'date_display' => 'datetime' );
+		$this->store_people(
+			array(
+				1 => array(
+					'roles'           => array( 'mac_members_pending' ),
+					'user_registered' => '2026-05-01 12:00:00',
+				),
+			)
+		);
+
+		self::assertStringContainsString(
+			'<td data-mac-members-column="registered"><time datetime="2026-05-01T12:00:00+00:00" title="May 1, 2026 12:00 pm">May 1, 2026 12:00 pm</time></td>',
+			$this->create_shortcode()->render()
+		);
+	}
+
+	public function test_relative_dates_show_the_time_since(): void {
+		$GLOBALS['mac_members_test_options'][ MAC_MEMBERS_SETTINGS_OPTION ] = array( 'date_display' => 'relative' );
 		$this->store_people(
 			array(
 				1 => array(
@@ -319,9 +336,9 @@ final class MembersTableShortcodeTest extends TestCase {
 		self::assertStringContainsString( '<th scope="col" data-mac-members-column="last_login">Last Login</th>', $output );
 		// The column starts unchecked, so the stylesheet hides it until the viewer checks it.
 		self::assertStringContainsString( '<input type="checkbox" value="last_login" data-mac-members-column-toggle data-mac-members-column-default="hidden">Last Login</label>', $output );
-		// Last Login shows the time too, and stays empty for a member without a recorded login.
+		// Last Login shows the day like Registered, and stays empty for a member without a recorded login.
 		self::assertStringContainsString(
-			'<td data-mac-members-column="last_login"><time datetime="' . gmdate( 'c', 1790000000 ) . '" title="' . gmdate( 'F j, Y g:i a', 1790000000 ) . '">' . gmdate( 'F j, Y g:i a', 1790000000 ) . '</time></td>',
+			'<td data-mac-members-column="last_login"><time datetime="' . gmdate( 'c', 1790000000 ) . '" title="' . gmdate( 'F j, Y g:i a', 1790000000 ) . '">' . gmdate( 'F j, Y', 1790000000 ) . '</time></td>',
 			$output
 		);
 		self::assertStringContainsString( '<td data-mac-members-column="last_login"></td>', $output );

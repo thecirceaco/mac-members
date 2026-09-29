@@ -29,13 +29,13 @@ MAC Members always uses these four roles. New registrations need `mac_members_pe
 
 ## Settings
 
-The settings page is under `Settings > MAC Members`. Turn on "Show MAC Members as a top-level admin menu item" to give it its own menu item with the MAC icon instead; it's off by default. Saving sends you back to the page, at its new address when this setting changed.
+The settings page is under `Settings > MAC Members`. Turn on "Top-level admin menu" to give it its own menu item with the MAC icon instead; it's off by default. Saving sends you back to the page, at its new address when this setting changed.
 
 The settings page has three sections:
 
-- **Members table**: the roles hidden from the members table, none checked by default; the member details fields, empty by default; the dates, Relative by default, or Date; and the table size, Medium by default, or Small (see Members Table below).
-- **Emails**: the from email; the member emails, one row with Approval, Denial and Deactivation checkboxes; the admin notification email; and the admin emails, a row with the same three checkboxes. Every email is on by default, and the approval emails also go out on reactivation.
-- **Plugin**: the top-level menu item, off by default, and deleting the plugin data on uninstall, off by default (see Review capability below).
+- **Interface**: Hidden roles, none checked by default; Extra modal fields, empty by default; Date format, Date by default, or Datetime or Relative; and Interface scale, Medium by default, or Small (see Members Table below).
+- **Emails**: From email; Member emails, one row with Approval, Denial, Deactivation and Reactivation checkboxes; Admin notification email; and Admin emails, a row with the same four checkboxes. Every email is on by default.
+- **Plugin**: Top-level admin menu, off by default, and Delete plugin data, off by default (see Review capability below).
 
 ## Members Table
 
@@ -55,11 +55,11 @@ The table has a filter for each status (Pending, Approved, Inactive, Denied) and
 
 Every view lists the newest registrations first. The columns are User ID, Email, First Name, Last Name, Username, Registered, Last Login, Details, Status, Roles and Actions. Roles lists the member's roles other than the status roles, for example Officer or Trustee, and the Actions column has only the status changes the member's status allows.
 
-"View details" in the Details column opens a dialog with the row's fields, in the table's order, followed by the fields the "Member details fields" setting lists. Admins use the same dialog; the table doesn't link to the WordPress profile screen. Close, Escape or a click outside the dialog closes it. While it is open, only the dialog scrolls: the page gets `overflow: hidden`, and `scrollbar-gutter: stable` keeps it from shifting where its scrollbar was. Each row carries its details in a `<template>`, escaped on the server, and the script only copies that template into the dialog, so opening it sends no request and a value can't add markup.
+"View details" in the Details column opens a dialog with the row's fields, in the table's order, followed by the fields the "Extra modal fields" setting lists. Admins use the same dialog; the table doesn't link to the WordPress profile screen. Close, Escape or a click outside the dialog closes it. While it is open, only the dialog scrolls: the page gets `overflow: hidden`, and `scrollbar-gutter: stable` keeps it from shifting where its scrollbar was. Each row carries its details in a `<template>`, escaped on the server, and the script only copies that template into the dialog, so opening it sends no request and a value can't add markup.
 
 The dialog's footer has the row's status buttons, the full width of the dialog. A change made there closes the dialog, and the table shows the result as it does for the row's own buttons; an error shows in the footer, since the table's notices are behind the dialog.
 
-The "Member details fields" setting lists the extra fields, one per line or comma-separated, each a user meta key, a colon and a label:
+The "Extra modal fields" setting lists the extra fields, one per line or comma-separated, each a user meta key or ACF field name, a colon and a label. The table itself doesn't show them:
 
 ```text
 phone : Phone
@@ -86,15 +86,15 @@ After a change, a row that no longer belongs in a filtered view disappears, and 
 
 When the table fits its frame, the header sticks to the page, under the admin bar (ACSS's `--admin-bar-height`). A site with a sticky header sets `--mac-members-sticky-offset` to that header's height; ACSS's `--header-height` is not used, because it is the header's height whether or not the header stays on screen. When it doesn't fit, for example on a narrow screen or with many columns, the table scrolls inside its frame, both ways, up to 80% of the screen height, and keeps its header and first visible column in view. The script checks the fit when the page loads and again when the frame or the table changes size.
 
-The "Members table size" setting sets the text and button size: Medium, the default, puts the table, its controls and its buttons in `--text-m`, and Small in `--text-s`. The buttons keep ACSS's `btn--s` class, and Medium sets ACSS's `--btn-font-size`.
+The "Interface scale" setting sets the text and button size of the table, its controls and its modal: Medium, the default, uses `--text-m`, and Small `--text-s`. The buttons keep ACSS's `btn--s` class, and Medium sets ACSS's `--btn-font-size`.
 
-Users who hold a hidden role never show in the members table: not in its rows, its counts, its search or its role filter, so nobody can change their status there. The "Roles hidden from the members table" setting has a checkbox for each role except the four member roles, which cannot be hidden; none is checked by default. Roles with any of the administrative capabilities listed under Security, like Administrator, are always hidden, because status changes refuse their users anyway; their checkboxes show checked and disabled. Editors show, since `unfiltered_html` alone doesn't hide a role. The table leaves those users out with `role__not_in` in every user query. Development builds kept this setting as comma-separated text; its role slugs and names carry over, and its capabilities are dropped.
+Users who hold a hidden role never show in the members table: not in its rows, its counts, its search or its role filter, so nobody can change their status there. The "Hidden roles" setting has a checkbox for each role except the four member roles, which cannot be hidden; none is checked by default. Roles with any of the administrative capabilities listed under Security, like Administrator, are always hidden, because status changes refuse their users anyway; their checkboxes show checked and disabled. Editors show, since `unfiltered_html` alone doesn't hide a role. The table leaves those users out with `role__not_in` in every user query. Development builds kept this setting as comma-separated text; its role slugs and names carry over, and its capabilities are dropped.
 
 The table and the dialog use only ACSS tokens and button classes, and ACSS 4 defines its colors with `light-dark()`, so they follow the color scheme of the page or section around them: the site's scheme, a `scheme--dark` or `scheme--light` section, or the visitor's device when ACSS's scheme is auto. The dialog's backdrop stays black in both. How ACSS's main colors look in the dark scheme, for example the neutral buttons, comes from the site's ACSS settings.
 
 Last Login shows only while MAC Core is active and its "Show last login column" setting is on. MAC Core then records the time of each login through a login form in the `mac_core_last_login` user meta, and MAC Members only reads it; the cell is empty for a member without a recorded login. The column starts hidden, and its checkbox shows it. MAC Members detects MAC Core by its `MAC_CORE_VERSION` constant and reads the setting from the `mac_core_settings` option, so if that option changes shape, the column stops showing rather than failing. The table loads the user meta of every member on the page in one query.
 
-The "Dates in the members table" setting applies to Registered and Last Login. Relative, the default, shows the time since, like "3 days ago"; Date shows the day in the site's date format, and Last Login also the time. Both show the full date and time on hover, in a `<time>` element.
+The "Date format" setting applies to Registered and Last Login, in the table and the modal. Date, the default, shows the day in the site's date format; Datetime adds the time in the site's time format; Relative shows the time since, like "3 days ago". All three show the full date and time on hover, in a `<time>` element.
 
 The stylesheet and the script are versioned with the plugin version and the file's modification time, so a new build reaches browsers and CDNs that keep the old files for a year.
 
@@ -109,7 +109,7 @@ On a page whose content contains the shortcode, the plugin defines `DONOTCACHEPA
 | Approve | Pending or Denied | Approved | approval |
 | Deny | Pending | Denied | denial |
 | Deactivate | Approved | Inactive | deactivation |
-| Reactivate | Inactive | Approved | approval |
+| Reactivate | Inactive | Approved | reactivation |
 
 Denied means a request that was refused; inactive means someone who was a member and no longer is. Approve on a denied member corrects a denial. Nobody is deleted.
 
@@ -125,12 +125,8 @@ MAC Members sends hardcoded HTML emails after successful status changes.
 
 The current notification types are:
 
-- member approval email, also sent on reactivation
-- member denial email
-- member deactivation email
-- admin approval email, also sent on reactivation
-- admin denial email
-- admin deactivation email
+- member approval, denial, deactivation and reactivation emails
+- admin approval, denial, deactivation and reactivation emails
 
 Member emails link to the site's home page rather than `wp-login.php`, because many sites have their own login, registration and password pages. Admin emails list the member's details with the User ID first, then first name, last name, username and email address. They don't link to the WordPress profile screen; the member's full details are in the members table.
 
@@ -159,7 +155,7 @@ wp cap add membership_manager mac_members_review
 
 `mac_members_review` works as a narrow `promote_users`: the plugin changes the roles itself, and only moves members between its four roles, and never adds one that grants a sensitive capability. A reviewer does not need `promote_users`, which in wp-admin would let them give any user any role, or `edit_users`, which would let them edit any user, administrators included.
 
-Deleting the plugin from the Plugins screen keeps its data, like MAC Core, unless "Delete plugin data on uninstall" is on in the settings; it is off by default. With it on, deleting the plugin removes the settings, `mac_members_review` from every role, and the four member roles that no user holds. Roles that users still hold stay, so nobody is left without a role; the settings page shows how many users hold each member role next to the setting. The per-user lock rows always go, because they only exist while a status change runs.
+Deleting the plugin from the Plugins screen keeps its data, like MAC Core, unless "Delete plugin data" is on in the settings; it is off by default. With it on, deleting the plugin removes the settings, `mac_members_review` from every role, and the four member roles that no user holds. Roles that users still hold stay, so nobody is left without a role; the settings page shows how many users hold each member role next to the setting. The per-user lock rows always go, because they only exist while a status change runs.
 
 ## Development
 

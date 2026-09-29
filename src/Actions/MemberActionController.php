@@ -393,9 +393,10 @@ final class MemberActionController implements Service
 		}
 
 		return match ( $transition ) {
-			MemberTransition::Approve, MemberTransition::Reactivate => $this->notifications->send_approval_notifications( $user ),
+			MemberTransition::Approve    => $this->notifications->send_approval_notifications( $user ),
 			MemberTransition::Deny       => $this->notifications->send_denial_notifications( $user ),
 			MemberTransition::Deactivate => $this->notifications->send_deactivation_notifications( $user ),
+			MemberTransition::Reactivate => $this->notifications->send_reactivation_notifications( $user ),
 		};
 	}
 

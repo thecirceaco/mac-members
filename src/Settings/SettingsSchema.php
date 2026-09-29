@@ -22,31 +22,30 @@ final class SettingsSchema
 	public const TYPE_FIELDS = 'fields';
 
 	/**
-	 * Sizes of the members table: see the "Members table size" setting.
+	 * Sizes of the members table and its modal: see the "Interface scale" setting.
 	 */
 	public const TABLE_SIZES = array( 'medium', 'small' );
 
 	/**
-	 * How the members table shows dates: see the "Dates in the members table" setting.
+	 * How the members table and its modal show dates: see the "Date format" setting.
 	 */
-	public const DATE_DISPLAYS = array( 'relative', 'date' );
+	public const DATE_DISPLAYS = array( 'date', 'datetime', 'relative' );
 
 	/**
-	 * The sections of the settings page, in order, with their titles and an optional description.
+	 * The sections of the settings page, in order, with their titles.
 	 *
 	 * @return array<string,array{title:string,description?:string}>
 	 */
 	public function get_sections(): array
 	{
 		return array(
-			'table'  => array(
-				'title' => __( 'Members table', 'mac-members' ),
+			'interface' => array(
+				'title' => __( 'Interface', 'mac-members' ),
 			),
-			'emails' => array(
-				'title'       => __( 'Emails', 'mac-members' ),
-				'description' => __( 'The approval emails also go out when an inactive member is reactivated.', 'mac-members' ),
+			'emails'    => array(
+				'title' => __( 'Emails', 'mac-members' ),
 			),
-			'plugin' => array(
+			'plugin'    => array(
 				'title' => __( 'Plugin', 'mac-members' ),
 			),
 		);
@@ -66,7 +65,8 @@ final class SettingsSchema
 	}
 
 	/**
-	 * The settings in the order of the settings page, each in a section. Toggles with a group share one row.
+	 * The settings in the order of the settings page, each in a section. Toggles with a group share one row, and
+	 * a toggle shows its option label next to its checkbox.
 	 *
 	 * @return array<string,array{label:string,type:string,default:mixed,section:string,description?:string,choices?:array<string,string>,rows?:int,group?:string,option?:string}>
 	 */
@@ -74,41 +74,41 @@ final class SettingsSchema
 	{
 		return array(
 			'hidden_roles' => array(
-				'label'       => __( 'Roles hidden from the members table', 'mac-members' ),
+				'label'       => __( 'Hidden roles', 'mac-members' ),
 				'type'        => self::TYPE_ROLES,
 				'default'     => array(),
-				'section'     => 'table',
-				'description' => __( 'Users who hold a checked role never show in the members table, its counts, its search or its role filter, so nobody can change their status there. Roles with administrative capabilities, like Administrator, are always hidden, because the plugin never changes their users. The four member roles cannot be hidden, so they are not listed.', 'mac-members' ),
+				'section'     => 'interface',
+				'description' => __( 'Members with a checked role don\'t show in the members table, its counts, its search or its role filter, so their status can\'t be changed there. Roles with administrative capabilities, like Administrator, are always hidden. The four member roles can\'t be hidden, so they aren\'t listed.', 'mac-members' ),
 			),
 			'detail_fields' => array(
-				'label'       => __( 'Member details fields', 'mac-members' ),
+				'label'       => __( 'Extra modal fields', 'mac-members' ),
 				'type'        => self::TYPE_FIELDS,
 				'default'     => '',
-				'section'     => 'table',
+				'section'     => 'interface',
 				'rows'        => 12,
-				'description' => __( 'One field per line or comma-separated: the user meta key, a colon and the label, for example phone : Phone. Without a label, the ACF field label shows, or else the key made readable. The member details show these fields after the account fields, in this order. Private keys that start with an underscore, passwords, sessions and capabilities never show.', 'mac-members' ),
+				'description' => __( 'Fields the member details modal shows after the table\'s fields, in this order; the table itself doesn\'t show them. One per line or comma-separated, as key : Label, for example phone : Phone, where the key is a user meta key, an ACF field name or a user field like user_url. With the key alone, the label is the ACF field\'s label, or else the key made readable: local_number shows as Local number. Keys that start with an underscore never show, nor do passwords, password reset keys, login sessions, capabilities and user levels.', 'mac-members' ),
 			),
 			'date_display' => array(
-				'label'       => __( 'Dates in the members table', 'mac-members' ),
+				'label'       => __( 'Date format', 'mac-members' ),
 				'type'        => self::TYPE_CHOICE,
-				'default'     => 'relative',
-				'section'     => 'table',
+				'default'     => 'date',
+				'section'     => 'interface',
 				'choices'     => array_combine(
 					self::DATE_DISPLAYS,
-					array( __( 'Relative', 'mac-members' ), __( 'Date', 'mac-members' ) )
+					array( __( 'Date', 'mac-members' ), __( 'Datetime', 'mac-members' ), __( 'Relative', 'mac-members' ) )
 				),
-				'description' => __( 'For Registered and Last Login. Relative shows the time since, like 3 days ago. Date shows the day in the site\'s date format, and Last Login the time too. Both show the full date and time on hover.', 'mac-members' ),
+				'description' => __( 'For Registered and Last Login, in the table and the modal. Date and Datetime use the site\'s date and time formats; Relative shows the time since, like 3 days ago. The full date and time show on hover.', 'mac-members' ),
 			),
 			'table_size' => array(
-				'label'       => __( 'Members table size', 'mac-members' ),
+				'label'       => __( 'Interface scale', 'mac-members' ),
 				'type'        => self::TYPE_CHOICE,
 				'default'     => 'medium',
-				'section'     => 'table',
+				'section'     => 'interface',
 				'choices'     => array_combine(
 					self::TABLE_SIZES,
 					array( __( 'Medium', 'mac-members' ), __( 'Small', 'mac-members' ) )
 				),
-				'description' => __( 'Medium puts the table, its controls and its buttons in the normal text size, Small in the small one.', 'mac-members' ),
+				'description' => __( 'The text and button size of the members table, its controls and its modal. Medium uses the normal text size, Small the small one.', 'mac-members' ),
 			),
 			'from_email' => array(
 				'label'   => __( 'From email', 'mac-members' ),
@@ -140,6 +140,14 @@ final class SettingsSchema
 				'group'   => 'member_emails',
 				'option'  => __( 'Deactivation', 'mac-members' ),
 			),
+			'send_member_reactivation_email' => array(
+				'label'   => __( 'Send member reactivation email', 'mac-members' ),
+				'type'    => self::TYPE_TOGGLE,
+				'default' => true,
+				'section' => 'emails',
+				'group'   => 'member_emails',
+				'option'  => __( 'Reactivation', 'mac-members' ),
+			),
 			'admin_notification_email' => array(
 				'label'   => __( 'Admin notification email', 'mac-members' ),
 				'type'    => self::TYPE_EMAIL,
@@ -170,18 +178,28 @@ final class SettingsSchema
 				'group'   => 'admin_emails',
 				'option'  => __( 'Deactivation', 'mac-members' ),
 			),
+			'send_admin_reactivation_email' => array(
+				'label'   => __( 'Send admin reactivation email', 'mac-members' ),
+				'type'    => self::TYPE_TOGGLE,
+				'default' => true,
+				'section' => 'emails',
+				'group'   => 'admin_emails',
+				'option'  => __( 'Reactivation', 'mac-members' ),
+			),
 			'top_level_menu' => array(
-				'label'   => __( 'Show MAC Members as a top-level admin menu item', 'mac-members' ),
+				'label'   => __( 'Top-level admin menu', 'mac-members' ),
 				'type'    => self::TYPE_TOGGLE,
 				'default' => false,
 				'section' => 'plugin',
+				'option'  => __( 'Show MAC Members as a top-level admin menu item', 'mac-members' ),
 			),
 			'delete_data_on_uninstall' => array(
-				'label'       => __( 'Delete plugin data on uninstall', 'mac-members' ),
+				'label'       => __( 'Delete plugin data', 'mac-members' ),
 				'type'        => self::TYPE_TOGGLE,
 				'default'     => false,
 				'section'     => 'plugin',
-				'description' => __( 'When the plugin is deleted, remove its settings, the review capability and the member roles that no user holds. Roles that users still hold are kept, so nobody is left without a role.', 'mac-members' ),
+				'option'      => __( 'Delete plugin data on uninstall', 'mac-members' ),
+				'description' => __( 'When the plugin is deleted, also remove its settings, the review capability and the member roles that no user holds. Roles that users still hold stay.', 'mac-members' ),
 			),
 		);
 	}

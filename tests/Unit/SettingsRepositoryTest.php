@@ -42,9 +42,11 @@ final class SettingsRepositoryTest extends TestCase {
 		self::assertTrue( $settings['send_admin_denial_email'] );
 		self::assertTrue( $settings['send_member_deactivation_email'] );
 		self::assertTrue( $settings['send_admin_deactivation_email'] );
+		self::assertTrue( $settings['send_member_reactivation_email'] );
+		self::assertTrue( $settings['send_admin_reactivation_email'] );
 		self::assertFalse( $settings['delete_data_on_uninstall'] );
 		self::assertSame( 'medium', $settings['table_size'] );
-		self::assertSame( 'relative', $settings['date_display'] );
+		self::assertSame( 'date', $settings['date_display'] );
 		self::assertSame( 'Example Site', $repository->get_from_name() );
 	}
 
@@ -59,8 +61,9 @@ final class SettingsRepositoryTest extends TestCase {
 	public function test_date_display_accepts_only_its_choices(): void {
 		$repository = $this->create_repository();
 
-		self::assertSame( 'date', $repository->save( array( 'date_display' => 'Date' ) )['date_display'] );
-		self::assertSame( 'relative', $repository->save( array( 'date_display' => 'ago' ) )['date_display'] );
+		self::assertSame( 'datetime', $repository->save( array( 'date_display' => 'Datetime' ) )['date_display'] );
+		self::assertSame( 'relative', $repository->save( array( 'date_display' => 'relative' ) )['date_display'] );
+		self::assertSame( 'date', $repository->save( array( 'date_display' => 'ago' ) )['date_display'] );
 	}
 
 	public function test_detail_fields_are_saved_one_per_line_with_clean_keys_and_labels(): void {
