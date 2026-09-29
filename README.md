@@ -37,7 +37,7 @@ MAC Members doesn't register users: the site's registration form does, and MAC M
 - Leave "Anyone can register" off. WS Form creates users without it, and with it on, `wp-login.php?action=register` becomes a second way in.
 - The form sends the "request received" emails, so each site can word them; MAC Members sends only the status change emails.
 - An Edit Profile form with an Update action never changes roles, so members can safely edit their own profile.
-- The applicant picks a password in the form and can log in right away. A pending or denied account sees only what any logged-in user sees, so gate members-only content on the Member role, for example with SureMembers access groups that follow the roles, never on being logged in. SureMembers lets a role in only for users who hold no access group, and granting a group to a user adds or removes the group's roles, so don't grant those groups to users directly.
+- The applicant picks a password in the form and can log in right away. A pending or denied account sees only what any logged-in user sees, so gate members-only content on the Member role, for example with SureMembers access groups that follow the roles, never on being logged in. SureMembers lets a role in only for users who hold no access group, and granting a group to a user adds the group's roles while revoking it removes them, so don't grant those groups to users directly.
 - The email address isn't verified: the reviewer checks the applicant against the member list. To verify it, remove the password fields and turn on "Create password" and "Send user notification: User" in the action; WordPress then emails a link to set the password.
 
 ## Settings
