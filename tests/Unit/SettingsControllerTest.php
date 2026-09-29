@@ -33,7 +33,7 @@ final class SettingsControllerTest extends TestCase {
 
 		$controller->register();
 
-		self::assertArrayHasKey( 'admin_menu', $GLOBALS['mac_members_test_actions'] );
+		self::assertSame( 20, $GLOBALS['mac_members_test_actions']['admin_menu'][0]['priority'] );
 		self::assertArrayHasKey( 'admin_init', $GLOBALS['mac_members_test_actions'] );
 		self::assertArrayHasKey( 'admin_notices', $GLOBALS['mac_members_test_actions'] );
 		self::assertArrayHasKey( MAC_MEMBERS_PLUGIN_FILE, $GLOBALS['mac_members_test_activation_hooks'] );

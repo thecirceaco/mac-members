@@ -49,7 +49,8 @@ final class SettingsController implements Service
 	public function register(): void
 	{
 		\register_activation_hook( MAC_MEMBERS_PLUGIN_FILE, array( $this, 'activate' ) );
-		\add_action( 'admin_menu', array( $this, 'register_settings_page' ) );
+		// Priority 20, like MAC Core: as a top-level item, MAC Members sits with MAC Core at the end of the menu.
+		\add_action( 'admin_menu', array( $this, 'register_settings_page' ), 20 );
 		\add_action( 'admin_init', array( $this, 'handle_save' ) );
 		\add_action( 'admin_notices', array( $this, 'render_missing_roles_warning' ) );
 	}

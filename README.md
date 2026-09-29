@@ -29,7 +29,7 @@ MAC Members always uses these four roles. New registrations need `mac_members_pe
 
 ## Settings
 
-The settings page is under `Settings > MAC Members`. Turn on "Top-level admin menu" to give it its own menu item with the MAC icon instead; it's off by default. Saving sends you back to the page, at its new address when this setting changed.
+The settings page is under `Settings > MAC Members`. Turn on "Top-level admin menu" to give it its own menu item with the MAC icon instead, at the end of the menu next to MAC Core, since both add their items at `admin_menu` priority 20; it's off by default. Saving sends you back to the page, at its new address when this setting changed.
 
 The settings page has three sections:
 
