@@ -38,7 +38,7 @@ MAC Members isn't part of the MAC starters, the UC ones included: not every clie
 3. Set `Settings > General > New User Default Role` to Member (Pending), and keep "Anyone can register" off.
 4. In the WS Form "Create Account" form, set the User Management action's Role to Member (Pending) and save the form. Before importing a registration form into a site, check the export with the mac-agent skill `validate-wsform-export`: it fails on an Administrator role and names each registration's role.
 5. Gate members-only content on the Member role with SureMembers access groups that follow the roles (see Registration).
-6. Add a protected page with `[mac_members_table]`, and give each reviewer Member Reviewer on top of their own role (see Members Table and Review capability).
+6. Add a page with `[mac_members_table]` for the reviewers, and give each reviewer Member Reviewer on top of their own role (see Members Table and Review capability). The table shows only to users with `mac_members_review`, so its data stays safe either way. Restrict the page too, with a SureMembers access group whose User Roles list Member Reviewer and Administrator and whose unauthorized action redirects, so other visitors don't land on an empty page and search engines don't index it.
 7. If the site already has members under other roles, such as Subscriber, move them to the member roles once, for example with WP-CLI.
 
 ## Registration
