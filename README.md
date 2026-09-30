@@ -215,6 +215,13 @@ pwsh -NoProfile -File .\bin\build-dev-zip.ps1
 
 To build from a dirty working tree intentionally, pass `-AllowDirty`. The ZIP is written to `dist/`.
 
+### Structure
+
+- `mac-members.php` is the main plugin file and stays minimal: it loads `inc/constants.php` and `inc/autoload.php`, then calls `\MacMembers\Kernel::boot()`.
+- Runtime code lives in `src/`, in the `MacMembers` namespace. A class that registers hooks implements `MacMembers\Contracts\Service`, and `MacMembers\Kernel` registers it.
+- Every name carries the plugin's prefix: `MAC_MEMBERS_*` for constants, `mac_members_*` for options, hooks, actions and AJAX identifiers, and `mac-members` for CSS classes and asset handles.
+- The bundled SureCart licensing SDK in `inc/Vendor/SureCart/Licensing/` sits outside the autoloader. `MacMembers\Licensing\LicensingService` loads it (see License and Updates).
+
 ## License
 
 GPL v3 or later. See the `LICENSE` file for details.
