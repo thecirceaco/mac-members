@@ -55,6 +55,8 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
+      id-token: write
+      attestations: write
     env:
       TAG: ${{ github.ref_name }}
       COMMIT: ${{ needs.verify.outputs.commit }}
@@ -68,8 +70,6 @@ jobs:
       - name: Build ZIP and checksum
         run: bash .github/scripts/build-release-zip.sh "$TAG" "$COMMIT"
 
-      # No build provenance attestation (actions/attest-build-provenance) here: artifact
-      # attestations need a public repository or GitHub Enterprise Cloud.
       - name: Write provenance file
         run: |
           checksum="$(cut -d' ' -f1 "dist/mac-members-${TAG}.zip.sha256")"
@@ -87,6 +87,12 @@ jobs:
             "sha256": "${checksum}"
           }
           EOF
+
+      # Artifact attestations need a public repository, or GitHub Enterprise Cloud.
+      - name: Attest build provenance
+        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        with:
+          subject-path: dist/mac-members-${{ github.ref_name }}.zip
 
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
@@ -127,7 +133,14 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
         run: |
-          gh release create "$TAG" --verify-tag --title "$TAG" --notes "" \
+          zip="mac-members-${TAG}.zip"
+          {
+            echo "SHA-256 of \`${zip}\`: \`$(cut -d' ' -f1 "dist/${zip}.sha256")\`"
+            echo
+            echo "Check its build provenance with \`gh attestation verify ${zip} --repo ${GITHUB_REPOSITORY}\`."
+          } > "$RUNNER_TEMP/notes.md"
+
+          gh release create "$TAG" --verify-tag --title "$TAG" --notes-file "$RUNNER_TEMP/notes.md" \
             "dist/mac-members-${TAG}.zip" \
             "dist/mac-members-${TAG}.zip.sha256" \
             "dist/mac-members-${TAG}.provenance.json"

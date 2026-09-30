@@ -15,7 +15,7 @@
  * Author URI:        https://circea.co
  * Update URI:        https://updates.circea.co/mac-members/
  * Requires PHP:      8.3
- * Requires at least: 6.0
+ * Requires at least: 6.9
  * License:           GPL v3 or later
  * License URI:       http://www.gnu.org/licenses/gpl-3.0.txt
  */
