@@ -89,7 +89,8 @@ final class UpdateCompatibility implements Service
 
 	/**
 	 * The running WordPress version. wp_get_wp_version() arrived in WordPress 6.7 and can't be changed by another
-	 * plugin; MAC Members supports 6.0, so older sites fall back to get_bloginfo( 'version' ).
+	 * plugin. MAC Members requires 6.9, but a site below 6.7 that gets an update anyway falls back to
+	 * get_bloginfo( 'version' ) instead of a fatal error on the Updates screen.
 	 */
 	private function running_version(): string
 	{

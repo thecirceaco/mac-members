@@ -40,6 +40,13 @@ These are the only differences from upstream `src/`:
 
 MAC Members itself doesn't define or hook any of them. The option and transient keys the SDK builds from the product name and the plugin slug, like `macmembers_license_options` and `surecart_<md5 of the slug>_version_info`, stay as they are: they already differ per plugin, and new names would lose what's stored under the old ones.
 
+4. **Redirect after the license form** (`Settings::redirect()`, `Settings.php`). Upstream prints `esc_url( $url )` inside a `<script>`. For HTML, `esc_url()` turns `&` into `&#038;`, which a script doesn't decode, so the `tab=license` of the redirect ended up in the URL fragment: after activating or deactivating a license, the admin landed on the Settings tab instead of the License tab. The copy prints `wp_json_encode( esc_url_raw( $url ) )`, a JavaScript string of the raw URL; `esc_url_raw()` still drops the characters that could close the script. The same change goes into MAC Core's copy.
+
+```diff
+-			window.location.assign("<?php echo esc_url( $url ); ?>");
++			window.location.assign(<?php echo wp_json_encode( esc_url_raw( $url ) ); ?>);
+```
+
 ## Updating
 
 Keep this copy in step with MAC Core's: update both to the same SDK version, with the same local changes.
@@ -48,4 +55,4 @@ Keep this copy in step with MAC Core's: update both to the same SDK version, wit
 2. Copy its `src/*.php` over the files here and reapply the local changes above.
 3. Run `diff -u <upstream>/src/<File>.php <File>.php` for each file. Only the local changes should show.
 4. Update the version and commit in this file.
-5. Run `composer test`. `tests/Unit/BundledSureCartSdkTest.php` checks the namespace and the `register_menu` change, and fails if a hook the SDK fires or a constant it reads has no MAC Members prefix, which also catches a global name that a new SDK version adds.
+5. Run `composer test`. `tests/Unit/BundledSureCartSdkTest.php` checks the namespace, the `register_menu` change and the redirect, and fails if a hook the SDK fires or a constant it reads has no MAC Members prefix, which also catches a global name that a new SDK version adds.

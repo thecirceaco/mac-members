@@ -80,6 +80,14 @@ final class BundledSureCartSdkTest extends TestCase {
 		self::assertStringContainsString( "if ( ! empty( \$this->menu_args['register_menu'] ) ) {\n\t\t\tadd_action( 'admin_menu', array( \$this, 'admin_menu' ), 99 );", $settings );
 	}
 
+	public function test_the_license_form_redirect_keeps_the_tab_in_the_query(): void {
+		$settings = (string) file_get_contents( self::SDK_DIR . '/Settings.php' );
+
+		// esc_url() would turn & into &#038;, which a script doesn't decode, and the tab would end in the fragment.
+		self::assertStringContainsString( 'window.location.assign(<?php echo wp_json_encode( esc_url_raw( $url ) ); ?>);', $settings );
+		self::assertStringNotContainsString( 'window.location.assign("<?php echo esc_url( $url ); ?>");', $settings );
+	}
+
 	public function test_the_readme_records_the_upstream_version_and_the_local_changes(): void {
 		$readme = (string) file_get_contents( self::SDK_DIR . '/README.md' );
 
@@ -87,5 +95,6 @@ final class BundledSureCartSdkTest extends TestCase {
 		self::assertStringContainsString( 'c24515df17bc184686ca3c86761ce0541f60d7b5', $readme );
 		self::assertStringContainsString( '## Local changes', $readme );
 		self::assertStringContainsString( '3. **Prefixed global names.**', $readme );
+		self::assertStringContainsString( '4. **Redirect after the license form**', $readme );
 	}
 }
