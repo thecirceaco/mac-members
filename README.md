@@ -29,6 +29,18 @@ Activation also creates the Member Reviewer role, `mac_members_reviewer`, for th
 
 MAC Members always uses these four roles. New registrations need `mac_members_pending`, for example from the registration form's user action, and membership rules, for example in SureMembers, use `mac_members_approved`. Earlier versions, up to 0.2.0, let a site choose other roles for the statuses; a site whose members hold other roles moves them to these once, for example with WP-CLI.
 
+## Adding MAC Members to a Project
+
+MAC Members isn't part of the MAC starters, the UC ones included: not every client needs member-only content, and the starters don't include SureMembers. Add it, together with SureMembers, to the projects that need member-only content (Mihai, 2026-09-30). Follow this order:
+
+1. Install and activate MAC Members from the release ZIP. Activation creates the member roles and Member Reviewer. The next steps need Member (Pending) to exist: WS Form lists the roles with Administrator first and shows it in place of a role that doesn't exist, and the next save of the form stores it.
+2. Enter the license key in the License tab.
+3. Set `Settings > General > New User Default Role` to Member (Pending), and keep "Anyone can register" off.
+4. In the WS Form "Create Account" form, set the User Management action's Role to Member (Pending) and save the form. Before importing a registration form into a site, check the export with the mac-agent skill `validate-wsform-export`: it fails on an Administrator role and names each registration's role.
+5. Gate members-only content on the Member role with SureMembers access groups that follow the roles (see Registration).
+6. Add a protected page with `[mac_members_table]`, and give each reviewer Member Reviewer on top of their own role (see Members Table and Review capability).
+7. If the site already has members under other roles, such as Subscriber, move them to the member roles once, for example with WP-CLI.
+
 ## Registration
 
 MAC Members doesn't register users: the site's registration form does, and MAC Members reviews the accounts it creates. On MAC sites that's the WS Form "Create Account" form with a User Management action, checked against WS Form User 1.6.8 on 2026-09-30.
