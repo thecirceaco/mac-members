@@ -10,7 +10,7 @@
  * Plugin Name:       MAC Members
  * Plugin URI:        https://circea.co
  * Description:       Company standard membership plugin for WordPress projects.
- * Version:           0.5.1
+ * Version:           1.0.0
  * Author:            Circea
  * Author URI:        https://circea.co
  * Update URI:        https://updates.circea.co/mac-members/
