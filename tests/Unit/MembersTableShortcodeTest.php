@@ -32,7 +32,7 @@ final class MembersTableShortcodeTest extends TestCase {
 	/**
 	 * The columns without Last Login, which shows only while MAC Core records last logins.
 	 */
-	private const SHOWN_COLUMNS = array( 'user_id', 'email', 'first_name', 'last_name', 'username', 'registered', 'details', 'status', 'roles', 'actions' );
+	private const SHOWN_COLUMNS = array( 'first_name', 'last_name', 'email', 'registered', 'status', 'roles', 'details', 'actions', 'username', 'user_id' );
 
 	protected function setUp(): void {
 		parent::setUp();
@@ -185,18 +185,19 @@ final class MembersTableShortcodeTest extends TestCase {
 		}
 	}
 
-	public function test_columns_start_with_the_user_id_and_end_with_status_and_actions(): void {
+	public function test_columns_start_with_the_name_and_end_with_the_ones_a_reviewer_rarely_needs(): void {
 		$this->store_members( array( 7 => 'mac_members_pending' ) );
 
 		$output = $this->create_shortcode()->render();
 
 		self::assertSame( 10, preg_match_all( '/<th scope="col" data-mac-members-column="([^"]+)">([^<]+)<\/th>/', $output, $headers ) );
 		self::assertSame(
-			array( 'User ID', 'Email', 'First Name', 'Last Name', 'Username', 'Registered', 'Details', 'Status', 'Roles', 'Actions' ),
+			array( 'First Name', 'Last Name', 'Email', 'Registered', 'Status', 'Roles', 'Details', 'Actions', 'Username', 'User ID' ),
 			$headers[2]
 		);
 		self::assertSame( self::SHOWN_COLUMNS, $headers[1] );
-		self::assertStringContainsString( '<tr class="mac-members-list__row" data-mac-members-user-id="7" data-mac-members-status="pending"><td data-mac-members-column="user_id">7</td><td data-mac-members-column="email">member7@example.test</td>', $output );
+		self::assertStringContainsString( '<tr class="mac-members-list__row" data-mac-members-user-id="7" data-mac-members-status="pending"><td data-mac-members-column="first_name"></td><td data-mac-members-column="last_name"></td><td data-mac-members-column="email">member7@example.test</td>', $output );
+		self::assertStringContainsString( '<td data-mac-members-column="username">member7</td><td data-mac-members-column="user_id">7</td></tr>', $output );
 	}
 
 	public function test_roles_column_lists_the_other_roles_of_each_member(): void {
@@ -215,15 +216,16 @@ final class MembersTableShortcodeTest extends TestCase {
 		self::assertStringContainsString( '<td class="mac-members-roles" data-mac-members-column="roles"></td>', $output );
 	}
 
-	public function test_column_checkboxes_are_all_checked_by_default(): void {
+	public function test_column_checkboxes_start_checked_except_roles_username_and_user_id(): void {
 		$this->store_members( array( 1 => 'mac_members_pending' ) );
 
 		$output = $this->create_shortcode()->render();
 
-		self::assertSame( 10, preg_match_all( '/<input type="checkbox" value="([^"]+)" data-mac-members-column-toggle( checked)?>/', $output, $boxes ) );
+		self::assertSame( 10, preg_match_all( '/<input type="checkbox" value="([^"]+)" data-mac-members-column-toggle( data-mac-members-column-default="hidden")?( checked)?>/', $output, $boxes ) );
 		self::assertSame( self::SHOWN_COLUMNS, $boxes[1] );
-		self::assertSame( array_fill( 0, 10, ' checked' ), $boxes[2] );
-		self::assertStringContainsString( '<label class="mac-members-columns__option"><input type="checkbox" value="roles" data-mac-members-column-toggle checked>Roles</label>', $output );
+		self::assertSame( array( 'first_name', 'last_name', 'email', 'registered', 'status', 'details', 'actions' ), array_keys( array_filter( array_combine( $boxes[1], $boxes[3] ) ) ) );
+		self::assertSame( array( 'roles', 'username', 'user_id' ), array_keys( array_filter( array_combine( $boxes[1], $boxes[2] ) ) ) );
+		self::assertStringContainsString( '<label class="mac-members-columns__option"><input type="checkbox" value="roles" data-mac-members-column-toggle data-mac-members-column-default="hidden">Roles</label>', $output );
 		// The checkboxes sit right above the table, under the status filters and the role and search form.
 		self::assertLessThan( strpos( $output, 'class="mac-members-search"' ), strpos( $output, 'class="mac-members-filters"' ) );
 		self::assertLessThan( strpos( $output, 'class="mac-members-columns"' ), strpos( $output, 'class="mac-members-search"' ) );
@@ -237,8 +239,8 @@ final class MembersTableShortcodeTest extends TestCase {
 		$output = $this->create_shortcode()->render();
 
 		self::assertStringContainsString( '<input type="checkbox" value="email" data-mac-members-column-toggle>', $output );
-		self::assertStringContainsString( '<input type="checkbox" value="roles" data-mac-members-column-toggle>', $output );
-		self::assertStringContainsString( '<input type="checkbox" value="user_id" data-mac-members-column-toggle checked>', $output );
+		self::assertStringContainsString( '<input type="checkbox" value="roles" data-mac-members-column-toggle data-mac-members-column-default="hidden">', $output );
+		self::assertStringContainsString( '<input type="checkbox" value="first_name" data-mac-members-column-toggle checked>', $output );
 		// Hidden columns are still rendered: the stylesheet hides them while their checkbox is unchecked.
 		self::assertStringContainsString( '<td data-mac-members-column="email">member1@example.test</td>', $output );
 	}
@@ -316,7 +318,7 @@ final class MembersTableShortcodeTest extends TestCase {
 		);
 	}
 
-	public function test_last_login_column_shows_after_registered_while_mac_core_records_last_logins(): void {
+	public function test_last_login_column_shows_after_actions_while_mac_core_records_last_logins(): void {
 		$this->store_people(
 			array(
 				1 => array(
@@ -352,7 +354,8 @@ final class MembersTableShortcodeTest extends TestCase {
 
 		self::assertStringContainsString( '<input type="checkbox" value="last_login" data-mac-members-column-toggle data-mac-members-column-default="hidden" checked>Last Login</label>', $output );
 		self::assertStringContainsString( '<input type="checkbox" value="email" data-mac-members-column-toggle>Email</label>', $output );
-		self::assertStringContainsString( '<input type="checkbox" value="username" data-mac-members-column-toggle checked>Username</label>', $output );
+		self::assertStringContainsString( '<input type="checkbox" value="first_name" data-mac-members-column-toggle checked>First Name</label>', $output );
+		self::assertStringContainsString( '<input type="checkbox" value="username" data-mac-members-column-toggle data-mac-members-column-default="hidden">Username</label>', $output );
 	}
 
 	public function test_last_login_column_is_missing_while_mac_core_does_not_record_last_logins(): void {
@@ -398,7 +401,7 @@ final class MembersTableShortcodeTest extends TestCase {
 		self::assertSame( 1, preg_match( '/<template data-mac-members-details data-mac-members-details-title="Ana Pop"><dl class="mac-members-details__list">(.*?)<\/dl><\/template>/s', $output, $details ) );
 		self::assertSame( 10, preg_match_all( '/<dt>([^<]*)<\/dt>/', $details[1], $labels ) );
 		self::assertSame(
-			array( 'User ID', 'Email', 'First Name', 'Last Name', 'Username', 'Registered', 'Status', 'Roles', 'Local #', 'Phone' ),
+			array( 'First Name', 'Last Name', 'Email', 'Registered', 'Status', 'Roles', 'Username', 'User ID', 'Local #', 'Phone' ),
 			$labels[1]
 		);
 		self::assertStringContainsString( '<dt>Registered</dt><dd><time datetime="2026-05-01T12:00:00+00:00" title="May 1, 2026 12:00 pm">May 1, 2026</time></dd>', $details[1] );

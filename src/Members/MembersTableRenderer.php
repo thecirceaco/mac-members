@@ -16,15 +16,16 @@ if ( ! defined( 'ABSPATH' ) ) {
 final class MembersTableRenderer
 {
 	/**
-	 * The table's columns, in order. The column checkboxes can hide any of them. Last Login shows only while MAC
+	 * The table's columns, in order: who the member is, the review (status, roles, details and actions), then the
+	 * columns a reviewer rarely needs. The column checkboxes can hide any of them. Last Login shows only while MAC
 	 * Core records last logins.
 	 */
-	public const COLUMN_KEYS = array( 'user_id', 'email', 'first_name', 'last_name', 'username', 'registered', 'last_login', 'details', 'status', 'roles', 'actions' );
+	public const COLUMN_KEYS = array( 'first_name', 'last_name', 'email', 'registered', 'status', 'roles', 'details', 'actions', 'last_login', 'username', 'user_id' );
 
 	/**
-	 * Columns that start hidden until the viewer checks them.
+	 * Columns that start hidden until the viewer checks them. The member details dialog shows them either way.
 	 */
-	public const DEFAULT_HIDDEN_COLUMNS = array( 'last_login' );
+	public const DEFAULT_HIDDEN_COLUMNS = array( 'roles', 'last_login', 'username', 'user_id' );
 
 	/**
 	 * Display options: the columns the viewer hid, the size (medium or small), how dates show (date, datetime or
@@ -121,20 +122,20 @@ final class MembersTableRenderer
 	 */
 	public function get_columns(): array
 	{
-		$columns = array_combine(
-			self::COLUMN_KEYS,
+		$columns = array_replace(
+			array_flip( self::COLUMN_KEYS ),
 			array(
-				__( 'User ID', 'mac-members' ),
-				__( 'Email', 'mac-members' ),
-				__( 'First Name', 'mac-members' ),
-				__( 'Last Name', 'mac-members' ),
-				__( 'Username', 'mac-members' ),
-				__( 'Registered', 'mac-members' ),
-				__( 'Last Login', 'mac-members' ),
-				__( 'Details', 'mac-members' ),
-				__( 'Status', 'mac-members' ),
-				__( 'Roles', 'mac-members' ),
-				__( 'Actions', 'mac-members' ),
+				'first_name' => __( 'First Name', 'mac-members' ),
+				'last_name'  => __( 'Last Name', 'mac-members' ),
+				'email'      => __( 'Email', 'mac-members' ),
+				'registered' => __( 'Registered', 'mac-members' ),
+				'status'     => __( 'Status', 'mac-members' ),
+				'roles'      => __( 'Roles', 'mac-members' ),
+				'details'    => __( 'Details', 'mac-members' ),
+				'actions'    => __( 'Actions', 'mac-members' ),
+				'last_login' => __( 'Last Login', 'mac-members' ),
+				'username'   => __( 'Username', 'mac-members' ),
+				'user_id'    => __( 'User ID', 'mac-members' ),
 			)
 		);
 
@@ -471,25 +472,27 @@ final class MembersTableRenderer
 		$login  = $this->get_user_value( $user, 'user_login' );
 		$title  = trim( $first . ' ' . $last );
 
-		// Each item's label and its value as HTML, escaped.
-		$items = array(
-			array( __( 'User ID', 'mac-members' ), esc_html( (string) $id ) ),
-			array( __( 'Email', 'mac-members' ), esc_html( $this->get_user_value( $user, 'user_email' ) ) ),
-			array( __( 'First Name', 'mac-members' ), esc_html( $first ) ),
-			array( __( 'Last Name', 'mac-members' ), esc_html( $last ) ),
-			array( __( 'Username', 'mac-members' ), esc_html( $login ) ),
-			array( __( 'Registered', 'mac-members' ), $this->render_date( $this->get_registered_time( $user ) ) ),
+		// Each field's value as HTML, escaped, keyed by column.
+		$fields = array(
+			'first_name' => esc_html( $first ),
+			'last_name'  => esc_html( $last ),
+			'email'      => esc_html( $this->get_user_value( $user, 'user_email' ) ),
+			'registered' => $this->render_date( $this->get_registered_time( $user ) ),
+			'status'     => $status instanceof MemberStatus ? '<span class="mac-members-status__label mac-members-status__label--' . esc_attr( $status->value ) . '">' . esc_html( $status->label() ) . '</span>' : null,
+			'roles'      => esc_html( implode( ', ', $row['roles'] ?? array() ) ),
+			'last_login' => $this->render_date( $row['last_login'] ?? null ),
+			'username'   => esc_html( $login ),
+			'user_id'    => esc_html( (string) $id ),
 		);
 
-		if ( true === $this->display['last_login'] ) {
-			$items[] = array( __( 'Last Login', 'mac-members' ), $this->render_date( $row['last_login'] ?? null ) );
-		}
+		// Each item's label and its value, in the table's order. Last Login comes only while the table shows it.
+		$items = array();
 
-		if ( $status instanceof MemberStatus ) {
-			$items[] = array( __( 'Status', 'mac-members' ), '<span class="mac-members-status__label mac-members-status__label--' . esc_attr( $status->value ) . '">' . esc_html( $status->label() ) . '</span>' );
+		foreach ( $this->get_columns() as $key => $label ) {
+			if ( isset( $fields[ $key ] ) ) {
+				$items[] = array( $label, $fields[ $key ] );
+			}
 		}
-
-		$items[] = array( __( 'Roles', 'mac-members' ), esc_html( implode( ', ', $row['roles'] ?? array() ) ) );
 
 		foreach ( $row['details'] ?? array() as $detail ) {
 			$items[] = array( $detail['label'], esc_html( $detail['value'] ) );
