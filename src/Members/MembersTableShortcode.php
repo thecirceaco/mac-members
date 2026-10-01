@@ -123,7 +123,7 @@ final class MembersTableShortcode implements Service
 			$this->get_pagination( $view, $page, $per_page, $members['total'], $base_url, $kept ),
 			Roles::missing(),
 			$this->render_token->issue( $user_ids ),
-			$this->get_search_form( null === $fixed_view ? $view : null, $base_url, $roles, $role, $search ),
+			$this->get_search_form( null === $fixed_view ? $view : null, $base_url, $roles, $role, $search, $kept ),
 			array(
 				'hidden_columns' => $this->get_hidden_columns(),
 				'size'           => $this->get_choice( 'table_size', SettingsSchema::TABLE_SIZES ),
@@ -311,14 +311,16 @@ final class MembersTableShortcode implements Service
 
 	/**
 	 * The role and search form. It sends the page's other query arguments and the current view as hidden
-	 * fields, because a GET form replaces the query string of its action.
+	 * fields, because a GET form replaces the query string of its action. While a role or a search is set, its
+	 * reset link shows the same view and page size without them.
 	 *
 	 * @param string|null          $view  The current view, or null when the shortcode fixes it.
 	 * @param array<string,string> $roles Roles the role filter offers, keyed by slug.
+	 * @param array<string,string> $kept  The page size, role and search query arguments that are set.
 	 *
-	 * @return array{action:string,hidden:array<string,string>,roles:array<string,string>,role:string,search:string}
+	 * @return array{action:string,hidden:array<string,string>,roles:array<string,string>,role:string,search:string,reset:string}
 	 */
-	private function get_search_form( ?string $view, string $base_url, array $roles, string $role, string $search ): array
+	private function get_search_form( ?string $view, string $base_url, array $roles, string $role, string $search, array $kept ): array
 	{
 		$parts  = explode( '?', $base_url, 2 );
 		$query  = array();
@@ -336,12 +338,20 @@ final class MembersTableShortcode implements Service
 			$hidden[ self::STATUS_QUERY_ARG ] = $view;
 		}
 
+		$reset = '';
+
+		if ( '' !== $role || '' !== $search ) {
+			$view_arg = null === $view ? array() : array( self::STATUS_QUERY_ARG => $view );
+			$reset    = \add_query_arg( $view_arg + array_diff_key( $kept, array_flip( array( self::ROLE_QUERY_ARG, self::SEARCH_QUERY_ARG ) ) ), $base_url );
+		}
+
 		return array(
 			'action' => $parts[0],
 			'hidden' => $hidden,
 			'roles'  => $roles,
 			'role'   => $role,
 			'search' => $search,
+			'reset'  => $reset,
 		);
 	}
 

@@ -34,6 +34,7 @@
 	margin: 0;
 	padding-block: 0.75em;
 	padding-inline: 1em;
+	font-size: var(--mac-members-size);
 	border: var(--border-size) var(--border-style) var(--info);
 	border-radius: var(--radius);
 	background: var(--info-ultra-light);
@@ -86,10 +87,13 @@
 	font-weight: 700;
 }
 
+/* Bricks makes every label light gray, with 5px under it; these keep the text color and sit on the line. */
 .mac-members-columns__option {
 	display: inline-flex;
 	align-items: center;
 	gap: 0.5ch;
+	margin: 0;
+	color: inherit;
 	cursor: pointer;
 }
 
@@ -135,9 +139,35 @@
 	line-height: var(--text-line-height);
 }
 
+/*
+ * The search and, while a role or a search is set, the reset link wrap together. The flex basis keeps them on the
+ * role filter's row where Bricks makes every input 100% wide.
+ */
+.mac-members-search__query {
+	display: flex;
+	flex: 1 1 24ch;
+	gap: 1ch;
+	min-inline-size: 0;
+}
+
 .mac-members-search__input {
-	flex: 1 1 auto;
+	flex: 1 1 0;
+	min-inline-size: 0;
 	appearance: none;
+}
+
+/* An outline icon button, square and as tall as the search. */
+.mac-members-search__reset {
+	--btn-min-width: auto;
+	flex: none;
+	justify-content: center;
+	aspect-ratio: 1;
+	padding: 0;
+}
+
+.mac-members-search__reset-icon {
+	inline-size: 1.25em;
+	block-size: 1.25em;
 }
 
 .mac-members-search__input::placeholder {
@@ -489,6 +519,7 @@ html:has(.mac-members-details:modal) {
 	margin: 0;
 	padding-block: 0.75em;
 	padding-inline: 1em;
+	font-size: var(--mac-members-size);
 	border: var(--border);
 	border-radius: var(--card-radius, var(--radius));
 	background: var(--bg-ultra-light);
@@ -528,10 +559,13 @@ html:has(.mac-members-details:modal) {
 	--btn-min-width: auto;
 }
 
+/* A label too, so it keeps the text color and no margin, like the column checkboxes. */
 .mac-members-per-page {
 	display: flex;
 	align-items: center;
 	gap: 1ch;
+	margin: 0;
+	color: inherit;
 }
 
 .mac-members-per-page__select {

@@ -38,6 +38,11 @@ final class MembersTableRenderer
 	);
 
 	/**
+	 * The reset link's icon: an arrow turning back, drawn in the text color.
+	 */
+	private const RESET_ICON = '<svg class="mac-members-search__reset-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M3.5 12a8.5 8.5 0 1 0 8.5-8.5A8.5 8.5 0 0 0 6 6"/><path d="M6 1.5V6h4.5"/></svg>';
+
+	/**
 	 * The display options of the table being rendered.
 	 *
 	 * @var array{hidden_columns:array<int,string>,size:string,dates:string,last_login:bool}
@@ -51,7 +56,7 @@ final class MembersTableRenderer
 	 * @param array{page?:int,pages?:int,per_page?:int,total?:int,first?:int,last?:int,links?:array<int,array{page:int,url:string,current:bool}|null>,previous_url?:string,next_url?:string} $pagination Pagination.
 	 * @param array<int,string>                                      $missing_roles Slugs of the member roles that do not exist.
 	 * @param string                                                 $render_token Token that status changes from this table must send.
-	 * @param array{action?:string,hidden?:array<string,string>,roles?:array<string,string>,role?:string,search?:string} $search_form Role and search form; empty hides it.
+	 * @param array{action?:string,hidden?:array<string,string>,roles?:array<string,string>,role?:string,search?:string,reset?:string} $search_form Role and search form; empty hides it.
 	 * @param array{hidden_columns?:array<int,string>,size?:string,dates?:string,last_login?:bool} $display Display options.
 	 */
 	public function render(
@@ -267,9 +272,10 @@ final class MembersTableRenderer
 
 	/**
 	 * A GET form without buttons: the role filter, when members hold other roles, and the search. Enter in the
-	 * search sends the form, and the script sends it when the role changes.
+	 * search sends the form, and the script sends it when the role changes and as the search is typed. While a
+	 * role or a search is set, a reset link after the search shows the view without them.
 	 *
-	 * @param array{action?:string,hidden?:array<string,string>,roles?:array<string,string>,role?:string,search?:string} $form Role and search form.
+	 * @param array{action?:string,hidden?:array<string,string>,roles?:array<string,string>,role?:string,search?:string,reset?:string} $form Role and search form.
 	 */
 	private function render_search_form( array $form, string $form_id ): string
 	{
@@ -280,6 +286,7 @@ final class MembersTableRenderer
 		$roles  = $form['roles'] ?? array();
 		$role   = (string) ( $form['role'] ?? '' );
 		$search = (string) ( $form['search'] ?? '' );
+		$reset  = (string) ( $form['reset'] ?? '' );
 		$output = '<form class="mac-members-search" id="' . esc_attr( $form_id ) . '" method="get" action="' . esc_url( (string) ( $form['action'] ?? '' ) ) . '" role="search" aria-label="' . esc_attr__( 'Filter members', 'mac-members' ) . '">';
 
 		foreach ( $form['hidden'] ?? array() as $name => $value ) {
@@ -298,7 +305,14 @@ final class MembersTableRenderer
 			$output .= '</select></span>';
 		}
 
+		$output .= '<span class="mac-members-search__query">';
 		$output .= '<input class="mac-members-search__input" type="search" name="' . esc_attr( MembersTableShortcode::SEARCH_QUERY_ARG ) . '" value="' . esc_attr( $search ) . '" maxlength="' . esc_attr( (string) MembersQuery::SEARCH_MAX_LENGTH ) . '" placeholder="' . esc_attr__( 'Search by name, email or username', 'mac-members' ) . '" aria-label="' . esc_attr__( 'Search members', 'mac-members' ) . '">';
+
+		if ( '' !== $reset ) {
+			$output .= '<a class="mac-members-search__reset btn--neutral btn--outline btn--s" href="' . esc_url( $reset ) . '" aria-label="' . esc_attr__( 'Reset filters', 'mac-members' ) . '" title="' . esc_attr__( 'Reset filters', 'mac-members' ) . '">' . self::RESET_ICON . '</a>';
+		}
+
+		$output .= '</span>';
 		$output .= '</form>';
 
 		return $output;

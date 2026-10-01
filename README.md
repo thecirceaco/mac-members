@@ -100,20 +100,23 @@ Right above the table, under the role and search form, a checkbox for each colum
 
 Under the table, the page links sit on the left: Previous, the first and last page, the current page with one page on each side, gaps for the pages in between, and Next. On the right, "Per page" chooses 24, 48, 96 or 192 members per page, 24 by default, and the range shows which members the page lists, such as "1-24 of 2,353". The page and the page size are kept in the `mac_members_page` and `mac_members_per_page` query arguments. A page past the end, for example after a larger page size, shows the last page. The page size select belongs to the role and search form, so choosing a size keeps the role and the search and starts again at page 1.
 
-A form above the table narrows any view. It has no buttons:
+A form above the table narrows any view. It has no submit button:
 
 - **Role** lists the other roles the shown members hold, for example Officer or Trustee, without the four status roles and the hidden roles. It shows only when members hold such a role, and choosing a role reloads the table.
-- **Search** fills the rest of the row and matches members whose first name, last name, email, username or display name contains every word. A number also matches the user ID. Enter runs the search, and an empty search shows everyone again.
+- **Search** fills the rest of the row and matches members whose first name, last name, email, username or display name contains every word. A number also matches the user ID. The search runs by itself 400 ms after typing stops, once it has at least 3 characters, and emptying it shows everyone again; Enter runs it at any length, for example for a short user ID. The page reloads with the results, and the cursor stays at the end of the search. Letters typed while the page loads are kept, and the search runs again with them.
+- **Reset**, an icon button after the search, shows while a role or a search is set. It goes back to the same view and page size without them.
 
 The role and the search are kept in the `mac_members_role` and `mac_members_search` query arguments. The status filters, their counts and the page links keep them.
 
 ACSS keeps its `btn--` classes in a cascade layer, while its reset `input, button, textarea, select { font: inherit; }` is outside any layer, so on a `<button>` the reset wins and the button loses the ACSS button font. The table's buttons use `revert-layer` for their background, border, color and font, so the ACSS button styles apply, hover included.
 
+Bricks styles every form element on the page: its base CSS makes each `label` light gray with 5px under it, and each `input` 100% wide. The column checkboxes and "Per page" keep the text color and no margin, and the search sizes itself with a flex basis, so on Bricks sites the table looks as it does on Etch. Checked on 2026-10-01 with Bricks 2.4.2 and the Bricks starter's ACSS.
+
 After a change, a row that no longer belongs in a filtered view disappears, and in the All view the row shows its new status and buttons. The filter counts and the range follow the changes. When the last row of a page goes and members are left on other pages, the page loads again to show them.
 
 When the table fits its frame, the header sticks to the page, under the admin bar (ACSS's `--admin-bar-height`). A site with a sticky header sets `--mac-members-sticky-offset` to that header's height; ACSS's `--header-height` is not used, because it is the header's height whether or not the header stays on screen. When it doesn't fit, for example on a narrow screen or with many columns, the table scrolls inside its frame, both ways, up to 80% of the screen height, and keeps its header and first visible column in view. The script checks the fit when the page loads and again when the frame or the table changes size.
 
-The "Interface scale" setting sets the text and button size of the table, its controls and its modal: Medium, the default, uses `--text-m`, and Small `--text-s`. The buttons keep ACSS's `btn--s` class, and Medium sets ACSS's `--btn-font-size`.
+The "Interface scale" setting sets the text and button size of the table, its controls, its messages and its modal: Medium, the default, uses `--text-m`, and Small `--text-s`. The buttons keep ACSS's `btn--s` class, and Medium sets ACSS's `--btn-font-size`.
 
 Users who hold a hidden role never show in the members table: not in its rows, its counts, its search or its role filter, so nobody can change their status there. The "Hidden roles" setting has a checkbox for each role except the four member roles, which cannot be hidden; none is checked by default. Roles with any of the administrative capabilities listed under Security, like Administrator, are always hidden, because status changes refuse their users anyway; their checkboxes show checked and disabled. Editors show, since `unfiltered_html` alone doesn't hide a role. The table leaves those users out with `role__not_in` in every user query. Development builds kept this setting as comma-separated text; its role slugs and names carry over, and its capabilities are dropped.
 

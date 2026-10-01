@@ -476,4 +476,105 @@
 
 		select.form.submit();
 	});
+
+	// The search sends its form by itself 400 ms after the last change, once it has at least 3 characters, or
+	// when it's emptied while a search is set; Enter sends it at any length. The page that loads next puts the
+	// cursor back at the end of the search, with anything typed while it loaded, and searches again for that.
+	const searchDelay = 400;
+	const searchMinLength = 3;
+	const searchStorageKey = 'mac_members_search';
+	const searchStorageAge = 15000;
+
+	const rememberSearch = (form, value) => {
+		try {
+			window.sessionStorage.setItem(searchStorageKey, JSON.stringify({ action: form.action, value, time: Date.now() }));
+		} catch (error) {
+			// Without session storage the next page only leaves the cursor out of the search.
+		}
+	};
+
+	const takeRememberedSearch = (form) => {
+		try {
+			const stored = JSON.parse(window.sessionStorage.getItem(searchStorageKey) || 'null');
+
+			window.sessionStorage.removeItem(searchStorageKey);
+
+			if (!stored || stored.action !== form.action || typeof stored.value !== 'string' || Date.now() - stored.time > searchStorageAge) {
+				return null;
+			}
+
+			return stored.value;
+		} catch (error) {
+			return null;
+		}
+	};
+
+	document.querySelectorAll('form.mac-members-search').forEach((form) => {
+		const input = form.querySelector('.mac-members-search__input');
+
+		if (!input) {
+			return;
+		}
+
+		const applied = input.value.trim();
+		let timer = 0;
+		let sending = false;
+
+		const send = () => {
+			sending = true;
+			rememberSearch(form, input.value);
+
+			if (typeof form.requestSubmit === 'function') {
+				form.requestSubmit();
+				return;
+			}
+
+			form.submit();
+		};
+
+		const schedule = () => {
+			const value = input.value.trim();
+
+			window.clearTimeout(timer);
+
+			if (value === applied || (value !== '' && value.length < searchMinLength)) {
+				return;
+			}
+
+			timer = window.setTimeout(send, searchDelay);
+		};
+
+		input.addEventListener('input', (event) => {
+			if (!event.isComposing) {
+				schedule();
+			}
+		});
+
+		input.addEventListener('compositionend', schedule);
+
+		input.addEventListener('keydown', (event) => {
+			if (event.key === 'Enter' && !event.isComposing) {
+				window.clearTimeout(timer);
+				sending = true;
+				rememberSearch(form, input.value);
+			}
+		});
+
+		window.addEventListener('pagehide', () => {
+			if (sending) {
+				rememberSearch(form, input.value);
+			}
+		});
+
+		const remembered = takeRememberedSearch(form);
+
+		if (remembered === null) {
+			return;
+		}
+
+		input.value = remembered;
+		input.focus();
+		input.setSelectionRange(remembered.length, remembered.length);
+		schedule();
+	});
 })();
