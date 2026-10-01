@@ -39,9 +39,9 @@ final class MembersTableRenderer
 	);
 
 	/**
-	 * The reset link's icon: an arrow turning back, drawn in the text color.
+	 * The reset link's icon, Streamline Ultimate's Button Refresh Arrow (bold), filled with the link's color.
 	 */
-	private const RESET_ICON = '<svg class="mac-members-search__reset-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M3.5 12a8.5 8.5 0 1 0 8.5-8.5A8.5 8.5 0 0 0 6 6"/><path d="M6 1.5V6h4.5"/></svg>';
+	private const RESET_ICON = '<svg class="mac-members-search__reset-icon" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false"><path d="M10.66 20.07a1.25 1.25 0 0 0 -0.5 2.45 11 11 0 0 0 2.2 0.23 10.75 10.75 0 1 0 -10 -6.65 0.24 0.24 0 0 1 -0.09 0.29l-1 0.73a1 1 0 0 0 -0.39 1 1 1 0 0 0 0.77 0.77l4 0.85 0.21 0a1 1 0 0 0 0.54 -0.16 1.05 1.05 0 0 0 0.43 -0.58l0.94 -4.4a1 1 0 0 0 -1.56 -1l-1.37 1a0.24 0.24 0 0 1 -0.22 0 0.22 0.22 0 0 1 -0.16 -0.16 8.26 8.26 0 1 1 6.2 5.64Z"/></svg>';
 
 	/**
 	 * The display options of the table being rendered.
@@ -272,9 +272,10 @@ final class MembersTableRenderer
 	}
 
 	/**
-	 * A GET form without buttons: the role filter, when members hold other roles, and the search. Enter in the
-	 * search sends the form, and the script sends it when the role changes and as the search is typed. While a
-	 * role or a search is set, a reset link after the search shows the view without them.
+	 * A GET form without a submit button: the role filter, when members hold other roles, and the search. Enter
+	 * in the search sends the form, and the script sends it when the role changes and as the search is typed.
+	 * The reset link after the search shows the view without the role and the search; it is active while one of
+	 * them is set.
 	 *
 	 * @param array{action?:string,hidden?:array<string,string>,roles?:array<string,string>,role?:string,search?:string,reset?:string} $form Role and search form.
 	 */
@@ -310,7 +311,10 @@ final class MembersTableRenderer
 		$output .= '<input class="mac-members-search__input" type="search" name="' . esc_attr( MembersTableShortcode::SEARCH_QUERY_ARG ) . '" value="' . esc_attr( $search ) . '" maxlength="' . esc_attr( (string) MembersQuery::SEARCH_MAX_LENGTH ) . '" placeholder="' . esc_attr__( 'Search by name, email or username', 'mac-members' ) . '" aria-label="' . esc_attr__( 'Search members', 'mac-members' ) . '">';
 
 		if ( '' !== $reset ) {
-			$output .= '<a class="mac-members-search__reset btn--neutral btn--outline btn--s" href="' . esc_url( $reset ) . '" aria-label="' . esc_attr__( 'Reset filters', 'mac-members' ) . '" title="' . esc_attr__( 'Reset filters', 'mac-members' ) . '">' . self::RESET_ICON . '</a>';
+			$active  = '' !== $role || '' !== $search;
+			$output .= '<a class="mac-members-search__reset btn--danger btn--s' . ( $active ? ' is-active' : '' ) . '" href="' . esc_url( $reset ) . '" title="' . esc_attr__( 'Reset filters', 'mac-members' ) . '">';
+			$output .= self::RESET_ICON . '<span class="mac-members-search__reset-text">' . esc_html__( 'Reset filters', 'mac-members' ) . '</span>';
+			$output .= '</a>';
 		}
 
 		$output .= '</span>';

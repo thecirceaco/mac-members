@@ -104,7 +104,11 @@ A form above the table narrows any view. It has no submit button:
 
 - **Role** lists the other roles the shown members hold, for example Officer or Trustee, without the four status roles and the hidden roles. It shows only when members hold such a role, and choosing a role reloads the table.
 - **Search** fills the rest of the row and matches members whose first name, last name, email, username or display name contains every word. A number also matches the user ID. The search runs by itself 400 ms after typing stops, once it has at least 3 characters, and emptying it shows everyone again; Enter runs it at any length, for example for a short user ID. The page reloads with the results, and the cursor stays at the end of the search. Letters typed while the page loads are kept, and the search runs again with them.
-- **Reset**, an icon button after the search, shows while a role or a search is set. It goes back to the same view and page size without them.
+- **Reset**, an icon button after the search, goes back to the same view and page size without the role and the search. It has no border and always shows, in the text color, and in the danger color while a role or a search is set.
+
+In a narrow form, under 30em as on phones, the role filter and the search each fill their own row, and Reset becomes a full-width ACSS danger button, "Reset filters", under the search, shown only while a role or a search is set.
+
+The chevrons of the selects and the reset icon are Streamline Ultimate icons, Arrow Down 1 and Button Refresh Arrow in their bold style, cleaned to fill with the current color: the chevron takes the select's text color.
 
 The role and the search are kept in the `mac_members_role` and `mac_members_search` query arguments. The status filters, their counts and the page links keep them.
 

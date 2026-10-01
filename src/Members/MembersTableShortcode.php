@@ -311,8 +311,8 @@ final class MembersTableShortcode implements Service
 
 	/**
 	 * The role and search form. It sends the page's other query arguments and the current view as hidden
-	 * fields, because a GET form replaces the query string of its action. While a role or a search is set, its
-	 * reset link shows the same view and page size without them.
+	 * fields, because a GET form replaces the query string of its action. Its reset link shows the same view and
+	 * page size without the role and the search.
 	 *
 	 * @param string|null          $view  The current view, or null when the shortcode fixes it.
 	 * @param array<string,string> $roles Roles the role filter offers, keyed by slug.
@@ -338,12 +338,8 @@ final class MembersTableShortcode implements Service
 			$hidden[ self::STATUS_QUERY_ARG ] = $view;
 		}
 
-		$reset = '';
-
-		if ( '' !== $role || '' !== $search ) {
-			$view_arg = null === $view ? array() : array( self::STATUS_QUERY_ARG => $view );
-			$reset    = \add_query_arg( $view_arg + array_diff_key( $kept, array_flip( array( self::ROLE_QUERY_ARG, self::SEARCH_QUERY_ARG ) ) ), $base_url );
-		}
+		$view_arg = null === $view ? array() : array( self::STATUS_QUERY_ARG => $view );
+		$reset    = \add_query_arg( $view_arg + array_diff_key( $kept, array_flip( array( self::ROLE_QUERY_ARG, self::SEARCH_QUERY_ARG ) ) ), $base_url );
 
 		return array(
 			'action' => $parts[0],
