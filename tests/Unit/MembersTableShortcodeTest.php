@@ -690,10 +690,9 @@ final class MembersTableShortcodeTest extends TestCase {
 
 		$output = $this->create_shortcode()->render();
 
-		// Without a role to offer, the form is the hidden fields, the search and the reset link. Enter sends it.
+		// Without a role to offer or a role or search set, the form is the hidden fields and the search. Enter sends it.
 		self::assertStringContainsString( '<form class="mac-members-search" id="mac-members-search-1" method="get" action="/" role="search" aria-label="Filter members"><input type="hidden" name="page_id" value="5"><input type="hidden" name="mac_members_status" value="denied"><span class="mac-members-search__query"><input class="mac-members-search__input" type="search"', $output );
-		self::assertStringContainsString( 'aria-label="Search members"><a class="mac-members-search__reset btn--danger btn--s" href="/?page_id=5&amp;mac_members_status=denied" title="Reset filters">', $output );
-		self::assertStringContainsString( '<span class="mac-members-search__reset-text">Reset filters</span></a></span></form>', $output );
+		self::assertStringContainsString( 'aria-label="Search members"></span></form>', $output );
 	}
 
 	public function test_reset_link_shows_the_view_and_page_size_without_the_role_and_the_search(): void {
@@ -718,11 +717,10 @@ final class MembersTableShortcodeTest extends TestCase {
 		$output = $this->create_shortcode()->render();
 
 		// It keeps the page's own arguments, the view and the page size, and drops the role, the search and the page.
-		// While a role or a search is set, it is active.
-		self::assertStringContainsString( '<a class="mac-members-search__reset btn--danger btn--s is-active" href="/?page_id=5&amp;mac_members_status=approved&amp;mac_members_per_page=48" title="Reset filters"><svg class="mac-members-search__reset-icon" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false">', $output );
-		// The search and the reset link wrap together, and the link's text names it where only its icon shows.
+		self::assertStringContainsString( '<a class="mac-members-search__reset btn--danger btn--s" href="/?page_id=5&amp;mac_members_status=approved&amp;mac_members_per_page=48"><svg class="mac-members-search__reset-icon" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false">', $output );
+		// The search and the reset link wrap together.
 		self::assertStringContainsString( 'aria-label="Search members"><a class="mac-members-search__reset', $output );
-		self::assertStringContainsString( '</svg><span class="mac-members-search__reset-text">Reset filters</span></a></span></form>', $output );
+		self::assertStringContainsString( '</svg>Reset filters</a></span></form>', $output );
 	}
 
 	public function test_reset_link_of_a_fixed_view_has_no_status(): void {
@@ -731,16 +729,15 @@ final class MembersTableShortcodeTest extends TestCase {
 
 		$output = $this->create_shortcode()->render( array( 'status' => 'approved' ) );
 
-		self::assertStringContainsString( '<a class="mac-members-search__reset btn--danger btn--s is-active" href="/members/" title="Reset filters">', $output );
+		self::assertStringContainsString( '<a class="mac-members-search__reset btn--danger btn--s" href="/members/">', $output );
 	}
 
-	public function test_reset_link_shows_without_a_role_or_a_search_but_is_not_active(): void {
+	public function test_no_reset_link_without_a_role_or_a_search(): void {
 		$_GET['mac_members_status'] = 'approved';
 
 		$output = $this->create_shortcode()->render();
 
-		self::assertStringContainsString( '<a class="mac-members-search__reset btn--danger btn--s" href="/?mac_members_status=approved" title="Reset filters">', $output );
-		self::assertStringNotContainsString( 'is-active', $output );
+		self::assertStringNotContainsString( 'mac-members-search__reset', $output );
 	}
 
 	public function test_fixed_view_form_has_no_status_field(): void {

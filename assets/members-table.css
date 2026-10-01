@@ -127,6 +127,7 @@
 	gap: 1ch;
 }
 
+/* No background image: Bricks draws its own arrow on every select with two gradients. */
 .mac-members-search__role,
 .mac-members-search__input {
 	padding-block: 0.5em;
@@ -134,6 +135,7 @@
 	border: var(--border);
 	border-radius: var(--radius);
 	background-color: var(--white);
+	background-image: none;
 	color: var(--text-dark);
 	font-family: var(--text-font-family);
 	font-size: var(--mac-members-size);
@@ -157,14 +159,9 @@
 	appearance: none;
 }
 
-/*
- * The reset link is an ACSS danger button. In a wide form it is a square icon button as tall as the search,
- * without a border, in the text color, and in the danger color while a role or a search is set. In a narrow
- * form it shows only then, as the danger button with its text, under the search.
- */
+/* The reset link is an ACSS danger button with an icon and its text, shown while a role or a search is set. */
 .mac-members-search__reset {
 	--btn-min-width: auto;
-	position: relative;
 	flex: none;
 	gap: 0.5em;
 }
@@ -172,38 +169,8 @@
 /* Streamline Ultimate's Button Refresh Arrow, bold, in the link's color. */
 .mac-members-search__reset-icon {
 	flex: none;
-	inline-size: 1.25em;
-	block-size: 1.25em;
-}
-
-@container (inline-size >= 30em) {
-	.mac-members-search__reset {
-		aspect-ratio: 1;
-		justify-content: center;
-		padding: 0;
-		border-color: transparent;
-		background: transparent;
-		color: var(--text-dark);
-	}
-
-	.mac-members-search__reset.is-active,
-	.mac-members-search__reset:hover,
-	.mac-members-search__reset:focus-visible {
-		color: var(--danger);
-	}
-
-	.mac-members-search__reset.is-active:hover {
-		color: var(--danger-hover);
-	}
-
-	.mac-members-search__reset-text {
-		position: absolute;
-		inline-size: 1px;
-		block-size: 1px;
-		overflow: hidden;
-		clip-path: inset(50%);
-		white-space: nowrap;
-	}
+	inline-size: 1em;
+	block-size: 1em;
 }
 
 /* A narrow form, as on phones, puts the role filter, the search and the reset link each on its own row. */
@@ -224,15 +191,6 @@
 	.mac-members-search__reset {
 		inline-size: 100%;
 		justify-content: center;
-	}
-
-	.mac-members-search__reset:not(.is-active) {
-		display: none;
-	}
-
-	.mac-members-search__reset-icon {
-		inline-size: 1em;
-		block-size: 1em;
 	}
 }
 
@@ -640,6 +598,7 @@ html:has(.mac-members-details:modal) {
 	border: var(--border);
 	border-radius: var(--radius);
 	background-color: var(--white);
+	background-image: none;
 	color: var(--text-dark);
 	font-family: var(--text-font-family);
 	font-size: var(--mac-members-size);

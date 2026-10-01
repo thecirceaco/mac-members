@@ -274,8 +274,7 @@ final class MembersTableRenderer
 	/**
 	 * A GET form without a submit button: the role filter, when members hold other roles, and the search. Enter
 	 * in the search sends the form, and the script sends it when the role changes and as the search is typed.
-	 * The reset link after the search shows the view without the role and the search; it is active while one of
-	 * them is set.
+	 * While a role or a search is set, a reset link after the search shows the view without them.
 	 *
 	 * @param array{action?:string,hidden?:array<string,string>,roles?:array<string,string>,role?:string,search?:string,reset?:string} $form Role and search form.
 	 */
@@ -310,11 +309,8 @@ final class MembersTableRenderer
 		$output .= '<span class="mac-members-search__query">';
 		$output .= '<input class="mac-members-search__input" type="search" name="' . esc_attr( MembersTableShortcode::SEARCH_QUERY_ARG ) . '" value="' . esc_attr( $search ) . '" maxlength="' . esc_attr( (string) MembersQuery::SEARCH_MAX_LENGTH ) . '" placeholder="' . esc_attr__( 'Search by name, email or username', 'mac-members' ) . '" aria-label="' . esc_attr__( 'Search members', 'mac-members' ) . '">';
 
-		if ( '' !== $reset ) {
-			$active  = '' !== $role || '' !== $search;
-			$output .= '<a class="mac-members-search__reset btn--danger btn--s' . ( $active ? ' is-active' : '' ) . '" href="' . esc_url( $reset ) . '" title="' . esc_attr__( 'Reset filters', 'mac-members' ) . '">';
-			$output .= self::RESET_ICON . '<span class="mac-members-search__reset-text">' . esc_html__( 'Reset filters', 'mac-members' ) . '</span>';
-			$output .= '</a>';
+		if ( '' !== $reset && ( '' !== $role || '' !== $search ) ) {
+			$output .= '<a class="mac-members-search__reset btn--danger btn--s" href="' . esc_url( $reset ) . '">' . self::RESET_ICON . esc_html__( 'Reset filters', 'mac-members' ) . '</a>';
 		}
 
 		$output .= '</span>';

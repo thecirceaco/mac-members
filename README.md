@@ -104,9 +104,9 @@ A form above the table narrows any view. It has no submit button:
 
 - **Role** lists the other roles the shown members hold, for example Officer or Trustee, without the four status roles and the hidden roles. It shows only when members hold such a role, and choosing a role reloads the table.
 - **Search** fills the rest of the row and matches members whose first name, last name, email, username or display name contains every word. A number also matches the user ID. The search runs by itself 400 ms after typing stops, once it has at least 3 characters, and emptying it shows everyone again; Enter runs it at any length, for example for a short user ID. The page reloads with the results, and the cursor stays at the end of the search. Letters typed while the page loads are kept, and the search runs again with them.
-- **Reset**, an icon button after the search, goes back to the same view and page size without the role and the search. It has no border and always shows, in the text color, and in the danger color while a role or a search is set.
+- **Reset filters**, an ACSS danger button with an icon after the search, shows while a role or a search is set. It goes back to the same view and page size without them.
 
-In a narrow form, under 30em as on phones, the role filter and the search each fill their own row, and Reset becomes a full-width ACSS danger button, "Reset filters", under the search, shown only while a role or a search is set.
+In a narrow form, under 30em as on phones, the role filter, the search and Reset filters each fill their own row.
 
 The chevrons of the selects and the reset icon are Streamline Ultimate icons, Arrow Down 1 and Button Refresh Arrow in their bold style, cleaned to fill with the current color: the chevron takes the select's text color.
 
@@ -114,7 +114,7 @@ The role and the search are kept in the `mac_members_role` and `mac_members_sear
 
 ACSS keeps its `btn--` classes in a cascade layer, while its reset `input, button, textarea, select { font: inherit; }` is outside any layer, so on a `<button>` the reset wins and the button loses the ACSS button font. The table's buttons use `revert-layer` for their background, border, color and font, so the ACSS button styles apply, hover included.
 
-Bricks styles every form element on the page: its base CSS makes each `label` light gray with 5px under it, and each `input` 100% wide. The column checkboxes and "Per page" keep the text color and no margin, and the search sizes itself with a flex basis, so on Bricks sites the table looks as it does on Etch. Checked on 2026-10-01 with Bricks 2.4.2 and the Bricks starter's ACSS.
+Bricks styles every form element on the page: its base CSS makes each `label` light gray with 5px under it, each `input` 100% wide, and draws its own arrow on each `select` with two background gradients. The column checkboxes and "Per page" keep the text color and no margin, the search sizes itself with a flex basis, and the selects have no background image, so on Bricks sites the table looks as it does on Etch. Checked on 2026-10-02 with Bricks 2.4.2 and the Bricks starter's ACSS, by comparing every computed style of the table, its form and its dialog with and without the Bricks stylesheet, on desktop and phone widths; what remains differs only where it shows nothing, such as border colors on elements without a border.
 
 After a change, a row that no longer belongs in a filtered view disappears, and in the All view the row shows its new status and buttons. The filter counts and the range follow the changes. When the last row of a page goes and members are left on other pages, the page loads again to show them.
 
